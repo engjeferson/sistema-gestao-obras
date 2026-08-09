@@ -7,21 +7,26 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createStockSaida } from "@/server/actions/estoque";
 
+type StageOption = { id: string; codigo: string | null; nome: string };
+
 export function StockSaidaForm({
   materials,
   works,
   balances,
+  stagesByWork,
   defaultWorkId,
 }: {
   materials: { id: string; nome: string }[];
   works: { id: string; nome: string; codigo: string }[];
-  balances: Record<string, Record<string, number>>;
+  balances: Record<string, Record<string, { saldo: number; custoMedio: number }>>;
+  stagesByWork: Record<string, StageOption[]>;
   defaultWorkId?: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(createStockSaida, undefined);
   const [origemWorkId, setOrigemWorkId] = useState(defaultWorkId ?? "");
   const [materialId, setMaterialId] = useState("");
-  const saldoAtual = balances[origemWorkId || "geral"]?.[materialId] ?? 0;
+  const saldoAtual = balances[origemWorkId || "geral"]?.[materialId]?.saldo ?? 0;
+  const stagesForWork = stagesByWork[origemWorkId] ?? [];
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -64,6 +69,20 @@ export function StockSaidaForm({
             ))}
           </NativeSelect>
         </div>
+        {origemWorkId ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="stageId">Etapa</Label>
+            <NativeSelect id="stageId" name="stageId" defaultValue="" key={origemWorkId}>
+              <option value="">—</option>
+              {stagesForWork.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.codigo ? `${stage.codigo} — ` : ""}
+                  {stage.nome}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="quantidade">Quantidade</Label>
           <Input id="quantidade" name="quantidade" type="number" step="0.001" min="0.001" required />

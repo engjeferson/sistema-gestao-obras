@@ -3,6 +3,7 @@ import { z } from "zod";
 export const stockEntradaSchema = z.object({
   materialId: z.string().min(1, "Selecione o material."),
   destinoWorkId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
   quantidade: z.coerce.number().positive("Informe uma quantidade maior que zero."),
   valorUnitario: z.coerce.number().nonnegative().optional(),
   data: z.string().min(1, "Informe a data."),
@@ -12,6 +13,7 @@ export const stockEntradaSchema = z.object({
 export const stockSaidaSchema = z.object({
   materialId: z.string().min(1, "Selecione o material."),
   origemWorkId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
   quantidade: z.coerce.number().positive("Informe uma quantidade maior que zero."),
   valorUnitario: z.coerce.number().nonnegative().optional(),
   data: z.string().min(1, "Informe a data."),
@@ -21,13 +23,13 @@ export const stockSaidaSchema = z.object({
 export const stockTransferItemSchema = z.object({
   materialId: z.string().min(1, "Selecione o material."),
   quantidade: z.coerce.number().positive("Informe uma quantidade maior que zero."),
-  valorUnitario: z.coerce.number().nonnegative().optional(),
 });
 
 export const stockTransferenciaSchema = z
   .object({
     origemWorkId: z.string().optional().or(z.literal("").transform(() => undefined)),
     destinoWorkId: z.string().optional().or(z.literal("").transform(() => undefined)),
+    stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
     data: z.string().min(1, "Informe a data."),
     motivo: z.string().trim().optional(),
     itens: z.array(stockTransferItemSchema).min(1, "Adicione ao menos um item para transferir."),

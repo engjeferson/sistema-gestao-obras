@@ -24,6 +24,7 @@ type MovementRow = {
   material: { nome: string };
   origemWork: { nome: string; codigo: string } | null;
   destinoWork: { nome: string; codigo: string } | null;
+  stage: { nome: string; codigo: string | null } | null;
   createdBy: { name: string };
 };
 
@@ -31,7 +32,13 @@ function localLabel(work: { nome: string; codigo: string } | null) {
   return work ? `${work.codigo} — ${work.nome}` : "Estoque Geral";
 }
 
-export function StockMovementsTable({ movements }: { movements: MovementRow[] }) {
+export function StockMovementsTable({
+  movements,
+  showMaterialColumn = true,
+}: {
+  movements: MovementRow[];
+  showMaterialColumn?: boolean;
+}) {
   if (movements.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -47,9 +54,10 @@ export function StockMovementsTable({ movements }: { movements: MovementRow[] })
           <TableRow>
             <TableHead>Data</TableHead>
             <TableHead>Tipo</TableHead>
-            <TableHead>Material</TableHead>
+            {showMaterialColumn ? <TableHead>Material</TableHead> : null}
             <TableHead>Origem</TableHead>
             <TableHead>Destino</TableHead>
+            <TableHead>Etapa</TableHead>
             <TableHead>Quantidade</TableHead>
             <TableHead>Valor</TableHead>
             <TableHead>Motivo</TableHead>
@@ -63,9 +71,12 @@ export function StockMovementsTable({ movements }: { movements: MovementRow[] })
               <TableCell>
                 <Badge variant={TIPO_BADGE[m.tipo]}>{TIPO_LABELS[m.tipo]}</Badge>
               </TableCell>
-              <TableCell className="font-medium">{m.material.nome}</TableCell>
+              {showMaterialColumn ? <TableCell className="font-medium">{m.material.nome}</TableCell> : null}
               <TableCell>{m.tipo === "ENTRADA" ? "—" : localLabel(m.origemWork)}</TableCell>
               <TableCell>{m.tipo === "SAIDA" ? "—" : localLabel(m.destinoWork)}</TableCell>
+              <TableCell>
+                {m.stage ? (m.stage.codigo ? `${m.stage.codigo} — ${m.stage.nome}` : m.stage.nome) : "—"}
+              </TableCell>
               <TableCell>{m.quantidade}</TableCell>
               <TableCell>
                 {m.valorUnitario !== null ? formatCurrencyBRL(m.valorUnitario * m.quantidade) : "—"}

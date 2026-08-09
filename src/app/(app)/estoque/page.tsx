@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Wallet, Package } from "lucide-react";
 import { getStockBalances, listStockMovements } from "@/server/actions/estoque";
 import { listWorks } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
+import { KpiCard } from "@/components/dashboard/kpi-card";
 import { StockLocationFilter } from "@/components/estoque/stock-location-filter";
 import { StockBalanceTable } from "@/components/estoque/stock-balance-table";
 import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 
 export default async function EstoquePage({
   searchParams,
@@ -26,6 +28,7 @@ export default async function EstoquePage({
     quantidade: Number(m.quantidade),
     valorUnitario: m.valorUnitario !== null ? Number(m.valorUnitario) : null,
   }));
+  const valorTotalEstoque = balances.reduce((sum, b) => sum + b.valorTotal, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,6 +56,11 @@ export default async function EstoquePage({
       </div>
 
       <StockLocationFilter works={worksOptions} selected={workId ?? ""} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <KpiCard icon={Wallet} label="Valor total em estoque neste local" value={formatCurrencyBRL(valorTotalEstoque)} />
+        <KpiCard icon={Package} label="Materiais com saldo neste local" value={String(balances.length)} />
+      </div>
 
       <div className="flex flex-col gap-2">
         <h2 className="font-medium">Saldo atual</h2>

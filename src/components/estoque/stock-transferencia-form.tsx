@@ -9,21 +9,27 @@ import { StockTransferItemsEditor } from "@/components/estoque/stock-transfer-it
 import { createStockTransferencia } from "@/server/actions/estoque";
 import type { StockTransferItemValues } from "@/lib/validations/estoque";
 
+type StageOption = { id: string; codigo: string | null; nome: string };
+
 export function StockTransferenciaForm({
   materials,
   works,
   balances,
+  stagesByWork,
   defaultOrigemWorkId,
 }: {
   materials: { id: string; nome: string }[];
   works: { id: string; nome: string; codigo: string }[];
-  balances: Record<string, Record<string, number>>;
+  balances: Record<string, Record<string, { saldo: number; custoMedio: number }>>;
+  stagesByWork: Record<string, StageOption[]>;
   defaultOrigemWorkId?: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(createStockTransferencia, undefined);
   const [origemWorkId, setOrigemWorkId] = useState(defaultOrigemWorkId ?? "");
-  const [items, setItems] = useState<StockTransferItemValues[]>([{ materialId: "", quantidade: 1, valorUnitario: 0 }]);
+  const [destinoWorkId, setDestinoWorkId] = useState("");
+  const [items, setItems] = useState<StockTransferItemValues[]>([{ materialId: "", quantidade: 1 }]);
   const saldosOrigem = balances[origemWorkId || "geral"] ?? {};
+  const stagesForWork = stagesByWork[destinoWorkId] ?? [];
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -48,7 +54,12 @@ export function StockTransferenciaForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="destinoWorkId">Destino</Label>
-          <NativeSelect id="destinoWorkId" name="destinoWorkId" defaultValue="">
+          <NativeSelect
+            id="destinoWorkId"
+            name="destinoWorkId"
+            value={destinoWorkId}
+            onChange={(e) => setDestinoWorkId(e.target.value)}
+          >
             <option value="">Estoque Geral</option>
             {works.map((work) => (
               <option key={work.id} value={work.id}>
@@ -57,6 +68,20 @@ export function StockTransferenciaForm({
             ))}
           </NativeSelect>
         </div>
+        {destinoWorkId ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="stageId">Etapa</Label>
+            <NativeSelect id="stageId" name="stageId" defaultValue="" key={destinoWorkId}>
+              <option value="">—</option>
+              {stagesForWork.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.codigo ? `${stage.codigo} — ` : ""}
+                  {stage.nome}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="data">Data</Label>
           <Input id="data" name="data" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
@@ -71,7 +96,8 @@ export function StockTransferenciaForm({
         <Label>Itens a transferir</Label>
         <StockTransferItemsEditor items={items} onChange={setItems} materials={materials} saldosOrigem={saldosOrigem} />
         <p className="text-xs text-muted-foreground">
-          O custo dos itens transferidos (quantidade × valor unitário) é atribuído à obra de destino.
+          O custo transferido é o custo médio já registrado na origem — não é preciso informar valor de novo. Esse
+          valor é atribuído à obra de destino.
         </p>
       </div>
 

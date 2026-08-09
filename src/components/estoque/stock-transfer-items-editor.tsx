@@ -4,6 +4,7 @@ import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { StockTransferItemValues } from "@/lib/validations/estoque";
 
 type MaterialOption = { id: string; nome: string };
@@ -17,14 +18,14 @@ export function StockTransferItemsEditor({
   items: StockTransferItemValues[];
   onChange: (items: StockTransferItemValues[]) => void;
   materials: MaterialOption[];
-  saldosOrigem: Record<string, number>;
+  saldosOrigem: Record<string, { saldo: number; custoMedio: number }>;
 }) {
   function updateItem(index: number, patch: Partial<StockTransferItemValues>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
 
   function addItem() {
-    onChange([...items, { materialId: "", quantidade: 1, valorUnitario: 0 }]);
+    onChange([...items, { materialId: "", quantidade: 1 }]);
   }
 
   function removeItem(index: number) {
@@ -39,15 +40,15 @@ export function StockTransferItemsEditor({
             <tr>
               <th className="p-2 font-medium">Material</th>
               <th className="p-2 font-medium">Saldo na origem</th>
+              <th className="p-2 font-medium">Custo médio</th>
               <th className="p-2 font-medium">Quantidade</th>
-              <th className="p-2 font-medium">Valor unitário</th>
               <th className="p-2" />
             </tr>
           </thead>
           <tbody>
             {items.map((item, index) => {
-              const saldo = saldosOrigem[item.materialId] ?? 0;
-              const excedeSaldo = item.materialId && item.quantidade > saldo;
+              const info = saldosOrigem[item.materialId] ?? { saldo: 0, custoMedio: 0 };
+              const excedeSaldo = item.materialId && item.quantidade > info.saldo;
               return (
                 <tr key={index} className="border-t">
                   <td className="p-2">
@@ -67,7 +68,10 @@ export function StockTransferItemsEditor({
                     </NativeSelect>
                   </td>
                   <td className={`p-2 whitespace-nowrap ${excedeSaldo ? "text-destructive" : "text-muted-foreground"}`}>
-                    {item.materialId ? saldo : "—"}
+                    {item.materialId ? info.saldo : "—"}
+                  </td>
+                  <td className="p-2 whitespace-nowrap text-muted-foreground">
+                    {item.materialId ? formatCurrencyBRL(info.custoMedio) : "—"}
                   </td>
                   <td className="p-2">
                     <Input
@@ -78,16 +82,6 @@ export function StockTransferItemsEditor({
                       onChange={(e) => updateItem(index, { quantidade: Number(e.target.value) })}
                       className="w-28"
                       required
-                    />
-                  </td>
-                  <td className="p-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.valorUnitario ?? 0}
-                      onChange={(e) => updateItem(index, { valorUnitario: Number(e.target.value) })}
-                      className="w-28"
                     />
                   </td>
                   <td className="p-2">

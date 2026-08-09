@@ -20,3 +20,39 @@ export function computeSaldo(movements: StockMovementForBalance[], workId: strin
     return saldo;
   }, 0);
 }
+
+export type StockMovementForValuation = StockMovementForBalance & {
+  valorUnitario: number | null;
+  data: Date;
+  createdAt: Date;
+};
+
+/**
+ * Custo médio ponderado: cada saída consome ao custo médio corrente do local,
+ * então o valor do saldo reflete o que realmente está parado ali.
+ */
+export function computeSaldoComValor(movements: StockMovementForValuation[], workId: string | null) {
+  const relevantes = movements
+    .filter((m) => sameLocal(m.destinoWorkId, workId) || sameLocal(m.origemWorkId, workId))
+    .sort((a, b) => a.data.getTime() - b.data.getTime() || a.createdAt.getTime() - b.createdAt.getTime());
+
+  let quantidade = 0;
+  let valorTotal = 0;
+
+  for (const m of relevantes) {
+    const entrouAqui = (m.tipo === "ENTRADA" || m.tipo === "TRANSFERENCIA") && sameLocal(m.destinoWorkId, workId);
+    const saiuAqui = (m.tipo === "SAIDA" || m.tipo === "TRANSFERENCIA") && sameLocal(m.origemWorkId, workId);
+
+    if (entrouAqui) {
+      quantidade += m.quantidade;
+      valorTotal += m.quantidade * (m.valorUnitario ?? 0);
+    }
+    if (saiuAqui) {
+      const custoMedio = quantidade > 0 ? valorTotal / quantidade : 0;
+      valorTotal -= m.quantidade * custoMedio;
+      quantidade -= m.quantidade;
+    }
+  }
+
+  return { quantidade, valorTotal: Math.max(0, valorTotal) };
+}

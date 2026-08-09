@@ -68,6 +68,7 @@ export async function createInvoiceWithFinancialEntry(
           materialId,
           tipo: "ENTRADA",
           destinoWorkId: data.workId,
+          stageId,
           quantidade: item.quantidade,
           valorUnitario: item.valorUnitario,
           data: new Date(data.dataEmissao),

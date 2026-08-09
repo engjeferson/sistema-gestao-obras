@@ -1,5 +1,6 @@
 import { listActiveMaterials } from "@/server/actions/materiais";
 import { listWorks } from "@/server/actions/obras";
+import { listStagesForAllWorks } from "@/server/actions/planejamento";
 import { StockEntradaForm } from "@/components/estoque/stock-entrada-form";
 
 export default async function NovaEntradaPage({
@@ -8,7 +9,11 @@ export default async function NovaEntradaPage({
   searchParams: Promise<{ local?: string }>;
 }) {
   const { local } = await searchParams;
-  const [materials, works] = await Promise.all([listActiveMaterials(), listWorks()]);
+  const [materials, works, stagesByWork] = await Promise.all([
+    listActiveMaterials(),
+    listWorks(),
+    listStagesForAllWorks(),
+  ]);
   const materialsOptions = materials.map((m) => ({ id: m.id, nome: m.nome }));
   const worksOptions = works.map((w) => ({ id: w.id, nome: w.nome, codigo: w.codigo }));
 
@@ -17,7 +22,12 @@ export default async function NovaEntradaPage({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Nova entrada de estoque</h1>
       </div>
-      <StockEntradaForm materials={materialsOptions} works={worksOptions} defaultWorkId={local} />
+      <StockEntradaForm
+        materials={materialsOptions}
+        works={worksOptions}
+        stagesByWork={stagesByWork}
+        defaultWorkId={local}
+      />
     </div>
   );
 }

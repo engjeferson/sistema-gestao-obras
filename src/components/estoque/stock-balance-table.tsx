@@ -1,11 +1,13 @@
+import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UNIT_LABELS } from "@/lib/status-labels";
+import { UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 
 type BalanceRow = {
   materialId: string;
   materialNome: string;
   unidade: string | null;
   saldo: number;
+  valorTotal: number;
 };
 
 export function StockBalanceTable({ balances }: { balances: BalanceRow[] }) {
@@ -25,14 +27,23 @@ export function StockBalanceTable({ balances }: { balances: BalanceRow[] }) {
             <TableHead>Material</TableHead>
             <TableHead>Unidade</TableHead>
             <TableHead>Saldo</TableHead>
+            <TableHead>Valor</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {balances.map((row) => (
             <TableRow key={row.materialId}>
-              <TableCell className="font-medium">{row.materialNome}</TableCell>
+              <TableCell className="font-medium">
+                <Link
+                  href={`/estoque/material/${row.materialId}`}
+                  className="hover:text-primary hover:underline"
+                >
+                  {row.materialNome}
+                </Link>
+              </TableCell>
               <TableCell>{row.unidade ? UNIT_LABELS[row.unidade] : "—"}</TableCell>
               <TableCell className={row.saldo < 0 ? "text-destructive" : ""}>{row.saldo}</TableCell>
+              <TableCell>{formatCurrencyBRL(row.valorTotal)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
