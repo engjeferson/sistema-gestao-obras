@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 
-type BalanceRow = {
+export type BalanceRow = {
   materialId: string;
   materialNome: string;
   unidade: string | null;

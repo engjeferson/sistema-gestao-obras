@@ -5,7 +5,7 @@ import { listWorks } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { StockLocationFilter } from "@/components/estoque/stock-location-filter";
-import { StockBalanceTable } from "@/components/estoque/stock-balance-table";
+import { StockBalanceSearch } from "@/components/estoque/stock-balance-search";
 import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 
@@ -64,7 +64,7 @@ export default async function EstoquePage({
 
       <div className="flex flex-col gap-2">
         <h2 className="font-medium">Saldo atual</h2>
-        <StockBalanceTable balances={balances} />
+        <StockBalanceSearch balances={balances} />
       </div>
 
       <div className="flex flex-col gap-2">
