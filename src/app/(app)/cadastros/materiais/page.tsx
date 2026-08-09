@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listMaterials } from "@/server/actions/materiais";
 import { Button } from "@/components/ui/button";
-import { MaterialsTable } from "@/components/cadastros/materials-table";
+import { MaterialsSearchList } from "@/components/cadastros/materials-search-list";
 
 export default async function MateriaisPage() {
   const materials = await listMaterials();
@@ -14,7 +14,7 @@ export default async function MateriaisPage() {
           <Plus /> Novo material
         </Button>
       </div>
-      <MaterialsTable materials={materials} />
+      <MaterialsSearchList materials={materials} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listProfessionals } from "@/server/actions/profissionais";
 import { Button } from "@/components/ui/button";
-import { ProfessionalsTable } from "@/components/cadastros/professionals-table";
+import { ProfessionalsSearchList } from "@/components/cadastros/professionals-search-list";
 
 export default async function ProfissionaisPage() {
   const professionals = await listProfessionals();
@@ -14,7 +14,7 @@ export default async function ProfissionaisPage() {
           <Plus /> Novo profissional
         </Button>
       </div>
-      <ProfessionalsTable professionals={professionals} />
+      <ProfessionalsSearchList professionals={professionals} />
     </div>
   );
 }

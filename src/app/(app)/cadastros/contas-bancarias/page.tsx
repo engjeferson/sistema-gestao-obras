@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listBankAccounts } from "@/server/actions/contas-bancarias";
 import { Button } from "@/components/ui/button";
-import { BankAccountsTable } from "@/components/cadastros/bank-accounts-table";
+import { BankAccountsSearchList } from "@/components/cadastros/bank-accounts-search-list";
 
 export default async function ContasBancariasPage() {
   const bankAccounts = await listBankAccounts();
@@ -14,7 +14,7 @@ export default async function ContasBancariasPage() {
           <Plus /> Nova conta
         </Button>
       </div>
-      <BankAccountsTable bankAccounts={bankAccounts} />
+      <BankAccountsSearchList bankAccounts={bankAccounts} />
     </div>
   );
 }

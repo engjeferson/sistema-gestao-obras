@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { Button } from "@/components/ui/button";
-import { SuppliersTable } from "@/components/cadastros/suppliers-table";
+import { SuppliersSearchList } from "@/components/cadastros/suppliers-search-list";
 
 export default async function FornecedoresPage() {
   const suppliers = await listSuppliers();
@@ -22,7 +22,7 @@ export default async function FornecedoresPage() {
           <Plus /> Novo fornecedor
         </Button>
       </div>
-      <SuppliersTable suppliers={suppliers} />
+      <SuppliersSearchList suppliers={suppliers} />
     </div>
   );
 }

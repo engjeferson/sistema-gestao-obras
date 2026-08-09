@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listClients } from "@/server/actions/clientes";
 import { Button } from "@/components/ui/button";
-import { ClientsTable } from "@/components/cadastros/clients-table";
+import { ClientsSearchList } from "@/components/cadastros/clients-search-list";
 
 export default async function ClientesPage() {
   const clients = await listClients();
@@ -14,7 +14,7 @@ export default async function ClientesPage() {
           <Plus /> Novo cliente
         </Button>
       </div>
-      <ClientsTable clients={clients} />
+      <ClientsSearchList clients={clients} />
     </div>
   );
 }
