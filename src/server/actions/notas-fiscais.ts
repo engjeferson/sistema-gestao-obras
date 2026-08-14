@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
+import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
 
 const PAGE_SIZE = 20;
 
@@ -99,8 +100,13 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
 
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
   const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
+  const radarId = (formData.get("radarId") as string) || null;
 
-  await createInvoiceWithFinancialEntry(data, session.user.id, arquivoUrl, arquivoXmlUrl);
+  const { invoice } = await createInvoiceWithFinancialEntry(data, session.user.id, arquivoUrl, arquivoXmlUrl);
+
+  if (radarId) {
+    await markIncomingNFeLancada(radarId, invoice.id);
+  }
 
   revalidatePath("/notas-fiscais");
   revalidatePath("/estoque");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ type InvoiceFormProps = {
   supplierNames: string[];
   materials: { nome: string; unidadePadrao: string | null }[];
   defaultWorkId?: string;
+  initialXml?: string;
+  radarId?: string;
 };
 
 export function InvoiceForm({
@@ -36,6 +38,8 @@ export function InvoiceForm({
   supplierNames,
   materials,
   defaultWorkId,
+  initialXml,
+  radarId,
 }: InvoiceFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [items, setItems] = useState<InvoiceItemValues[]>([
@@ -56,31 +60,47 @@ export function InvoiceForm({
   const [uploadingXml, setUploadingXml] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
+  function applyParsedXml(text: string) {
+    const parsed = parseNFeXml(text);
+
+    if (parsed.numero) {
+      const numeroInput = document.getElementById("numero") as HTMLInputElement | null;
+      if (numeroInput) numeroInput.value = parsed.numero;
+    }
+    if (parsed.dataEmissao) {
+      const dataInput = document.getElementById("dataEmissao") as HTMLInputElement | null;
+      if (dataInput) dataInput.value = parsed.dataEmissao;
+    }
+    if (parsed.fornecedorNome) {
+      const supplierInput = document.getElementById("supplierNome") as HTMLInputElement | null;
+      if (supplierInput) supplierInput.value = parsed.fornecedorNome;
+    }
+    if (parsed.items.length > 0) {
+      setItems(parsed.items);
+    }
+    toast.success(
+      `XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}.`,
+    );
+  }
+
   async function handleXmlImport(file: File) {
     try {
       const text = await file.text();
-      const parsed = parseNFeXml(text);
-
-      if (parsed.numero) {
-        const numeroInput = document.getElementById("numero") as HTMLInputElement | null;
-        if (numeroInput) numeroInput.value = parsed.numero;
-      }
-      if (parsed.dataEmissao) {
-        const dataInput = document.getElementById("dataEmissao") as HTMLInputElement | null;
-        if (dataInput) dataInput.value = parsed.dataEmissao;
-      }
-      if (parsed.fornecedorNome) {
-        const supplierInput = document.getElementById("supplierNome") as HTMLInputElement | null;
-        if (supplierInput) supplierInput.value = parsed.fornecedorNome;
-      }
-      if (parsed.items.length > 0) {
-        setItems(parsed.items);
-      }
-      toast.success(`XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}.`);
+      applyParsedXml(text);
     } catch {
       toast.error("Não foi possível ler este XML como uma NF-e. Confira o arquivo ou preencha manualmente.");
     }
   }
+
+  useEffect(() => {
+    if (!initialXml) return;
+    try {
+      applyParsedXml(initialXml);
+    } catch {
+      toast.error("Não foi possível ler o XML desta nota. Preencha manualmente.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialXml]);
 
   async function handleFileChange(
     file: File | undefined,
@@ -112,6 +132,7 @@ export function InvoiceForm({
       <input type="hidden" name="parcelasJson" value={JSON.stringify(parcelas)} readOnly />
       <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
       <input type="hidden" name="arquivoXmlUrl" value={arquivoXmlUrl ?? ""} readOnly />
+      <input type="hidden" name="radarId" value={radarId ?? ""} readOnly />
 
       <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
         <Label htmlFor="arquivoXml">Importar XML da NF (opcional)</Label>

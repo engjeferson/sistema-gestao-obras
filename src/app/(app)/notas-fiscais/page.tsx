@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Radar } from "lucide-react";
 import { listInvoices } from "@/server/actions/notas-fiscais";
+import { listIncomingNFes } from "@/server/actions/sefaz-radar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { InvoicesTable } from "@/components/notas-fiscais/invoices-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 
@@ -12,7 +14,8 @@ export default async function NotasFiscaisPage({
 }) {
   const { page: pageParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
-  const result = await listInvoices(undefined, page);
+  const [result, incomingNFes] = await Promise.all([listInvoices(undefined, page), listIncomingNFes()]);
+  const pendentesRadar = incomingNFes.filter((item) => item.status === "PENDENTE").length;
   const invoices = result.items.map((invoice) => ({
     id: invoice.id,
     workId: invoice.workId,
@@ -31,9 +34,15 @@ export default async function NotasFiscaisPage({
           <h1 className="text-2xl font-semibold tracking-tight">Notas Fiscais</h1>
           <p className="text-muted-foreground">Compras e materiais lançados em todas as obras.</p>
         </div>
-        <Button render={<Link href="/notas-fiscais/nova" />} nativeButton={false}>
-          <Plus /> Nova nota fiscal
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" render={<Link href="/notas-fiscais/radar" />} nativeButton={false}>
+            <Radar /> Radar de NF-e
+            {pendentesRadar > 0 ? <Badge variant="warning">{pendentesRadar}</Badge> : null}
+          </Button>
+          <Button render={<Link href="/notas-fiscais/nova" />} nativeButton={false}>
+            <Plus /> Nova nota fiscal
+          </Button>
+        </div>
       </div>
 
       <InvoicesTable invoices={invoices} />

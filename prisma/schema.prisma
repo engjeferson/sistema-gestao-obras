@@ -133,13 +133,43 @@ model User {
 }
 
 model CompanySettings {
-  id        String   @id @default(cuid())
-  nome      String
-  cnpj      String?
-  endereco  String?
-  telefone  String?
-  logoUrl   String?
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  nome                  String
+  cnpj                  String?
+  uf                    String?
+  endereco              String?
+  telefone              String?
+  logoUrl               String?
+  sefazUltimoNsu        String?
+  updatedAt             DateTime @updatedAt
+}
+
+enum IncomingNFeStatus {
+  PENDENTE
+  LANCADA
+  IGNORADA
+}
+
+model IncomingNFe {
+  id           String            @id @default(cuid())
+  chaveAcesso  String            @unique
+  nsu          String
+  emitenteCnpj String?
+  emitenteNome String?
+  numero       String?
+  serie        String?
+  dataEmissao  DateTime?         @db.Date
+  valorTotal   Decimal?          @db.Decimal(14, 2)
+  status       IncomingNFeStatus @default(PENDENTE)
+  xmlCompleto  String?           @db.Text
+  invoiceId    String?           @unique
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([status])
+  @@index([emitenteCnpj])
 }
 
 model Client {
@@ -330,6 +360,7 @@ model Invoice {
   categoria            FinancialCategory     @relation(fields: [categoriaId], references: [id])
   items                InvoiceItem[]
   financialTransactions FinancialTransaction[]
+  incomingNFe          IncomingNFe?
 
   @@index([workId])
   @@index([stageId])
