@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteInvoice } from "@/server/actions/notas-fiscais";
@@ -96,7 +97,20 @@ export function InvoicesTable({
               <TableCell>{formatDateBR(invoice.dataEmissao)}</TableCell>
               <TableCell>{formatCurrencyBRL(invoice.valorTotal)}</TableCell>
               <TableCell className="text-right">
-                <DeleteInvoiceButton invoiceId={invoice.id} workId={invoice.workId} />
+                <div className="flex justify-end gap-2">
+                  {showObraColumn ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={<Link href={invoice.workId ? `/obras/${invoice.workId}/materiais` : "/estoque"} />}
+                      nativeButton={false}
+                      title={invoice.work ? `${invoice.work.codigo} — ${invoice.work.nome}` : "Estoque Geral"}
+                    >
+                      <ExternalLink /> {invoice.workId ? "Ver na obra" : "Ver estoque"}
+                    </Button>
+                  ) : null}
+                  <DeleteInvoiceButton invoiceId={invoice.id} workId={invoice.workId} />
+                </div>
               </TableCell>
             </TableRow>
           ))}
