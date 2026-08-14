@@ -115,6 +115,26 @@ export function NFePdfDocument({ nfe }: { nfe: NFeCompleta }) {
           </View>
         </View>
 
+        {nfe.duplicatas.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Fatura / Boletos (duplicatas)</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.colNome}>Parcela</Text>
+                <Text style={styles.colSmall}>Vencimento</Text>
+                <Text style={styles.colSmall}>Valor</Text>
+              </View>
+              {nfe.duplicatas.map((dup, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={styles.colNome}>{dup.numero ?? index + 1}</Text>
+                  <Text style={styles.colSmall}>{dup.vencimento ? formatDateBR(new Date(dup.vencimento)) : "—"}</Text>
+                  <Text style={styles.colSmall}>{formatCurrencyBRL(dup.valor)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.totaisBox}>
           {nfe.valorProdutos !== null ? (
             <View style={styles.row}>

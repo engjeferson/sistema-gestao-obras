@@ -28,6 +28,12 @@ export type NFeItem = {
   valorTotal: number;
 };
 
+export type NFeDuplicata = {
+  numero: string | null;
+  vencimento: string | null;
+  valor: number;
+};
+
 export type NFeCompleta = {
   chaveAcesso: string | null;
   numero: string | null;
@@ -43,6 +49,7 @@ export type NFeCompleta = {
   valorFrete: number | null;
   valorDesconto: number | null;
   valorTotal: number | null;
+  duplicatas: NFeDuplicata[];
 };
 
 function tag(xml: string, name: string): string | null {
@@ -90,6 +97,16 @@ export function parseNFeCompleta(xml: string): NFeCompleta {
   const dest = section(xml, "dest");
   const total = section(section(xml, "total"), "ICMSTot");
   const infProt = section(xml, "infProt");
+  const cobr = section(xml, "cobr");
+
+  const duplicatas: NFeDuplicata[] = Array.from(cobr.matchAll(/<dup[^>]*>([\s\S]*?)<\/dup>/g)).map((match) => {
+    const dup = match[1];
+    return {
+      numero: tag(dup, "nDup"),
+      vencimento: tag(dup, "dVenc"),
+      valor: num(tag(dup, "vDup")) ?? 0,
+    };
+  });
 
   const items: NFeItem[] = Array.from(xml.matchAll(/<det[^>]*>([\s\S]*?)<\/det>/g)).map((match) => {
     const det = match[1];
@@ -121,5 +138,6 @@ export function parseNFeCompleta(xml: string): NFeCompleta {
     valorFrete: num(tag(total, "vFrete")),
     valorDesconto: num(tag(total, "vDesc")),
     valorTotal: num(tag(total, "vNF")),
+    duplicatas,
   };
 }

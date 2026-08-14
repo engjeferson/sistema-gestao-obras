@@ -60,6 +60,7 @@ export function InvoiceForm({
   const [arquivoXmlUrl, setArquivoXmlUrl] = useState<string | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingXml, setUploadingXml] = useState(false);
+  const [pendingVencimentoUnico, setPendingVencimentoUnico] = useState<string | null>(null);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   function applyParsedXml(text: string) {
@@ -80,8 +81,20 @@ export function InvoiceForm({
     if (parsed.items.length > 0) {
       setItems(parsed.items);
     }
+    if (parsed.duplicatas.length >= 2) {
+      setGerarContaPagar(true);
+      setParcelar(true);
+      setParcelas(parsed.duplicatas.map((d) => ({ dataVencimento: d.vencimento, valor: d.valor })));
+    } else if (parsed.duplicatas.length === 1) {
+      setGerarContaPagar(true);
+      setPendingVencimentoUnico(parsed.duplicatas[0].vencimento);
+    }
+    const parcelasMsg =
+      parsed.duplicatas.length > 0
+        ? ` e ${parsed.duplicatas.length} boleto${parsed.duplicatas.length === 1 ? "" : "s"} da fatura`
+        : "";
     toast.success(
-      `XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}.`,
+      `XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}${parcelasMsg}.`,
     );
   }
 
@@ -120,6 +133,12 @@ export function InvoiceForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummary, initialXml]);
+
+  useEffect(() => {
+    if (!pendingVencimentoUnico || parcelar) return;
+    const el = document.getElementById("dataVencimento") as HTMLInputElement | null;
+    if (el) el.value = pendingVencimentoUnico;
+  }, [gerarContaPagar, parcelar, pendingVencimentoUnico]);
 
   async function handleFileChange(
     file: File | undefined,

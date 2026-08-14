@@ -43,17 +43,18 @@ export function InvoiceInstallmentsEditor({
     onChange(parcelas.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   }
 
-  // Mantém as parcelas já geradas em dia com o valor total da nota (ex: item alterado depois de gerar as parcelas).
+  // Mantém a SOMA das parcelas em dia com o valor total da nota (ex: item
+  // alterado depois de gerar as parcelas). Só redistribui quando a soma está
+  // errada — não mexe em parcelas cuja soma já bate, mesmo que a distribuição
+  // entre elas não seja perfeitamente igual (ex: valores reais dos boletos da
+  // fatura, importados do XML, que a SEFAZ/fornecedor já arredondou do jeito deles).
   useEffect(() => {
     if (parcelas.length === 0) return;
+    const somaAtual = parcelas.reduce((sum, p) => sum + p.valor, 0);
+    if (Math.abs(somaAtual - valorRestante) < 0.01) return;
     const n = parcelas.length;
     const baseValor = Math.floor((valorRestante / n) * 100) / 100;
     const remainder = Math.round((valorRestante - baseValor * n) * 100) / 100;
-    const jaSincronizado = parcelas.every((p, i) => {
-      const esperado = i === n - 1 ? baseValor + remainder : baseValor;
-      return Math.abs(p.valor - esperado) < 0.005;
-    });
-    if (jaSincronizado) return;
     onChange(parcelas.map((p, i) => ({ ...p, valor: i === n - 1 ? baseValor + remainder : baseValor })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valorRestante]);

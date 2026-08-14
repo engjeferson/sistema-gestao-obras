@@ -1,10 +1,16 @@
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
+export type ParsedNFeDuplicata = {
+  vencimento: string;
+  valor: number;
+};
+
 export type ParsedNFe = {
   numero: string | null;
   dataEmissao: string | null;
   fornecedorNome: string | null;
   items: InvoiceItemValues[];
+  duplicatas: ParsedNFeDuplicata[];
 };
 
 const UNIT_MAP: Record<string, InvoiceItemValues["unidade"]> = {
@@ -89,5 +95,16 @@ export function parseNFeXml(xmlText: string): ParsedNFe {
     };
   });
 
-  return { numero, dataEmissao, fornecedorNome, items };
+  const cobr = infNFe.getElementsByTagName("cobr")[0] ?? null;
+  const duplicatas: ParsedNFeDuplicata[] = cobr
+    ? Array.from(cobr.getElementsByTagName("dup"))
+        .map((dup) => {
+          const vencimento = text(dup.getElementsByTagName("dVenc")[0] ?? null);
+          const valor = Number(text(dup.getElementsByTagName("vDup")[0] ?? null) ?? "0");
+          return vencimento && Number.isFinite(valor) ? { vencimento, valor } : null;
+        })
+        .filter((d): d is ParsedNFeDuplicata => d !== null)
+    : [];
+
+  return { numero, dataEmissao, fornecedorNome, items, duplicatas };
 }
