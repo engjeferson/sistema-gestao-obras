@@ -19,6 +19,7 @@ type ObraFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
+  users: { id: string; name: string }[];
 };
 
 function toDateInputValue(date: Date | string | undefined | null) {
@@ -27,7 +28,7 @@ function toDateInputValue(date: Date | string | undefined | null) {
   return d.toISOString().slice(0, 10);
 }
 
-export function ObraForm({ action, defaultValues, submitLabel }: ObraFormProps) {
+export function ObraForm({ action, defaultValues, submitLabel, users }: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
   return (
@@ -48,6 +49,32 @@ export function ObraForm({ action, defaultValues, submitLabel }: ObraFormProps) 
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefone">Telefone</Label>
           <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="responsavelTecnicoId">Responsável técnico</Label>
+          <NativeSelect
+            id="responsavelTecnicoId"
+            name="responsavelTecnicoId"
+            defaultValue={defaultValues?.responsavelTecnicoId ?? ""}
+          >
+            <option value="">Não definido</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="encarregadoId">Encarregado</Label>
+          <NativeSelect id="encarregadoId" name="encarregadoId" defaultValue={defaultValues?.encarregadoId ?? ""}>
+            <option value="">Não definido</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="endereco">Endereço</Label>

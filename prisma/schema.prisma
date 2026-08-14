@@ -128,6 +128,8 @@ model User {
   rdosResponsavel       Rdo[]                   @relation("RdoResponsavel")
   financialTransactions FinancialTransaction[]  @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
+  worksResponsavelTecnico Work[]                @relation("WorkResponsavelTecnico")
+  worksEncarregado        Work[]                @relation("WorkEncarregado")
 
   @@index([role])
 }
@@ -246,22 +248,26 @@ model FinancialCategory {
 }
 
 model Work {
-  id                  String     @id @default(cuid())
-  codigo              String     @unique
-  nome                String
-  clientId            String?
-  telefone            String?
-  endereco            String?
-  valorContrato       Decimal    @db.Decimal(14, 2)
-  areaConstruida      Decimal?   @db.Decimal(10, 2)
-  dataInicio          DateTime   @db.Date
-  dataPrevistaTermino DateTime   @db.Date
-  status              WorkStatus @default(PLANEJAMENTO)
-  observacoes         String?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  id                    String     @id @default(cuid())
+  codigo                String     @unique
+  nome                  String
+  clientId              String?
+  responsavelTecnicoId  String?
+  encarregadoId         String?
+  telefone              String?
+  endereco              String?
+  valorContrato         Decimal    @db.Decimal(14, 2)
+  areaConstruida        Decimal?   @db.Decimal(10, 2)
+  dataInicio            DateTime   @db.Date
+  dataPrevistaTermino   DateTime   @db.Date
+  status                WorkStatus @default(PLANEJAMENTO)
+  observacoes           String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   client                Client?                 @relation(fields: [clientId], references: [id])
+  responsavelTecnico    User?                   @relation("WorkResponsavelTecnico", fields: [responsavelTecnicoId], references: [id])
+  encarregado           User?                   @relation("WorkEncarregado", fields: [encarregadoId], references: [id])
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   contracts             Contract[]

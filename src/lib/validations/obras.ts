@@ -6,6 +6,8 @@ export const workFormSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome da obra."),
   codigo: z.string().trim().min(1, "Informe o código da obra."),
   clienteNome: z.string().trim().optional(),
+  responsavelTecnicoId: z.string().trim().optional(),
+  encarregadoId: z.string().trim().optional(),
   telefone: z.string().trim().optional(),
   endereco: z.string().trim().optional(),
   valorContrato: z.coerce.number({ message: "Informe um valor válido." }).nonnegative(),
