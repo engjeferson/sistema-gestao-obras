@@ -13,6 +13,7 @@ export async function listIncomingNFes() {
   return prisma.incomingNFe.findMany({
     orderBy: { dataEmissao: "desc" },
     take: 200,
+    include: { invoice: { include: { work: true } } },
   });
 }
 
@@ -109,18 +110,37 @@ export async function restoreIncomingNFe(id: string) {
   revalidatePath("/notas-fiscais/radar");
 }
 
+export type IncomingNFeResumo = {
+  numero: string | null;
+  dataEmissao: string | null;
+  fornecedorNome: string | null;
+};
+
+function toResumo(incoming: { numero: string | null; dataEmissao: Date | null; emitenteNome: string | null }): IncomingNFeResumo {
+  return {
+    numero: incoming.numero,
+    dataEmissao: incoming.dataEmissao ? incoming.dataEmissao.toISOString().slice(0, 10) : null,
+    fornecedorNome: incoming.emitenteNome,
+  };
+}
+
 /**
  * Busca (ou usa em cache) o XML completo da NF-e, com itens — necessário
- * pra pré-preencher o formulário de lançamento.
+ * pra pré-preencher o formulário de lançamento. Sempre devolve o resumo
+ * (fornecedor/número/data) junto, mesmo quando o XML completo falha — assim
+ * o formulário ainda pode ser parcialmente preenchido.
  */
-export async function getIncomingNFeXml(id: string): Promise<{ xml: string } | { error: string }> {
+export async function getIncomingNFeXml(
+  id: string,
+): Promise<{ xml: string; resumo: IncomingNFeResumo } | { error: string; resumo: IncomingNFeResumo | null }> {
   const incoming = await prisma.incomingNFe.findUnique({ where: { id } });
-  if (!incoming) return { error: "Nota não encontrada." };
-  if (incoming.xmlCompleto) return { xml: incoming.xmlCompleto };
+  if (!incoming) return { error: "Nota não encontrada.", resumo: null };
+  const resumo = toResumo(incoming);
+  if (incoming.xmlCompleto) return { xml: incoming.xmlCompleto, resumo };
 
   const company = await prisma.companySettings.findFirst();
   if (!company?.cnpj || !company?.uf) {
-    return { error: "Cadastre o CNPJ e a UF da empresa em Configurações." };
+    return { error: "Cadastre o CNPJ e a UF da empresa em Configurações.", resumo };
   }
 
   try {
@@ -130,15 +150,25 @@ export async function getIncomingNFeXml(id: string): Promise<{ xml: string } | {
       chaveAcesso: incoming.chaveAcesso,
     });
 
+    if (retorno.cStat === "632") {
+      return {
+        error:
+          "Essa nota é antiga demais — a SEFAZ só disponibiliza o XML completo por um tempo limitado após a emissão. Fornecedor, número e data já foram preenchidos com os dados do resumo; adicione os itens manualmente.",
+        resumo,
+      };
+    }
     if (retorno.cStat !== "138" || retorno.docs.length === 0) {
-      return { error: `SEFAZ não retornou o documento completo (${retorno.cStat}: ${retorno.xMotivo}).` };
+      return { error: `SEFAZ não retornou o documento completo (${retorno.cStat}: ${retorno.xMotivo}).`, resumo };
     }
 
     const xml = retorno.docs[0].xml;
     await prisma.incomingNFe.update({ where: { id }, data: { xmlCompleto: xml } });
-    return { xml };
+    return { xml, resumo };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Não foi possível buscar o XML completo." };
+    return {
+      error: error instanceof Error ? error.message : "Não foi possível buscar o XML completo.",
+      resumo,
+    };
   }
 }
 

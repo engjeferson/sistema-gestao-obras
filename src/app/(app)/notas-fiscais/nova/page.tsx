@@ -29,6 +29,7 @@ export default async function NovaNotaFiscalPage({
   const materialsOptions = materials.map((m) => ({ nome: m.nome, unidadePadrao: m.unidadePadrao }));
   const initialXml = radarXml && "xml" in radarXml ? radarXml.xml : undefined;
   const radarError = radarXml && "error" in radarXml ? radarXml.error : undefined;
+  const initialSummary = radarXml && !initialXml ? (radarXml.resumo ?? undefined) : undefined;
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
@@ -46,6 +47,7 @@ export default async function NovaNotaFiscalPage({
         materials={materialsOptions}
         defaultWorkId={workId}
         initialXml={initialXml}
+        initialSummary={initialSummary}
         radarId={radarId}
       />
     </div>

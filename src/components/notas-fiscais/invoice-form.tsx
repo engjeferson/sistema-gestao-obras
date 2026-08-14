@@ -26,6 +26,7 @@ type InvoiceFormProps = {
   materials: { nome: string; unidadePadrao: string | null }[];
   defaultWorkId?: string;
   initialXml?: string;
+  initialSummary?: { numero: string | null; dataEmissao: string | null; fornecedorNome: string | null };
   radarId?: string;
 };
 
@@ -39,6 +40,7 @@ export function InvoiceForm({
   materials,
   defaultWorkId,
   initialXml,
+  initialSummary,
   radarId,
 }: InvoiceFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
@@ -101,6 +103,23 @@ export function InvoiceForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialXml]);
+
+  useEffect(() => {
+    if (initialXml || !initialSummary) return;
+    if (initialSummary.numero) {
+      const numeroInput = document.getElementById("numero") as HTMLInputElement | null;
+      if (numeroInput) numeroInput.value = initialSummary.numero;
+    }
+    if (initialSummary.dataEmissao) {
+      const dataInput = document.getElementById("dataEmissao") as HTMLInputElement | null;
+      if (dataInput) dataInput.value = initialSummary.dataEmissao;
+    }
+    if (initialSummary.fornecedorNome) {
+      const supplierInput = document.getElementById("supplierNome") as HTMLInputElement | null;
+      if (supplierInput) supplierInput.value = initialSummary.fornecedorNome;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSummary, initialXml]);
 
   async function handleFileChange(
     file: File | undefined,

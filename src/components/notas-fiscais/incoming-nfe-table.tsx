@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { EyeOff, Undo2 } from "lucide-react";
+import { EyeOff, Undo2, FileText, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,7 @@ type IncomingNFeRow = {
   dataEmissao: Date | null;
   valorTotal: number | null;
   status: "PENDENTE" | "LANCADA" | "IGNORADA";
+  invoiceLink: { workId: string | null; workLabel: string | null } | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -55,7 +56,20 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
   }
 
   if (row.status === "LANCADA") {
-    return <span className="text-xs text-muted-foreground">—</span>;
+    const href = row.invoiceLink ? (row.invoiceLink.workId ? `/obras/${row.invoiceLink.workId}/materiais` : "/estoque") : null;
+    return href ? (
+      <Button
+        variant="outline"
+        size="sm"
+        render={<Link href={href} />}
+        nativeButton={false}
+        title={row.invoiceLink?.workLabel ?? "Estoque da Empresa"}
+      >
+        <ExternalLink /> Ver na obra
+      </Button>
+    ) : (
+      <span className="text-xs text-muted-foreground">—</span>
+    );
   }
 
   if (row.status === "IGNORADA") {
@@ -98,6 +112,7 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
             <TableHead>NF / Série</TableHead>
             <TableHead>Data</TableHead>
             <TableHead>Valor</TableHead>
+            <TableHead>PDF</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -114,6 +129,17 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
               </TableCell>
               <TableCell>{row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"}</TableCell>
               <TableCell>{row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}</TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  render={<a href={`/api/notas-fiscais/radar/${row.id}/pdf`} target="_blank" rel="noreferrer" />}
+                  nativeButton={false}
+                  title="Ver PDF"
+                >
+                  <FileText className="size-4" />
+                </Button>
+              </TableCell>
               <TableCell className="text-right">
                 <RowActions row={row} />
               </TableCell>

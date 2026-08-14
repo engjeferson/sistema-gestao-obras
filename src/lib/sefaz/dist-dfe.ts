@@ -74,7 +74,7 @@ export async function buscarNFeCompletaPorChave(params: {
 }): Promise<RetDistDFe> {
   const cnpjLimpo = params.cnpj.replace(/\D/g, "");
 
-  const distDFeInt = `<distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.35"><tpAmb>${ambienteTpAmb()}</tpAmb><cUFAutor>${getUfCode(params.uf)}</cUFAutor><CNPJ>${cnpjLimpo}</CNPJ><consChNFe><chNFe>${params.chaveAcesso}</chNFe></consChNFe></distDFeInt>`;
+  const distDFeInt = `<distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01"><tpAmb>${ambienteTpAmb()}</tpAmb><cUFAutor>${getUfCode(params.uf)}</cUFAutor><CNPJ>${cnpjLimpo}</CNPJ><consChNFe><chNFe>${params.chaveAcesso}</chNFe></consChNFe></distDFeInt>`;
 
   const response = await callDistDFeInt(distDFeInt);
   return parseRetorno(response);
