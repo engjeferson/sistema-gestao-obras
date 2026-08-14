@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatCurrencyBRL } from "@/lib/status-labels";
+import { normalizeSearch } from "@/lib/text";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
 const UNIT_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ export function InvoiceItemsEditor({
   materials?: { nome: string; unidadePadrao: string | null }[];
 }) {
   const materialByName = new Map(materials.map((m) => [m.nome, m]));
+  const materialByNormalized = new Map(materials.map((m) => [normalizeSearch(m.nome), m]));
 
   function updateItem(index: number, patch: Partial<InvoiceItemValues>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -83,6 +85,15 @@ export function InvoiceItemsEditor({
                     placeholder="Ex: Cimento CP-II"
                     list="materiais-cadastrados"
                   />
+                  {item.material.trim() ? (
+                    materialByNormalized.has(normalizeSearch(item.material)) ? (
+                      <p className="mt-1 text-xs text-success">Cadastrado</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-warning">
+                        Novo material — será cadastrado com este nome
+                      </p>
+                    )
+                  ) : null}
                 </td>
                 <td className="p-2">
                   <Input

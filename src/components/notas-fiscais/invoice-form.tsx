@@ -10,6 +10,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { InvoiceItemsEditor } from "@/components/notas-fiscais/invoice-items-editor";
 import { InvoiceInstallmentsEditor } from "@/components/notas-fiscais/invoice-installments-editor";
 import { uploadFileToR2 } from "@/lib/upload-file";
+import { parseNFeXml } from "@/lib/parse-nfe-xml";
 import { ESTOQUE_GERAL_VALUE } from "@/lib/validations/notas-fiscais";
 import type { InvoiceItemValues, InvoiceInstallmentValues } from "@/lib/validations/notas-fiscais";
 
@@ -55,12 +56,42 @@ export function InvoiceForm({
   const [uploadingXml, setUploadingXml] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
+  async function handleXmlImport(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = parseNFeXml(text);
+
+      if (parsed.numero) {
+        const numeroInput = document.getElementById("numero") as HTMLInputElement | null;
+        if (numeroInput) numeroInput.value = parsed.numero;
+      }
+      if (parsed.dataEmissao) {
+        const dataInput = document.getElementById("dataEmissao") as HTMLInputElement | null;
+        if (dataInput) dataInput.value = parsed.dataEmissao;
+      }
+      if (parsed.fornecedorNome) {
+        const supplierInput = document.getElementById("supplierNome") as HTMLInputElement | null;
+        if (supplierInput) supplierInput.value = parsed.fornecedorNome;
+      }
+      if (parsed.items.length > 0) {
+        setItems(parsed.items);
+      }
+      toast.success(`XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}.`);
+    } catch {
+      toast.error("Não foi possível ler este XML como uma NF-e. Confira o arquivo ou preencha manualmente.");
+    }
+  }
+
   async function handleFileChange(
     file: File | undefined,
     kind: "pdf" | "xml",
     workId: string,
   ) {
-    if (!file || !workId) return;
+    if (!file) return;
+    if (kind === "xml") {
+      void handleXmlImport(file);
+    }
+    if (!workId) return;
     const setUploading = kind === "pdf" ? setUploadingPdf : setUploadingXml;
     const setUrl = kind === "pdf" ? setArquivoUrl : setArquivoXmlUrl;
     setUploading(true);
@@ -81,6 +112,25 @@ export function InvoiceForm({
       <input type="hidden" name="parcelasJson" value={JSON.stringify(parcelas)} readOnly />
       <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
       <input type="hidden" name="arquivoXmlUrl" value={arquivoXmlUrl ?? ""} readOnly />
+
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
+        <Label htmlFor="arquivoXml">Importar XML da NF (opcional)</Label>
+        <Input
+          id="arquivoXml"
+          type="file"
+          accept=".xml,text/xml"
+          disabled={uploadingXml}
+          onChange={(e) => {
+            const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
+            void handleFileChange(e.target.files?.[0], "xml", workSelect?.value ?? "");
+          }}
+        />
+        <p className="text-xs text-muted-foreground">
+          Selecione o XML da nota fiscal para preencher fornecedor, número, data e itens automaticamente.
+        </p>
+        {uploadingXml ? <p className="text-xs text-muted-foreground">Enviando anexo...</p> : null}
+        {arquivoXmlUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
@@ -176,37 +226,20 @@ export function InvoiceForm({
         <InvoiceItemsEditor items={items} onChange={setItems} materials={materials} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="arquivoPdf">Arquivo PDF</Label>
-          <Input
-            id="arquivoPdf"
-            type="file"
-            accept="application/pdf"
-            disabled={uploadingPdf}
-            onChange={(e) => {
-              const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
-              void handleFileChange(e.target.files?.[0], "pdf", workSelect?.value ?? "");
-            }}
-          />
-          {uploadingPdf ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-          {arquivoUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="arquivoXml">Arquivo XML</Label>
-          <Input
-            id="arquivoXml"
-            type="file"
-            accept=".xml"
-            disabled={uploadingXml}
-            onChange={(e) => {
-              const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
-              void handleFileChange(e.target.files?.[0], "xml", workSelect?.value ?? "");
-            }}
-          />
-          {uploadingXml ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-          {arquivoXmlUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
-        </div>
+      <div className="flex flex-col gap-2 sm:max-w-sm">
+        <Label htmlFor="arquivoPdf">Arquivo PDF</Label>
+        <Input
+          id="arquivoPdf"
+          type="file"
+          accept="application/pdf"
+          disabled={uploadingPdf}
+          onChange={(e) => {
+            const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
+            void handleFileChange(e.target.files?.[0], "pdf", workSelect?.value ?? "");
+          }}
+        />
+        {uploadingPdf ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
+        {arquivoUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border p-4">
