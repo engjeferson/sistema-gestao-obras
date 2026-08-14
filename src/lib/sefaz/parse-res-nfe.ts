@@ -48,3 +48,28 @@ export function parseResNFe(xml: string): ResNFeSummary | null {
     cancelada: cSitNFe === "2" || cSitNFe === "3",
   };
 }
+
+/**
+ * Alguns documentos vêm completos (procNFe/nfeProc) já no lote da
+ * distribuição, não só o resumo — mesmo assim extraímos um resumo
+ * padronizado, mas guardamos o XML completo pra não precisar buscar de novo.
+ */
+export function parseProcNFeSummary(xml: string): ResNFeSummary | null {
+  const idMatch = xml.match(/infNFe[^>]*\bId="NFe(\d{44})"/);
+  const chaveAcesso = idMatch ? idMatch[1] : null;
+  if (!chaveAcesso) return null;
+
+  const { serie, numero } = extrairSerieNumero(chaveAcesso);
+  const vNF = tag(xml, "vNF");
+
+  return {
+    chaveAcesso,
+    emitenteCnpj: tag(xml, "CNPJ"),
+    emitenteNome: tag(xml, "xNome"),
+    numero,
+    serie,
+    dataEmissao: tag(xml, "dhEmi")?.slice(0, 10) ?? null,
+    valorTotal: vNF ? Number(vNF) : null,
+    cancelada: false,
+  };
+}

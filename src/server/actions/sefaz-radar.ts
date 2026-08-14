@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { buscarLoteDistribuicao, buscarNFeCompletaPorChave } from "@/lib/sefaz/dist-dfe";
-import { parseResNFe } from "@/lib/sefaz/parse-res-nfe";
+import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefaz/parse-res-nfe";
 
 const MAX_LOTES_POR_SYNC = 10;
 
@@ -42,13 +42,22 @@ export async function syncIncomingNFes(): Promise<string | undefined> {
       }
 
       for (const doc of retorno.docs) {
-        if (!doc.schema.startsWith("resNFe")) continue;
-        const resumo = parseResNFe(doc.xml);
+        let resumo: ResNFeSummary | null = null;
+        let xmlCompleto: string | null = null;
+
+        if (doc.schema.startsWith("resNFe")) {
+          resumo = parseResNFe(doc.xml);
+        } else if (doc.schema.startsWith("procNFe") || doc.schema.startsWith("nfeProc")) {
+          resumo = parseProcNFeSummary(doc.xml);
+          xmlCompleto = doc.xml;
+        } else {
+          continue;
+        }
         if (!resumo) continue;
 
         await prisma.incomingNFe.upsert({
           where: { chaveAcesso: resumo.chaveAcesso },
-          update: {},
+          update: xmlCompleto ? { xmlCompleto } : {},
           create: {
             chaveAcesso: resumo.chaveAcesso,
             nsu: doc.nsu,
@@ -59,6 +68,7 @@ export async function syncIncomingNFes(): Promise<string | undefined> {
             dataEmissao: resumo.dataEmissao ? new Date(resumo.dataEmissao) : null,
             valorTotal: resumo.valorTotal,
             status: resumo.cancelada ? "IGNORADA" : "PENDENTE",
+            xmlCompleto,
           },
         });
         novos++;
