@@ -2,15 +2,22 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
-import { userFormSchema } from "@/lib/validations/usuarios";
+import { userFormSchema, userEditFormSchema } from "@/lib/validations/usuarios";
 
 export async function listUsers() {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
   return prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+}
+
+export async function getUser(userId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR"]);
+  return prisma.user.findUnique({ where: { id: userId } });
 }
 
 export async function createUser(_prevState: string | undefined, formData: FormData) {
@@ -40,6 +47,40 @@ export async function createUser(_prevState: string | undefined, formData: FormD
 
   revalidatePath("/configuracoes/usuarios");
   return undefined;
+}
+
+export async function updateUser(userId: string, _prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR"]);
+
+  const parsed = userEditFormSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password") || undefined,
+    role: formData.get("role"),
+  });
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+  const data = parsed.data;
+
+  const existing = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existing && existing.id !== userId) {
+    return "Já existe um usuário com esse e-mail.";
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
+    },
+  });
+
+  revalidatePath("/configuracoes/usuarios");
+  redirect("/configuracoes/usuarios");
 }
 
 export async function toggleUserActive(userId: string, active: boolean) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -67,7 +68,17 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                <ToggleActiveButton user={user} />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    render={<Link href={`/configuracoes/usuarios/${user.id}/editar`} />}
+                    nativeButton={false}
+                  >
+                    Editar
+                  </Button>
+                  <ToggleActiveButton user={user} />
+                </div>
               </TableCell>
             </TableRow>
           ))}
