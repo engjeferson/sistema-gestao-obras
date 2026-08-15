@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertsList } from "@/components/dashboard/alerts-list";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { BudgetByStageTable } from "@/components/orcamento/budget-by-stage-table";
+import { PortalShareCard } from "@/components/obras/portal-share-card";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -83,6 +84,8 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="flex flex-col gap-8">
+      <PortalShareCard workId={work.id} portalToken={work.portalToken} />
+
       <div className="flex flex-col gap-3">
         <SectionTitle>Contrato & margem</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

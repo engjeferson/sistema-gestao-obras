@@ -263,6 +263,7 @@ model Work {
   id                    String     @id @default(cuid())
   codigo                String     @unique
   nome                  String
+  portalToken           String     @unique @default(cuid())
   clientId              String?
   responsavelTecnicoId  String?
   encarregadoId         String?

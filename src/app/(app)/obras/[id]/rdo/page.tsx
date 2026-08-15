@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Smartphone } from "lucide-react";
 import { listRdos } from "@/server/actions/rdo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,15 @@ export default async function RdoPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          render={<Link href={`/campo/obras/${id}/rdo/novo`} />}
+          nativeButton={false}
+        >
+          <Smartphone /> Preencher no celular
+        </Button>
         <Button size="sm" render={<Link href={`/obras/${id}/rdo/novo`} />} nativeButton={false}>
           <Plus /> Novo RDO
         </Button>

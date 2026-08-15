@@ -11,6 +11,7 @@ import {
   Contact,
   BarChart3,
   Boxes,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/generated/prisma/enums";
@@ -27,6 +28,7 @@ const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/obras", label: "Obras", icon: Building2, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
       { href: "/estoque", label: "Estoque", icon: Boxes, roles: ["ADMINISTRADOR", "ENGENHEIRO"] },
+      { href: "/campo/obras", label: "Campo (RDO mobile)", icon: Smartphone, roles: ["ADMINISTRADOR", "ENGENHEIRO"] },
     ],
   },
   {
