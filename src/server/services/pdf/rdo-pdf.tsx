@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import { formatDateBR } from "@/lib/status-labels";
 import type { getRdo } from "@/server/actions/rdo";
 import type { CompanySettingsModel } from "@/generated/prisma/models";
@@ -26,7 +26,7 @@ const TEAL = "#22776e";
 const TEAL_LIGHT = "#e2f5f3";
 
 const styles = StyleSheet.create({
-  page: { fontSize: 10, fontFamily: "Helvetica", color: "#1a1a1a" },
+  page: { fontSize: 10, fontFamily: "Montserrat", color: "#1a1a1a" },
   headerBand: {
     backgroundColor: NAVY,
     paddingTop: 24,
@@ -134,9 +134,18 @@ type Props = {
   company: CompanySettingsModel | null;
   logoBase64: string | null;
   photosBase64: { url: string; base64: string; descricao: string | null }[];
+  origin: string;
 };
 
-export function RdoPdfDocument({ rdo, company, logoBase64, photosBase64 }: Props) {
+export function RdoPdfDocument({ rdo, company, logoBase64, photosBase64, origin }: Props) {
+  Font.register({
+    family: "Montserrat",
+    fonts: [
+      { src: `${origin}/fonts/montserrat/Montserrat-Regular.ttf`, fontWeight: 400 },
+      { src: `${origin}/fonts/montserrat/Montserrat-Bold.ttf`, fontWeight: 700 },
+    ],
+  });
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>

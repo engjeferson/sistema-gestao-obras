@@ -8,5 +8,5 @@ export async function proxy(...args: Parameters<typeof auth>) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.png|brand/).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.png|brand/|fonts/).*)"],
 };

@@ -52,6 +52,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       company={company}
       logoBase64={logoBase64}
       photosBase64={photosBase64.filter((p): p is NonNullable<typeof p> => p !== null)}
+      origin={origin}
     />,
   );
 
