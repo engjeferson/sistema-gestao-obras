@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
-import { createRdoWithSync } from "@/server/services/rdo-sync";
+import { createRdoWithSync, updateRdoWithSync } from "@/server/services/rdo-sync";
 
 export async function listRdos(workId: string) {
   return prisma.rdo.findMany({
@@ -85,4 +85,36 @@ export async function createRdo(_prevState: string | undefined, formData: FormDa
 
   const basePath = session.user.role === "OBRA" ? "/campo/obras" : "/obras";
   redirect(`${basePath}/${parsed.data.workId}/rdo/${rdo.id}`);
+}
+
+export async function updateRdo(rdoId: string, _prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+
+  const parsed = rdoFormSchema.safeParse({
+    workId: formData.get("workId"),
+    data: formData.get("data"),
+    clima: formData.get("clima") ?? undefined,
+    observacoesGerais: formData.get("observacoesGerais") ?? undefined,
+    workers: parseJsonField(formData, "workersJson", []),
+    activities: parseJsonField(formData, "activitiesJson", []),
+    occurrences: parseJsonField(formData, "occurrencesJson", []),
+    photos: parseJsonField(formData, "photosJson", []),
+  });
+
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+
+  await updateRdoWithSync(rdoId, parsed.data);
+
+  revalidatePath(`/obras/${parsed.data.workId}/rdo`);
+  revalidatePath(`/obras/${parsed.data.workId}/rdo/${rdoId}`);
+  revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
+  revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
+  revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
+  revalidatePath(`/campo/obras/${parsed.data.workId}/rdo/${rdoId}`);
+
+  const basePath = session.user.role === "OBRA" ? "/campo/obras" : "/obras";
+  redirect(`${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
 }

@@ -7,11 +7,11 @@ export default async function RdoDetailPage({
 }: {
   params: Promise<{ id: string; rdoId: string }>;
 }) {
-  const { rdoId } = await params;
+  const { id, rdoId } = await params;
   const rdo = await getRdo(rdoId);
   if (!rdo) {
     notFound();
   }
 
-  return <RdoDetailView rdo={rdo} />;
+  return <RdoDetailView rdo={rdo} basePath={`/obras/${id}`} />;
 }

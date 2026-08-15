@@ -14,7 +14,7 @@ export default async function NovoRdoPage({ params }: { params: Promise<{ id: st
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Novo RDO</h1>
       </div>
-      <RdoForm action={createRdo} workId={id} stages={stages} proximoNumero={(lastRdo?.numero ?? 0) + 1} />
+      <RdoForm action={createRdo} workId={id} stages={stages} numero={(lastRdo?.numero ?? 0) + 1} />
     </div>
   );
 }

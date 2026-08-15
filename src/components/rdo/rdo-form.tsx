@@ -12,23 +12,37 @@ import { RdoOccurrencesEditor } from "@/components/rdo/rdo-occurrences-editor";
 import { RdoPhotosEditor } from "@/components/rdo/rdo-photos-editor";
 import type { RdoWorkerValues, RdoActivityValues, RdoOccurrenceValues, RdoPhotoValues } from "@/lib/validations/rdo";
 
+type RdoFormDefaultValues = {
+  data: string;
+  clima: string;
+  observacoesGerais: string;
+  workers: RdoWorkerValues[];
+  activities: RdoActivityValues[];
+  occurrences: RdoOccurrenceValues[];
+  photos: RdoPhotoValues[];
+};
+
 export function RdoForm({
   action,
   workId,
   stages,
-  proximoNumero,
+  numero,
+  defaultValues,
+  submitLabel = "Salvar RDO",
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   workId: string;
   stages: StageOption[];
-  proximoNumero: number;
+  numero: number;
+  defaultValues?: RdoFormDefaultValues;
+  submitLabel?: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const [workers, setWorkers] = useState<RdoWorkerValues[]>([]);
-  const [activities, setActivities] = useState<RdoActivityValues[]>([]);
-  const [occurrences, setOccurrences] = useState<RdoOccurrenceValues[]>([]);
-  const [photos, setPhotos] = useState<RdoPhotoValues[]>([]);
-  const [clima, setClima] = useState("");
+  const [workers, setWorkers] = useState<RdoWorkerValues[]>(defaultValues?.workers ?? []);
+  const [activities, setActivities] = useState<RdoActivityValues[]>(defaultValues?.activities ?? []);
+  const [occurrences, setOccurrences] = useState<RdoOccurrenceValues[]>(defaultValues?.occurrences ?? []);
+  const [photos, setPhotos] = useState<RdoPhotoValues[]>(defaultValues?.photos ?? []);
+  const [clima, setClima] = useState(defaultValues?.clima ?? "");
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   return (
@@ -40,7 +54,7 @@ export function RdoForm({
       <input type="hidden" name="photosJson" value={JSON.stringify(photos)} readOnly />
 
       <div className="rounded-lg border p-4">
-        <p className="text-sm text-muted-foreground">RDO nº {proximoNumero}</p>
+        <p className="text-sm text-muted-foreground">RDO nº {numero}</p>
       </div>
 
       <input type="hidden" name="clima" value={clima} readOnly />
@@ -51,7 +65,7 @@ export function RdoForm({
           id="data"
           name="data"
           type="date"
-          defaultValue={new Date().toISOString().slice(0, 10)}
+          defaultValue={defaultValues?.data ?? new Date().toISOString().slice(0, 10)}
           className="max-w-xs"
           required
         />
@@ -84,14 +98,18 @@ export function RdoForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="observacoesGerais">Observações gerais</Label>
-        <Textarea id="observacoesGerais" name="observacoesGerais" />
+        <Textarea
+          id="observacoesGerais"
+          name="observacoesGerais"
+          defaultValue={defaultValues?.observacoesGerais ?? ""}
+        />
       </div>
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
       <div>
         <Button type="submit" size="lg" disabled={isPending}>
-          {isPending ? "Salvando..." : "Salvar RDO"}
+          {isPending ? "Salvando..." : submitLabel}
         </Button>
       </div>
     </form>

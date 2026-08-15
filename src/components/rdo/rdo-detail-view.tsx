@@ -1,4 +1,5 @@
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Download, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ const OCCURRENCE_LABELS: Record<string, string> = {
 
 type RdoWithRelations = NonNullable<Awaited<ReturnType<typeof getRdo>>>;
 
-export function RdoDetailView({ rdo }: { rdo: RdoWithRelations }) {
+export function RdoDetailView({ rdo, basePath }: { rdo: RdoWithRelations; basePath: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -27,14 +28,24 @@ export function RdoDetailView({ rdo }: { rdo: RdoWithRelations }) {
             {rdo.clima ? ` · ${rdo.clima}` : ""}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          render={<a href={`/api/rdo/${rdo.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
-          nativeButton={false}
-        >
-          <Download /> Baixar PDF
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link href={`${basePath}/rdo/${rdo.id}/editar`} />}
+            nativeButton={false}
+          >
+            <Pencil /> Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            render={<a href={`/api/rdo/${rdo.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
+            nativeButton={false}
+          >
+            <Download /> Baixar PDF
+          </Button>
+        </div>
       </div>
 
       {rdo.workers.length > 0 ? (

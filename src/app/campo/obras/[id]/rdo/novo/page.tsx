@@ -12,7 +12,7 @@ export default async function CampoNovoRdoPage({ params }: { params: Promise<{ i
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold tracking-tight">Novo RDO</h1>
-      <RdoForm action={createRdo} workId={id} stages={stages} proximoNumero={(lastRdo?.numero ?? 0) + 1} />
+      <RdoForm action={createRdo} workId={id} stages={stages} numero={(lastRdo?.numero ?? 0) + 1} />
     </div>
   );
 }
