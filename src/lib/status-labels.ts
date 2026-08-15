@@ -12,6 +12,13 @@ export const WORK_STATUS_BADGE: Record<string, "secondary" | "success" | "warnin
   CONCLUIDA: "secondary",
 };
 
+export const WORK_STATUS_ACCENT: Record<string, string> = {
+  PLANEJAMENTO: "border-l-muted-foreground/40",
+  EM_ANDAMENTO: "border-l-brand-teal",
+  PARALISADA: "border-l-warning",
+  CONCLUIDA: "border-l-success",
+};
+
 export const TRANSACTION_STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Pendente",
   PAGO: "Pago",

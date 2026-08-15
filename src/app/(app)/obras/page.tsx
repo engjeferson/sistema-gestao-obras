@@ -15,7 +15,7 @@ export default async function ObrasPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Obras</h1>
           <p className="text-muted-foreground">Acompanhe o andamento e a saúde financeira de todas as obras.</p>
         </div>
-        <Button render={<Link href="/obras/novo" />} nativeButton={false}>
+        <Button className="rounded-full" render={<Link href="/obras/novo" />} nativeButton={false}>
           <Plus /> Nova obra
         </Button>
       </div>

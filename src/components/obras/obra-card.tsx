@@ -10,8 +10,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { WORK_STATUS_BADGE, WORK_STATUS_LABELS, formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import {
+  WORK_STATUS_ACCENT,
+  WORK_STATUS_BADGE,
+  WORK_STATUS_LABELS,
+  formatCurrencyBRL,
+  formatDateBR,
+} from "@/lib/status-labels";
 import { getInitials } from "@/lib/text";
+import { cn } from "@/lib/utils";
 import type { ObraDashboardRow } from "@/server/actions/obras";
 
 function PersonMini({ label, person }: { label: string; person: { nome: string } | null }) {
@@ -35,7 +42,7 @@ export function ObraCard({ obra }: { obra: ObraDashboardRow }) {
   const saudePositiva = obra.saudeFinanceira >= 0;
 
   return (
-    <Card>
+    <Card className={cn("border-l-4 shadow-sm transition-shadow hover:shadow-md", WORK_STATUS_ACCENT[obra.status])}>
       <CardContent className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <PersonMini label="Responsável técnico" person={obra.responsavelTecnico} />
@@ -96,13 +103,18 @@ export function ObraCard({ obra }: { obra: ObraDashboardRow }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button className="flex-1" size="sm" render={<Link href={`/obras/${obra.id}`} />} nativeButton={false}>
+          <Button
+            className="flex-1 rounded-full"
+            size="sm"
+            render={<Link href={`/obras/${obra.id}`} />}
+            nativeButton={false}
+          >
             Acessar
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="outline" size="icon-sm">
+                <Button variant="outline" size="icon-sm" className="rounded-full">
                   <MoreVertical />
                 </Button>
               }

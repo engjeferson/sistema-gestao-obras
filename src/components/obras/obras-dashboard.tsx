@@ -99,7 +99,7 @@ export function ObrasDashboard({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex w-fit rounded-lg bg-muted p-1">
+        <div className="flex w-fit rounded-full bg-muted p-1">
           {(
             [
               ["todas", "Todas"],
@@ -112,7 +112,7 @@ export function ObrasDashboard({
               type="button"
               onClick={() => setStatusTab(value)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                "rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
                 statusTab === value
                   ? "bg-card text-foreground shadow-sm ring-1 ring-foreground/10"
                   : "text-muted-foreground hover:text-foreground",
@@ -123,13 +123,13 @@ export function ObrasDashboard({
           ))}
         </div>
 
-        <div className="flex rounded-lg bg-muted p-1">
+        <div className="flex rounded-full bg-muted p-1">
           <button
             type="button"
             onClick={() => setView("lista")}
             aria-label="Lista"
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors",
               view === "lista"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-foreground/10"
                 : "text-muted-foreground hover:text-foreground",
@@ -142,7 +142,7 @@ export function ObrasDashboard({
             onClick={() => setView("grade")}
             aria-label="Grade"
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors",
               view === "grade"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-foreground/10"
                 : "text-muted-foreground hover:text-foreground",
