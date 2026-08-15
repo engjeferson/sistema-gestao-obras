@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Import } from "lucide-react";
 import { listStagesWithTasks, listTasksForDependencyPicker } from "@/server/actions/planejamento";
+import { listPlanningTemplates } from "@/server/actions/planejamento-templates";
 import { AddStageForm } from "@/components/planejamento/add-stage-form";
 import { PlanningView } from "@/components/planejamento/planning-view";
+import { ApplyTemplatePicker } from "@/components/planejamento/apply-template-picker";
+import { SaveAsTemplateButton } from "@/components/planejamento/save-as-template-dialog";
 import { Button } from "@/components/ui/button";
 
 export default async function PlanejamentoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,18 +40,30 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
     stageNome: task.stage.nome,
   }));
 
+  if (stages.length === 0) {
+    const templates = await listPlanningTemplates();
+    return (
+      <div className="flex flex-col gap-6">
+        <ApplyTemplatePicker workId={id} templates={templates} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-2">
         <AddStageForm workId={id} />
-        <Button
-          variant="outline"
-          size="sm"
-          render={<Link href={`/obras/${id}/planejamento/importar`} />}
-          nativeButton={false}
-        >
-          <Import /> Lançamento em bloco
-        </Button>
+        <div className="flex items-center gap-2">
+          <SaveAsTemplateButton workId={id} />
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link href={`/obras/${id}/planejamento/importar`} />}
+            nativeButton={false}
+          >
+            <Import /> Lançamento em bloco
+          </Button>
+        </div>
       </div>
       <PlanningView stages={stages} workId={id} allTasks={allTasks} />
     </div>

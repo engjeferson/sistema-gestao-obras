@@ -128,6 +128,7 @@ model User {
   rdosResponsavel       Rdo[]                   @relation("RdoResponsavel")
   financialTransactions FinancialTransaction[]  @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
+  planningTemplates     PlanningTemplate[]
 
   @@index([role])
 }
@@ -525,6 +526,60 @@ model PlanningDependency {
 
   predecessorTask PlanningTask @relation("PredecessorLinks", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
   successorTask   PlanningTask @relation("SuccessorLinks", fields: [successorTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([predecessorTaskId, successorTaskId])
+  @@index([successorTaskId])
+}
+
+model PlanningTemplate {
+  id          String   @id @default(cuid())
+  nome        String
+  descricao   String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User                    @relation(fields: [createdById], references: [id])
+  stages    PlanningTemplateStage[]
+}
+
+model PlanningTemplateStage {
+  id         String @id @default(cuid())
+  templateId String
+  codigo     String?
+  nome       String
+  ordem      Int    @default(0)
+
+  template PlanningTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tasks    PlanningTemplateTask[]
+
+  @@index([templateId])
+}
+
+model PlanningTemplateTask {
+  id               String @id @default(cuid())
+  templateStageId  String
+  codigo           String?
+  nome             String
+  ordem            Int    @default(0)
+  offsetInicioDias Int
+  duracaoDias      Int
+
+  stage        PlanningTemplateStage        @relation(fields: [templateStageId], references: [id], onDelete: Cascade)
+  predecessors PlanningTemplateDependency[] @relation("TplSuccessorLinks")
+  successors   PlanningTemplateDependency[] @relation("TplPredecessorLinks")
+
+  @@index([templateStageId])
+}
+
+model PlanningTemplateDependency {
+  id                String @id @default(cuid())
+  predecessorTaskId String
+  successorTaskId   String
+  lagDias           Int    @default(0)
+
+  predecessorTask PlanningTemplateTask @relation("TplPredecessorLinks", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
+  successorTask   PlanningTemplateTask @relation("TplSuccessorLinks", fields: [successorTaskId], references: [id], onDelete: Cascade)
 
   @@unique([predecessorTaskId, successorTaskId])
   @@index([successorTaskId])

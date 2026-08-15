@@ -4,7 +4,7 @@ import { useState } from "react";
 import { List, GanttChartSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StageList, type PlainStage, type TaskOption } from "@/components/planejamento/stage-list";
-import { GanttChart, type GanttTask } from "@/components/gantt/gantt-chart";
+import { GanttChart } from "@/components/gantt/gantt-chart";
 
 export function PlanningView({
   stages,
@@ -16,18 +16,6 @@ export function PlanningView({
   allTasks: TaskOption[];
 }) {
   const [view, setView] = useState<"lista" | "gantt">("lista");
-
-  const ganttTasks: GanttTask[] = stages.flatMap((stage) =>
-    stage.tasks.map((task) => ({
-      id: task.id,
-      nome: task.nome,
-      etapaNome: stage.nome,
-      dataInicioPrevista: task.dataInicioPrevista,
-      dataFimPrevista: task.dataFimPrevista,
-      percentualExecutado: task.percentualExecutado,
-      status: task.status,
-    })),
-  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +31,7 @@ export function PlanningView({
       {view === "lista" ? (
         <StageList stages={stages} workId={workId} allTasks={allTasks} />
       ) : (
-        <GanttChart tasks={ganttTasks} workId={workId} />
+        <GanttChart stages={stages} workId={workId} allTasks={allTasks} />
       )}
     </div>
   );

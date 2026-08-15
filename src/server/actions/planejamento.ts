@@ -120,6 +120,17 @@ export async function createStage(_prevState: string | undefined, formData: Form
   return undefined;
 }
 
+export async function updateStageName(stageId: string, workId: string, nome: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const trimmed = nome.trim();
+  if (!trimmed) return;
+
+  await prisma.planningStage.update({ where: { id: stageId }, data: { nome: trimmed } });
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
 export async function deleteStage(stageId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
@@ -164,6 +175,17 @@ export async function createTask(_prevState: string | undefined, formData: FormD
 
   revalidatePath(`/obras/${data.workId}/planejamento`);
   return undefined;
+}
+
+export async function updateTaskName(taskId: string, workId: string, nome: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const trimmed = nome.trim();
+  if (!trimmed) return;
+
+  await prisma.planningTask.update({ where: { id: taskId }, data: { nome: trimmed } });
+  revalidatePath(`/obras/${workId}/planejamento`);
 }
 
 export async function deleteTask(taskId: string, workId: string) {
