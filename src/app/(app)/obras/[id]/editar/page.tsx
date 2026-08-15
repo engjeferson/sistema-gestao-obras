@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getWork, updateWork } from "@/server/actions/obras";
 import { listActiveProfessionals } from "@/server/actions/profissionais";
 import { ObraForm } from "@/components/obras/obra-form";
+import { presignGet } from "@/lib/r2";
 
 export default async function EditarObraPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -10,6 +11,7 @@ export default async function EditarObraPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
+  const renderPreviewUrl = work.renderUrl ? await presignGet(work.renderUrl) : null;
   const updateWorkWithId = updateWork.bind(null, work.id);
 
   return (
@@ -27,6 +29,7 @@ export default async function EditarObraPage({ params }: { params: Promise<{ id:
         }}
         submitLabel="Salvar alterações"
         professionals={professionals}
+        renderPreviewUrl={renderPreviewUrl}
       />
     </div>
   );

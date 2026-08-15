@@ -264,6 +264,7 @@ model Work {
   codigo                String     @unique
   nome                  String
   portalToken           String     @unique @default(cuid())
+  renderUrl             String?
   clientId              String?
   responsavelTecnicoId  String?
   encarregadoId         String?

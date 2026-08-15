@@ -1,4 +1,4 @@
-export type UploadCategory = "rdo-fotos" | "notas-fiscais" | "contratos" | "medicoes" | "company";
+export type UploadCategory = "rdo-fotos" | "notas-fiscais" | "contratos" | "medicoes" | "company" | "obra-render";
 
 export async function uploadFileToR2(
   file: File,

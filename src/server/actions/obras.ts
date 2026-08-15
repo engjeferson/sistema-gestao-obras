@@ -32,6 +32,7 @@ function parseWorkForm(formData: FormData) {
     dataPrevistaTermino: formData.get("dataPrevistaTermino"),
     status: formData.get("status"),
     observacoes: formData.get("observacoes") ?? undefined,
+    renderUrl: formData.get("renderUrl") ?? undefined,
   });
 }
 
@@ -107,6 +108,7 @@ export async function updateWork(workId: string, _prevState: string | undefined,
       dataPrevistaTermino: new Date(data.dataPrevistaTermino),
       status: data.status,
       observacoes: data.observacoes || null,
+      renderUrl: data.renderUrl || null,
     },
   });
 

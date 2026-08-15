@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
+import { WorkRenderUploader } from "@/components/obras/work-render-uploader";
 import { WORK_STATUS_LABELS } from "@/lib/status-labels";
 import type { WorkModel } from "@/generated/prisma/models";
 
@@ -20,6 +21,7 @@ type ObraFormProps = {
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
   professionals: { id: string; nome: string; tipo: { nome: string } }[];
+  renderPreviewUrl?: string | null;
 };
 
 function isEngenheiro(tipoNome: string) {
@@ -32,7 +34,13 @@ function toDateInputValue(date: Date | string | undefined | null) {
   return d.toISOString().slice(0, 10);
 }
 
-export function ObraForm({ action, defaultValues, submitLabel, professionals }: ObraFormProps) {
+export function ObraForm({
+  action,
+  defaultValues,
+  submitLabel,
+  professionals,
+  renderPreviewUrl,
+}: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const engenheiros = professionals.filter((p) => isEngenheiro(p.tipo.nome));
   const naoEngenheiros = professionals.filter((p) => !isEngenheiro(p.tipo.nome));
@@ -143,6 +151,15 @@ export function ObraForm({ action, defaultValues, submitLabel, professionals }: 
           <Label htmlFor="observacoes">Observações</Label>
           <Textarea id="observacoes" name="observacoes" defaultValue={defaultValues?.observacoes ?? ""} />
         </div>
+        {defaultValues?.id ? (
+          <div className="sm:col-span-2">
+            <WorkRenderUploader
+              workId={defaultValues.id}
+              defaultKey={defaultValues.renderUrl}
+              defaultPreviewUrl={renderPreviewUrl}
+            />
+          </div>
+        ) : null}
       </div>
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}

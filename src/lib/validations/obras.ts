@@ -16,6 +16,7 @@ export const workFormSchema = z.object({
   dataPrevistaTermino: z.string().min(1, "Informe a data prevista de término."),
   status: z.enum(workStatusValues),
   observacoes: z.string().trim().optional(),
+  renderUrl: z.string().trim().optional(),
 });
 
 export type WorkFormValues = z.infer<typeof workFormSchema>;
