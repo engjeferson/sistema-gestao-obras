@@ -89,8 +89,9 @@ export function RdoActivitiesEditor({
                   type="number"
                   min="0"
                   max="100"
-                  value={activity.percentualAtual}
-                  onChange={(e) => update(index, { percentualAtual: Number(e.target.value) })}
+                  value={activity.percentualAtual === 0 ? "" : activity.percentualAtual}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => update(index, { percentualAtual: e.target.value === "" ? 0 : Number(e.target.value) })}
                   className="w-20"
                 />
                 <span className="text-sm">%</span>
