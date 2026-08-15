@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { LogoutButton } from "@/components/layout/logout-button";
+import { InstallAppHint } from "@/components/campo/install-app-hint";
 
 export default async function CampoLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -24,7 +25,10 @@ export default async function CampoLayout({ children }: { children: React.ReactN
         </div>
         <LogoutButton className="text-white/70 hover:bg-white/10 hover:text-white" />
       </header>
-      <main className="flex-1 p-4">{children}</main>
+      <main className="flex-1 p-4">
+        <InstallAppHint />
+        {children}
+      </main>
     </div>
   );
 }

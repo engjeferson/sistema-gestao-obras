@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
@@ -13,6 +13,24 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "Reis Engenharia — Gestão de Obras",
   description: "Gestão de obras, financeiro, notas fiscais, planejamento e RDO da Reis Engenharia & Construções.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "RDO Obras",
+  },
+  icons: {
+    apple: "/icon.png",
+  },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0e1a2a",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
