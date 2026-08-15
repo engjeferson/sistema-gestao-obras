@@ -19,7 +19,7 @@ type ObraFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
-  users: { id: string; name: string }[];
+  professionals: { id: string; nome: string }[];
 };
 
 function toDateInputValue(date: Date | string | undefined | null) {
@@ -28,7 +28,7 @@ function toDateInputValue(date: Date | string | undefined | null) {
   return d.toISOString().slice(0, 10);
 }
 
-export function ObraForm({ action, defaultValues, submitLabel, users }: ObraFormProps) {
+export function ObraForm({ action, defaultValues, submitLabel, professionals }: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
   return (
@@ -58,9 +58,9 @@ export function ObraForm({ action, defaultValues, submitLabel, users }: ObraForm
             defaultValue={defaultValues?.responsavelTecnicoId ?? ""}
           >
             <option value="">Não definido</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
+            {professionals.map((professional) => (
+              <option key={professional.id} value={professional.id}>
+                {professional.nome}
               </option>
             ))}
           </NativeSelect>
@@ -69,9 +69,9 @@ export function ObraForm({ action, defaultValues, submitLabel, users }: ObraForm
           <Label htmlFor="encarregadoId">Encarregado</Label>
           <NativeSelect id="encarregadoId" name="encarregadoId" defaultValue={defaultValues?.encarregadoId ?? ""}>
             <option value="">Não definido</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
+            {professionals.map((professional) => (
+              <option key={professional.id} value={professional.id}>
+                {professional.nome}
               </option>
             ))}
           </NativeSelect>

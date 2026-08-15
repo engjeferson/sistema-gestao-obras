@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Tags, Building2 } from "lucide-react";
+import { Users, Tags, Building2, HardHat } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ConfiguracoesPage() {
@@ -25,6 +25,17 @@ export default function ConfiguracoesPage() {
               <div>
                 <CardTitle>Categorias financeiras</CardTitle>
                 <CardDescription>Gerenciar categorias de lançamentos</CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/configuracoes/tipos-profissional">
+          <Card className="transition-colors hover:bg-accent/50">
+            <CardHeader className="flex flex-row items-center gap-3">
+              <HardHat className="size-5" />
+              <div>
+                <CardTitle>Tipos de profissional</CardTitle>
+                <CardDescription>Engenheiro, empreiteiro, encarregado etc.</CardDescription>
               </div>
             </CardHeader>
           </Card>

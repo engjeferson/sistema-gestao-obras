@@ -11,7 +11,7 @@ import { toggleProfessionalActive } from "@/server/actions/profissionais";
 type ProfessionalRow = {
   id: string;
   nome: string;
-  funcao: string;
+  tipo: { nome: string };
   telefone: string | null;
   documento: string | null;
   ativo: boolean;
@@ -53,7 +53,7 @@ export function ProfessionalsTable({ professionals }: { professionals: Professio
         <TableHeader>
           <TableRow>
             <TableHead>Nome</TableHead>
-            <TableHead>Função</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Telefone</TableHead>
             <TableHead>CPF</TableHead>
             <TableHead>Status</TableHead>
@@ -68,7 +68,7 @@ export function ProfessionalsTable({ professionals }: { professionals: Professio
                   {professional.nome}
                 </Link>
               </TableCell>
-              <TableCell>{professional.funcao}</TableCell>
+              <TableCell>{professional.tipo.nome}</TableCell>
               <TableCell>{professional.telefone ?? "—"}</TableCell>
               <TableCell>{professional.documento ?? "—"}</TableCell>
               <TableCell>

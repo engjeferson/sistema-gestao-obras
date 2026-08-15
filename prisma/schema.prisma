@@ -128,8 +128,6 @@ model User {
   rdosResponsavel       Rdo[]                   @relation("RdoResponsavel")
   financialTransactions FinancialTransaction[]  @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
-  worksResponsavelTecnico Work[]                @relation("WorkResponsavelTecnico")
-  worksEncarregado        Work[]                @relation("WorkEncarregado")
 
   @@index([role])
 }
@@ -228,7 +226,7 @@ model Material {
 model Professional {
   id          String   @id @default(cuid())
   nome        String
-  funcao      String
+  tipoId      String
   telefone    String?
   documento   String?
   email       String?
@@ -236,6 +234,20 @@ model Professional {
   ativo       Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  tipo                    ProfessionalType @relation(fields: [tipoId], references: [id])
+  worksResponsavelTecnico Work[]           @relation("WorkResponsavelTecnico")
+  worksEncarregado        Work[]           @relation("WorkEncarregado")
+
+  @@index([tipoId])
+}
+
+model ProfessionalType {
+  id    String  @id @default(cuid())
+  nome  String  @unique
+  ativo Boolean @default(true)
+
+  professionals Professional[]
 }
 
 model FinancialCategory {
@@ -266,8 +278,8 @@ model Work {
   updatedAt             DateTime   @updatedAt
 
   client                Client?                 @relation(fields: [clientId], references: [id])
-  responsavelTecnico    User?                   @relation("WorkResponsavelTecnico", fields: [responsavelTecnicoId], references: [id])
-  encarregado           User?                   @relation("WorkEncarregado", fields: [encarregadoId], references: [id])
+  responsavelTecnico    Professional?           @relation("WorkResponsavelTecnico", fields: [responsavelTecnicoId], references: [id])
+  encarregado           Professional?           @relation("WorkEncarregado", fields: [encarregadoId], references: [id])
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   contracts             Contract[]

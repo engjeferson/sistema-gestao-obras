@@ -14,17 +14,17 @@ import { WORK_STATUS_BADGE, WORK_STATUS_LABELS, formatCurrencyBRL, formatDateBR 
 import { getInitials } from "@/lib/text";
 import type { ObraDashboardRow } from "@/server/actions/obras";
 
-function PersonMini({ label, person }: { label: string; person: { name: string } | null }) {
+function PersonMini({ label, person }: { label: string; person: { nome: string } | null }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Avatar size="sm">
         <AvatarFallback className="bg-primary/10 text-[10px] font-medium text-primary">
-          {person ? getInitials(person.name) : "—"}
+          {person ? getInitials(person.nome) : "—"}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0">
         <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
-        <p className="truncate text-xs leading-tight font-medium">{person?.name ?? "não atribuído"}</p>
+        <p className="truncate text-xs leading-tight font-medium">{person?.nome ?? "não atribuído"}</p>
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
-import { getWork, updateWork, listActiveUsers } from "@/server/actions/obras";
+import { getWork, updateWork } from "@/server/actions/obras";
+import { listActiveProfessionals } from "@/server/actions/profissionais";
 import { ObraForm } from "@/components/obras/obra-form";
 
 export default async function EditarObraPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [work, users] = await Promise.all([getWork(id), listActiveUsers()]);
+  const [work, professionals] = await Promise.all([getWork(id), listActiveProfessionals()]);
   if (!work) {
     notFound();
   }
@@ -25,7 +26,7 @@ export default async function EditarObraPage({ params }: { params: Promise<{ id:
           clienteNome: work.client?.nome,
         }}
         submitLabel="Salvar alterações"
-        users={users}
+        professionals={professionals}
       />
     </div>
   );

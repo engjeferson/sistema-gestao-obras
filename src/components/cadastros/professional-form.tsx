@@ -5,16 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { ProfessionalModel } from "@/generated/prisma/models";
 
 export function ProfessionalForm({
   action,
   defaultValues,
   submitLabel,
+  types,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: Partial<ProfessionalModel>;
   submitLabel: string;
+  types: { id: string; nome: string }[];
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
@@ -26,8 +29,17 @@ export function ProfessionalForm({
           <Input id="nome" name="nome" defaultValue={defaultValues?.nome} required />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="funcao">Função</Label>
-          <Input id="funcao" name="funcao" defaultValue={defaultValues?.funcao} placeholder="Ex: Pedreiro" required />
+          <Label htmlFor="tipoId">Tipo</Label>
+          <NativeSelect id="tipoId" name="tipoId" defaultValue={defaultValues?.tipoId ?? ""} required>
+            <option value="" disabled>
+              Selecione o tipo
+            </option>
+            {types.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.nome}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefone">Telefone</Label>

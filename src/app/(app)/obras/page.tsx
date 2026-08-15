@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { getObrasDashboard, listActiveUsers } from "@/server/actions/obras";
+import { getObrasDashboard } from "@/server/actions/obras";
 import { listClients } from "@/server/actions/clientes";
+import { listActiveProfessionals } from "@/server/actions/profissionais";
 import { Button } from "@/components/ui/button";
 import { ObrasDashboard } from "@/components/obras/obras-dashboard";
 
 export default async function ObrasPage() {
-  const [dashboard, clients, users] = await Promise.all([getObrasDashboard(), listClients(), listActiveUsers()]);
+  const [dashboard, clients, professionals] = await Promise.all([
+    getObrasDashboard(),
+    listClients(),
+    listActiveProfessionals(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -25,7 +30,7 @@ export default async function ObrasPage() {
         totalCount={dashboard.totalCount}
         kpis={dashboard.kpis}
         clients={clients}
-        users={users}
+        professionals={professionals}
       />
     </div>
   );

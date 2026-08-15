@@ -37,8 +37,8 @@ export function ObrasTable({ works }: { works: ObraDashboardRow[] }) {
                   </Link>
                 </TableCell>
                 <TableCell>{work.client?.nome ?? "—"}</TableCell>
-                <TableCell>{work.responsavelTecnico?.name ?? "—"}</TableCell>
-                <TableCell>{work.encarregado?.name ?? "—"}</TableCell>
+                <TableCell>{work.responsavelTecnico?.nome ?? "—"}</TableCell>
+                <TableCell>{work.encarregado?.nome ?? "—"}</TableCell>
                 <TableCell>{work.percentualExecutado.toFixed(2)}%</TableCell>
                 <TableCell>{formatCurrencyBRL(work.custoTotal)}</TableCell>
                 <TableCell>{formatDateBR(work.dataPrevistaTermino)}</TableCell>

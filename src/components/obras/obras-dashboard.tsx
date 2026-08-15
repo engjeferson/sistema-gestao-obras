@@ -34,7 +34,7 @@ export function ObrasDashboard({
   totalCount,
   kpis,
   clients,
-  users,
+  professionals,
 }: {
   works: ObraDashboardRow[];
   totalCount: number;
@@ -46,7 +46,7 @@ export function ObrasDashboard({
     saudeFinanceiraGlobal: number;
   };
   clients: { id: string; nome: string }[];
-  users: { id: string; name: string }[];
+  professionals: { id: string; nome: string }[];
 }) {
   const [statusTab, setStatusTab] = useState<StatusTab>("ativas");
   const [search, setSearch] = useState("");
@@ -187,9 +187,9 @@ export function ObrasDashboard({
           onChange={(e) => setResponsavelTecnicoId(e.target.value)}
         >
           <option value="">Responsável Téc.</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
+          {professionals.map((professional) => (
+            <option key={professional.id} value={professional.id}>
+              {professional.nome}
             </option>
           ))}
         </NativeSelect>
@@ -199,9 +199,9 @@ export function ObrasDashboard({
           onChange={(e) => setEncarregadoId(e.target.value)}
         >
           <option value="">Encarregado</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
+          {professionals.map((professional) => (
+            <option key={professional.id} value={professional.id}>
+              {professional.nome}
             </option>
           ))}
         </NativeSelect>

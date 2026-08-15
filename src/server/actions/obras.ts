@@ -149,16 +149,6 @@ export async function getWork(workId: string) {
   });
 }
 
-export async function listActiveUsers() {
-  const session = await auth();
-  if (!session) return [];
-  return prisma.user.findMany({
-    where: { active: true },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-}
-
 const ACTIVE_STATUSES = ["PLANEJAMENTO", "EM_ANDAMENTO"] as const;
 
 export async function getObrasDashboard() {

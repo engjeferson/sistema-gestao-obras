@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { ProfessionalForm } from "@/components/cadastros/professional-form";
 import { getProfessional, updateProfessional } from "@/server/actions/profissionais";
+import { listProfessionalTypes } from "@/server/actions/tipos-profissional";
 
 export default async function EditarProfissionalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const professional = await getProfessional(id);
+  const [professional, types] = await Promise.all([getProfessional(id), listProfessionalTypes()]);
   if (!professional) {
     notFound();
   }
@@ -18,6 +19,7 @@ export default async function EditarProfissionalPage({ params }: { params: Promi
         action={updateProfessionalWithId}
         defaultValues={professional}
         submitLabel="Salvar alterações"
+        types={types}
       />
     </div>
   );

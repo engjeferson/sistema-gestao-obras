@@ -8,17 +8,25 @@ import { assertRole } from "@/lib/permissions";
 import { professionalFormSchema } from "@/lib/validations/profissionais";
 
 export async function listProfessionals() {
-  return prisma.professional.findMany({ orderBy: { nome: "asc" } });
+  return prisma.professional.findMany({ include: { tipo: true }, orderBy: { nome: "asc" } });
+}
+
+export async function listActiveProfessionals() {
+  return prisma.professional.findMany({
+    where: { ativo: true },
+    include: { tipo: true },
+    orderBy: { nome: "asc" },
+  });
 }
 
 export async function getProfessional(professionalId: string) {
-  return prisma.professional.findUnique({ where: { id: professionalId } });
+  return prisma.professional.findUnique({ where: { id: professionalId }, include: { tipo: true } });
 }
 
 function parseProfessionalForm(formData: FormData) {
   return professionalFormSchema.safeParse({
     nome: formData.get("nome"),
-    funcao: formData.get("funcao"),
+    tipoId: formData.get("tipoId"),
     telefone: formData.get("telefone") ?? undefined,
     documento: formData.get("documento") ?? undefined,
     email: formData.get("email") ?? undefined,
@@ -39,7 +47,7 @@ export async function createProfessional(_prevState: string | undefined, formDat
   await prisma.professional.create({
     data: {
       nome: data.nome,
-      funcao: data.funcao,
+      tipoId: data.tipoId,
       telefone: data.telefone || null,
       documento: data.documento || null,
       email: data.email || null,
@@ -69,7 +77,7 @@ export async function updateProfessional(
     where: { id: professionalId },
     data: {
       nome: data.nome,
-      funcao: data.funcao,
+      tipoId: data.tipoId,
       telefone: data.telefone || null,
       documento: data.documento || null,
       email: data.email || null,
