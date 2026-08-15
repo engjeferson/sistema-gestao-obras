@@ -34,7 +34,6 @@ export function ObrasDashboard({
   totalCount,
   kpis,
   clients,
-  professionals,
 }: {
   works: ObraDashboardRow[];
   totalCount: number;
@@ -46,13 +45,10 @@ export function ObrasDashboard({
     saudeFinanceiraGlobal: number;
   };
   clients: { id: string; nome: string }[];
-  professionals: { id: string; nome: string }[];
 }) {
   const [statusTab, setStatusTab] = useState<StatusTab>("ativas");
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("");
-  const [responsavelTecnicoId, setResponsavelTecnicoId] = useState("");
-  const [encarregadoId, setEncarregadoId] = useState("");
   const [view, setView] = useState<"lista" | "grade">("grade");
 
   const filtered = useMemo(() => {
@@ -61,12 +57,10 @@ export function ObrasDashboard({
       if (statusTab === "ativas" && !ACTIVE_STATUSES.includes(obra.status)) return false;
       if (statusTab === "inativas" && ACTIVE_STATUSES.includes(obra.status)) return false;
       if (clientId && obra.client?.id !== clientId) return false;
-      if (responsavelTecnicoId && obra.responsavelTecnico?.id !== responsavelTecnicoId) return false;
-      if (encarregadoId && obra.encarregado?.id !== encarregadoId) return false;
       if (q && ![obra.nome, obra.codigo].some((field) => normalizeSearch(field).includes(q))) return false;
       return true;
     });
-  }, [works, statusTab, search, clientId, responsavelTecnicoId, encarregadoId]);
+  }, [works, statusTab, search, clientId]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -178,30 +172,6 @@ export function ObrasDashboard({
           {clients.map((client) => (
             <option key={client.id} value={client.id}>
               {client.nome}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          className="w-auto min-w-[10rem]"
-          value={responsavelTecnicoId}
-          onChange={(e) => setResponsavelTecnicoId(e.target.value)}
-        >
-          <option value="">Responsável Téc.</option>
-          {professionals.map((professional) => (
-            <option key={professional.id} value={professional.id}>
-              {professional.nome}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          className="w-auto min-w-[10rem]"
-          value={encarregadoId}
-          onChange={(e) => setEncarregadoId(e.target.value)}
-        >
-          <option value="">Encarregado</option>
-          {professionals.map((professional) => (
-            <option key={professional.id} value={professional.id}>
-              {professional.nome}
             </option>
           ))}
         </NativeSelect>
