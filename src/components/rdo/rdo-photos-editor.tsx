@@ -6,6 +6,7 @@ import { Trash2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadFileToR2 } from "@/lib/upload-file";
+import { compressImage } from "@/lib/compress-image";
 import type { RdoPhotoValues } from "@/lib/validations/rdo";
 
 export function RdoPhotosEditor({
@@ -27,10 +28,12 @@ export function RdoPhotosEditor({
     const uploaded: RdoPhotoValues[] = [];
     for (const file of Array.from(files)) {
       try {
-        const key = await uploadFileToR2(file, "rdo-fotos", workId, draftId);
+        const compressed = await compressImage(file);
+        const key = await uploadFileToR2(compressed, "rdo-fotos", workId, draftId);
         uploaded.push({ url: key, descricao: "" });
-      } catch {
-        toast.error(`Não foi possível enviar ${file.name}.`);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "";
+        toast.error(`Não foi possível enviar ${file.name}.${detail ? ` (${detail})` : ""}`);
       }
     }
     if (uploaded.length > 0) {

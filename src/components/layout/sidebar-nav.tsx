@@ -51,7 +51,15 @@ const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
   },
 ];
 
-export function SidebarNav({ role, collapsed = false }: { role: Role; collapsed?: boolean }) {
+export function SidebarNav({
+  role,
+  collapsed = false,
+  onNavigate,
+}: {
+  role: Role;
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   const groups = NAV_GROUPS.map((group) => ({
@@ -75,6 +83,7 @@ export function SidebarNav({ role, collapsed = false }: { role: Role; collapsed?
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 title={collapsed ? item.label : undefined}
                 className={cn(
                   "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
