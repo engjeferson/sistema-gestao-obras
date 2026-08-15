@@ -19,8 +19,12 @@ type ObraFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
-  professionals: { id: string; nome: string }[];
+  professionals: { id: string; nome: string; tipo: { nome: string } }[];
 };
+
+function isEngenheiro(tipoNome: string) {
+  return tipoNome.toLowerCase().includes("engenheiro");
+}
 
 function toDateInputValue(date: Date | string | undefined | null) {
   if (!date) return "";
@@ -30,6 +34,8 @@ function toDateInputValue(date: Date | string | undefined | null) {
 
 export function ObraForm({ action, defaultValues, submitLabel, professionals }: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const engenheiros = professionals.filter((p) => isEngenheiro(p.tipo.nome));
+  const naoEngenheiros = professionals.filter((p) => !isEngenheiro(p.tipo.nome));
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -58,7 +64,7 @@ export function ObraForm({ action, defaultValues, submitLabel, professionals }: 
             defaultValue={defaultValues?.responsavelTecnicoId ?? ""}
           >
             <option value="">Não definido</option>
-            {professionals.map((professional) => (
+            {engenheiros.map((professional) => (
               <option key={professional.id} value={professional.id}>
                 {professional.nome}
               </option>
@@ -69,7 +75,7 @@ export function ObraForm({ action, defaultValues, submitLabel, professionals }: 
           <Label htmlFor="encarregadoId">Encarregado</Label>
           <NativeSelect id="encarregadoId" name="encarregadoId" defaultValue={defaultValues?.encarregadoId ?? ""}>
             <option value="">Não definido</option>
-            {professionals.map((professional) => (
+            {naoEngenheiros.map((professional) => (
               <option key={professional.id} value={professional.id}>
                 {professional.nome}
               </option>
