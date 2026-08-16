@@ -4,46 +4,44 @@ import { useActionState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { createStage } from "@/server/actions/planejamento";
+import type { PlainStage } from "@/components/planejamento/stage-list";
 
-export function AddStageForm({
-  workId,
-  parentId,
-  label = "Nova etapa",
-  compact = false,
-}: {
-  workId: string;
-  parentId?: string;
-  label?: string;
-  compact?: boolean;
-}) {
+function flattenStageOptions(stages: PlainStage[], depth = 0): { id: string; label: string }[] {
+  return stages.flatMap((stage) => [
+    { id: stage.id, label: `${"— ".repeat(depth)}${stage.codigo} ${stage.nome}` },
+    ...flattenStageOptions(stage.children, depth + 1),
+  ]);
+}
+
+// Único jeito de criar etapa/sub: a lista de etapas já existentes aparece no seletor de pai.
+export function AddStageForm({ workId, stages }: { workId: string; stages: PlainStage[] }) {
   const [errorMessage, formAction, isPending] = useActionState(createStage, undefined);
-
-  if (compact) {
-    return (
-      <form action={formAction} className="flex flex-wrap items-end gap-2 rounded-md border p-3">
-        <input type="hidden" name="workId" value={workId} />
-        {parentId ? <input type="hidden" name="parentId" value={parentId} /> : null}
-        <Input name="nome" placeholder="Nome da sub" required className="w-48" />
-        <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-          <Plus /> {label}
-        </Button>
-        {errorMessage ? <p className="w-full text-sm text-destructive">{errorMessage}</p> : null}
-      </form>
-    );
-  }
+  const options = flattenStageOptions(stages);
 
   return (
-    <form action={formAction} className="flex items-end gap-2">
+    <form action={formAction} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="workId" value={workId} />
-      {parentId ? <input type="hidden" name="parentId" value={parentId} /> : null}
-      <div className="flex flex-1 flex-col gap-2">
-        <Input name="nome" placeholder="Nome da etapa (ex: Fundação)" required />
-        {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">Nome</label>
+        <Input name="nome" placeholder="Nome da etapa" required className="w-56" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">Etapa pai (opcional)</label>
+        <NativeSelect name="parentId" defaultValue="" className="w-56">
+          <option value="">— Nível superior —</option>
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </NativeSelect>
       </div>
       <Button type="submit" disabled={isPending}>
-        <Plus /> {label}
+        <Plus /> {isPending ? "Salvando..." : "Nova etapa"}
       </Button>
+      {errorMessage ? <p className="w-full text-sm text-destructive">{errorMessage}</p> : null}
     </form>
   );
 }

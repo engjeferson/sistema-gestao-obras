@@ -6,10 +6,10 @@ import { toast } from "sonner";
 import { addDays, differenceInCalendarDays, eachDayOfInterval } from "date-fns";
 import { ChevronDown, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { updatePlanningTaskDates, updateStageName, updateTaskName } from "@/server/actions/planejamento";
-import { TaskPredecessorsCell } from "@/components/planejamento/task-predecessors-cell";
+import { updatePlanningTaskDates, updateStageName, updateTaskName, type PredecessorChip } from "@/server/actions/planejamento";
+import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
 import { EditableName } from "@/components/planejamento/editable-name";
-import type { PlainStage, PlainTask, TaskOption } from "@/components/planejamento/stage-list";
+import type { PlainStage, PlainTask } from "@/components/planejamento/stage-list";
 import { PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 
 // As datas do planejamento são meia-noite UTC (@db.Date). Formatar com timeZone "UTC" explícito
@@ -64,15 +64,7 @@ function collectStageIds(stages: PlainStage[]): string[] {
   return stages.flatMap((s) => [s.id, ...collectStageIds(s.children)]);
 }
 
-export function GanttChart({
-  stages,
-  workId,
-  allTasks,
-}: {
-  stages: PlainStage[];
-  workId: string;
-  allTasks: TaskOption[];
-}) {
+export function GanttChart({ stages, workId }: { stages: PlainStage[]; workId: string }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [zoomIndex, setZoomIndex] = useState(2);
   const [fullscreen, setFullscreen] = useState(false);
@@ -122,41 +114,72 @@ export function GanttChart({
     return map;
   }, [rows]);
 
+  const stageRowInfo = useMemo(() => {
+    const map = new Map<string, { index: number; start: Date; end: Date }>();
+    rows.forEach((row, i) => {
+      if (row.type === "stage") map.set(row.stage.id, { index: i, start: row.start, end: row.end });
+    });
+    return map;
+  }, [rows]);
+
   const taskById = useMemo(() => {
     const map = new Map<string, PlainTask>();
     for (const task of allTasksFlat) map.set(task.id, task);
     return map;
   }, [allTasksFlat]);
 
+  // Setas de dependência — predecessora e dona podem ser tanto Item quanto Etapa/Sub (usa o
+  // fim/início agregado da etapa quando for o caso). Só desenha entre linhas visíveis.
   const arrows = useMemo(() => {
     const list: { id: string; path: string }[] = [];
+
+    function predecessorAnchor(chip: PredecessorChip): { index: number; endDate: Date } | null {
+      if (chip.type === "task") {
+        const index = taskRowIndex.get(chip.id);
+        const task = taskById.get(chip.id);
+        if (index === undefined || !task) return null;
+        return { index, endDate: task.dataFimPrevista };
+      }
+      const info = stageRowInfo.get(chip.id);
+      return info ? { index: info.index, endDate: info.end } : null;
+    }
+
+    function drawArrow(chip: PredecessorChip, ownerIndex: number, ownerStart: Date, ownerKey: string) {
+      const pred = predecessorAnchor(chip);
+      if (!pred) return;
+      const predRight = xForDate(pred.endDate) + pxPerDay;
+      const predY = pred.index * ROW_HEIGHT + ROW_HEIGHT / 2;
+      const succLeft = xForDate(ownerStart);
+      const succY = ownerIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+      let path: string;
+      if (succLeft - 12 >= predRight) {
+        const midX = (predRight + succLeft) / 2;
+        path = `M ${predRight} ${predY} H ${midX} V ${succY} H ${succLeft - 4}`;
+      } else {
+        const detourY = succY < predY ? succY - 16 : succY + 16;
+        path = `M ${predRight} ${predY} H ${predRight + 10} V ${detourY} H ${succLeft - 10} V ${succY} H ${succLeft - 4}`;
+      }
+      list.push({ id: `${chip.type}-${chip.id}-${ownerKey}`, path });
+    }
+
     for (const row of rows) {
-      if (row.type !== "task") continue;
-      const succIndex = taskRowIndex.get(row.task.id);
-      if (succIndex === undefined) continue;
-      for (const pred of row.task.predecessors) {
-        const predIndex = taskRowIndex.get(pred.taskId);
-        const predTask = taskById.get(pred.taskId);
-        if (predIndex === undefined || !predTask) continue;
-
-        const predRight = xForDate(predTask.dataFimPrevista) + pxPerDay;
-        const predY = predIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const succLeft = xForDate(row.task.dataInicioPrevista);
-        const succY = succIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-        let path: string;
-        if (succLeft - 12 >= predRight) {
-          const midX = (predRight + succLeft) / 2;
-          path = `M ${predRight} ${predY} H ${midX} V ${succY} H ${succLeft - 4}`;
-        } else {
-          const detourY = succY < predY ? succY - 16 : succY + 16;
-          path = `M ${predRight} ${predY} H ${predRight + 10} V ${detourY} H ${succLeft - 10} V ${succY} H ${succLeft - 4}`;
+      if (row.type === "task") {
+        const ownerIndex = taskRowIndex.get(row.task.id);
+        if (ownerIndex === undefined) continue;
+        for (const chip of row.task.predecessorChips) {
+          drawArrow(chip, ownerIndex, row.task.dataInicioPrevista, `task-${row.task.id}`);
         }
-        list.push({ id: `${pred.taskId}-${row.task.id}`, path });
+      } else {
+        const info = stageRowInfo.get(row.stage.id);
+        if (!info) continue;
+        for (const chip of row.stage.predecessorChips) {
+          drawArrow(chip, info.index, info.start, `stage-${row.stage.id}`);
+        }
       }
     }
     return list;
-  }, [rows, taskRowIndex, taskById, pxPerDay, rangeStart]);
+  }, [rows, taskRowIndex, taskById, stageRowInfo, pxPerDay, rangeStart]);
 
   const now = new Date();
   const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
@@ -343,7 +366,7 @@ export function GanttChart({
                       <span className="text-muted-foreground">
                         {differenceInCalendarDays(row.end, row.start) + 1}
                       </span>
-                      <span />
+                      <PredecessorsCell workId={workId} ownerStageId={row.stage.id} chips={row.stage.predecessorChips} />
                     </div>
                   );
                 }
@@ -386,12 +409,7 @@ export function GanttChart({
                       }}
                       className="w-[48px] rounded border px-1 py-0.5 text-[0.7rem]"
                     />
-                    <TaskPredecessorsCell
-                      taskId={task.id}
-                      workId={workId}
-                      predecessors={task.predecessors}
-                      allTasks={allTasks}
-                    />
+                    <PredecessorsCell workId={workId} ownerTaskId={task.id} chips={task.predecessorChips} />
                   </div>
                 );
               })}

@@ -4,19 +4,16 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { AddStageForm } from "@/components/planejamento/add-stage-form";
 import { AddTaskForm } from "@/components/planejamento/add-task-form";
 import { DeleteStageButton, DeleteTaskButton } from "@/components/planejamento/delete-buttons";
 import { EditableName } from "@/components/planejamento/editable-name";
-import { TaskPredecessorsCell, type PredecessorLink } from "@/components/planejamento/task-predecessors-cell";
+import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
-import { moveStage, updateStageName } from "@/server/actions/planejamento";
-
-export type TaskOption = { id: string; codigo: string; nome: string };
+import { moveStage, updateStageName, type PredecessorChip } from "@/server/actions/planejamento";
 
 export type PlainTask = {
   id: string;
@@ -26,26 +23,19 @@ export type PlainTask = {
   dataFimPrevista: Date;
   percentualExecutado: number;
   status: string;
-  predecessors: PredecessorLink[];
+  predecessorChips: PredecessorChip[];
 };
 
 export type PlainStage = {
   id: string;
   codigo: string;
   nome: string;
+  predecessorChips: PredecessorChip[];
   tasks: PlainTask[];
   children: PlainStage[];
 };
 
-export function StageList({
-  stages,
-  workId,
-  allTasks,
-}: {
-  stages: PlainStage[];
-  workId: string;
-  allTasks: TaskOption[];
-}) {
+export function StageList({ stages, workId }: { stages: PlainStage[]; workId: string }) {
   if (stages.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -61,7 +51,6 @@ export function StageList({
           key={stage.id}
           stage={stage}
           workId={workId}
-          allTasks={allTasks}
           depth={0}
           isFirst={index === 0}
           isLast={index === stages.length - 1}
@@ -74,14 +63,12 @@ export function StageList({
 function StageCard({
   stage,
   workId,
-  allTasks,
   depth,
   isFirst,
   isLast,
 }: {
   stage: PlainStage;
   workId: string;
-  allTasks: TaskOption[];
   depth: number;
   isFirst: boolean;
   isLast: boolean;
@@ -129,6 +116,11 @@ function StageCard({
 
   const body = (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Predecessoras da etapa:</span>
+        <PredecessorsCell workId={workId} ownerStageId={stage.id} chips={stage.predecessorChips} />
+      </div>
+
       {stage.tasks.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border">
           <Table>
@@ -156,12 +148,7 @@ function StageCard({
                     <Badge variant={PLANNING_STATUS_BADGE[task.status]}>{PLANNING_STATUS_LABELS[task.status]}</Badge>
                   </TableCell>
                   <TableCell>
-                    <TaskPredecessorsCell
-                      taskId={task.id}
-                      workId={workId}
-                      predecessors={task.predecessors}
-                      allTasks={allTasks}
-                    />
+                    <PredecessorsCell workId={workId} ownerTaskId={task.id} chips={task.predecessorChips} />
                   </TableCell>
                   <TableCell className="text-right">
                     <DeleteTaskButton taskId={task.id} workId={workId} />
@@ -175,10 +162,7 @@ function StageCard({
         <p className="text-sm text-muted-foreground">Nenhum item aqui ainda.</p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <AddTaskForm workId={workId} stageId={stage.id} />
-        <AddStageForm workId={workId} parentId={stage.id} label="Nova sub" compact />
-      </div>
+      <AddTaskForm workId={workId} stageId={stage.id} />
 
       {stage.children.length > 0 ? (
         <div className="flex flex-col gap-4 border-l pl-4">
@@ -187,7 +171,6 @@ function StageCard({
               key={child.id}
               stage={child}
               workId={workId}
-              allTasks={allTasks}
               depth={depth + 1}
               isFirst={index === 0}
               isLast={index === stage.children.length - 1}

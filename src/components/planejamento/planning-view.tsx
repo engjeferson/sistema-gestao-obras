@@ -3,18 +3,10 @@
 import { useState } from "react";
 import { List, GanttChartSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StageList, type PlainStage, type TaskOption } from "@/components/planejamento/stage-list";
+import { StageList, type PlainStage } from "@/components/planejamento/stage-list";
 import { GanttChart } from "@/components/gantt/gantt-chart";
 
-export function PlanningView({
-  stages,
-  workId,
-  allTasks,
-}: {
-  stages: PlainStage[];
-  workId: string;
-  allTasks: TaskOption[];
-}) {
+export function PlanningView({ stages, workId }: { stages: PlainStage[]; workId: string }) {
   const [view, setView] = useState<"lista" | "gantt">("lista");
 
   return (
@@ -29,9 +21,9 @@ export function PlanningView({
       </div>
 
       {view === "lista" ? (
-        <StageList stages={stages} workId={workId} allTasks={allTasks} />
+        <StageList stages={stages} workId={workId} />
       ) : (
-        <GanttChart stages={stages} workId={workId} allTasks={allTasks} />
+        <GanttChart stages={stages} workId={workId} />
       )}
     </div>
   );

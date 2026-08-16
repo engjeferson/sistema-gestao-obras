@@ -108,9 +108,140 @@ export async function listUpcomingTasks(workId: string) {
   });
 }
 
-export type StageTreeNode = Awaited<ReturnType<typeof listStagesWithTasks>>[number];
+export type PredecessorChip = { type: "stage" | "task"; id: string; codigo: string; nome: string };
 
-export async function listStagesWithTasks(workId: string) {
+export type StageTreeNode = {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  ordem: number;
+  predecessorChips: PredecessorChip[];
+  tasks: {
+    id: string;
+    codigo: string | null;
+    nome: string;
+    dataInicioPrevista: Date;
+    dataFimPrevista: Date;
+    percentualExecutado: number;
+    status: string;
+    predecessors: { id: string; predecessorTask: { id: string; codigo: string | null; nome: string } }[];
+    predecessorChips: PredecessorChip[];
+  }[];
+  children: StageTreeNode[];
+};
+
+/** Todos os ids de item (folha) dentro de uma etapa/sub, recursivamente. */
+function leafTaskIds(node: StageTreeNode | null): string[] {
+  if (!node) return [];
+  return [...node.tasks.map((t) => t.id), ...node.children.flatMap(leafTaskIds)];
+}
+
+function findStageById(nodes: StageTreeNode[], id: string): StageTreeNode | null {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const found = findStageById(n.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Resolve um código digitado (de etapa/sub OU item) pros ids de item que ele representa. */
+function findEntityByCode(nodes: StageTreeNode[], code: string): { taskIds: string[] } | null {
+  for (const n of nodes) {
+    if (n.codigo === code) return { taskIds: leafTaskIds(n) };
+    const task = n.tasks.find((t) => t.codigo === code);
+    if (task) return { taskIds: [task.id] };
+    const found = findEntityByCode(n.children, code);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Agrupa um conjunto de ids de item predecessor em "chips" — prefere a etapa/sub mais
+ * abrangente (percorre a árvore da raiz pra baixo) sempre que TODOS os itens dela estiverem
+ * no conjunto; o que sobrar vira chip de item individual.
+ */
+function groupIntoChips(taskIds: Set<string>, roots: StageTreeNode[], taskById: Map<string, StageTreeNode["tasks"][number]>): PredecessorChip[] {
+  const remaining = new Set(taskIds);
+  const chips: PredecessorChip[] = [];
+  const queue: StageTreeNode[] = [...roots];
+  while (queue.length > 0) {
+    const stage = queue.shift()!;
+    const leaves = leafTaskIds(stage);
+    if (leaves.length > 0 && leaves.every((id) => remaining.has(id))) {
+      chips.push({ type: "stage", id: stage.id, codigo: stage.codigo ?? "", nome: stage.nome });
+      for (const id of leaves) remaining.delete(id);
+    } else {
+      queue.push(...stage.children);
+    }
+  }
+  for (const id of remaining) {
+    const task = taskById.get(id);
+    if (task) chips.push({ type: "task", id: task.id, codigo: task.codigo ?? "", nome: task.nome });
+  }
+  return chips;
+}
+
+export async function addPlanningDependencyByCode(
+  workId: string,
+  predecessorCode: string,
+  ownerStageId: string | null,
+  ownerTaskId: string | null,
+) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const roots = await listStagesWithTasks(workId);
+  const predecessor = findEntityByCode(roots, predecessorCode.trim());
+  if (!predecessor) {
+    throw new Error("Código não encontrado.");
+  }
+
+  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStageId ? findStageById(roots, ownerStageId) : null);
+
+  const pairs = predecessor.taskIds.flatMap((p) =>
+    ownerTaskIds.filter((s) => s !== p).map((s) => ({ predecessorTaskId: p, successorTaskId: s })),
+  );
+  if (pairs.length === 0) {
+    throw new Error("Não foi possível relacionar — confira se não é o próprio item.");
+  }
+
+  await prisma.planningDependency.createMany({ data: pairs, skipDuplicates: true });
+
+  await prisma.$transaction(async (tx) => {
+    for (const predecessorTaskId of new Set(predecessor.taskIds)) {
+      await applyCascadeForTask(tx, workId, predecessorTaskId);
+    }
+  });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
+export async function removeGroupedDependency(
+  workId: string,
+  predecessorStageId: string | null,
+  predecessorTaskId: string | null,
+  ownerStageId: string | null,
+  ownerTaskId: string | null,
+) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const roots = await listStagesWithTasks(workId);
+  const predecessorTaskIds = predecessorTaskId
+    ? [predecessorTaskId]
+    : leafTaskIds(predecessorStageId ? findStageById(roots, predecessorStageId) : null);
+  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStageId ? findStageById(roots, ownerStageId) : null);
+
+  await prisma.planningDependency.deleteMany({
+    where: { predecessorTaskId: { in: predecessorTaskIds }, successorTaskId: { in: ownerTaskIds } },
+  });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
+export async function listStagesWithTasks(workId: string): Promise<StageTreeNode[]> {
   const stages = await prisma.planningStage.findMany({
     where: { workId },
     include: {
@@ -183,19 +314,48 @@ export async function listStagesWithTasks(workId: string) {
     }
   })(roots);
 
-  return roots;
-}
+  const tree = roots as unknown as StageTreeNode[];
 
-export async function listTasksForDependencyPicker(workId: string) {
-  const roots = await listStagesWithTasks(workId);
+  const taskById = new Map<string, StageTreeNode["tasks"][number]>();
+  (function indexTasks(nodes: StageTreeNode[]) {
+    for (const n of nodes) {
+      for (const t of n.tasks) taskById.set(t.id, t);
+      indexTasks(n.children);
+    }
+  })(tree);
 
-  function flatten(nodes: StageTreeNode[]): { id: string; codigo: string | null; nome: string }[] {
-    return nodes.flatMap((node) => [
-      ...node.tasks.map((task) => ({ id: task.id, codigo: task.codigo, nome: task.nome })),
-      ...flatten(node.children),
-    ]);
-  }
-  return flatten(roots);
+  // Chips de predecessora de cada item: agrupa pela etapa/sub mais abrangente possível.
+  (function assignTaskChips(nodes: StageTreeNode[]) {
+    for (const n of nodes) {
+      for (const t of n.tasks) {
+        const idSet = new Set(t.predecessors.map((d) => d.predecessorTask.id));
+        t.predecessorChips = groupIntoChips(idSet, tree, taskById);
+      }
+      assignTaskChips(n.children);
+    }
+  })(tree);
+
+  // Chips de predecessora de cada etapa/sub: só as predecessoras comuns a TODOS os itens dela
+  // (o que realmente bloqueia a etapa inteira) — não a união (que superestimaria).
+  (function assignStageChips(nodes: StageTreeNode[]) {
+    for (const n of nodes) {
+      const leaves = leafTaskIds(n)
+        .map((id) => taskById.get(id))
+        .filter((t): t is StageTreeNode["tasks"][number] => !!t);
+      let intersection: Set<string> = new Set();
+      if (leaves.length > 0) {
+        intersection = new Set(leaves[0].predecessors.map((d) => d.predecessorTask.id));
+        for (let i = 1; i < leaves.length; i++) {
+          const idSet = new Set(leaves[i].predecessors.map((d) => d.predecessorTask.id));
+          intersection = new Set([...intersection].filter((id) => idSet.has(id)));
+        }
+      }
+      n.predecessorChips = leaves.length > 0 ? groupIntoChips(intersection, tree, taskById) : [];
+      assignStageChips(n.children);
+    }
+  })(tree);
+
+  return tree;
 }
 
 export async function createStage(_prevState: string | undefined, formData: FormData) {
@@ -328,38 +488,6 @@ export async function updatePlanningTaskDates(taskId: string, workId: string, st
     await applyCascadeForTask(tx, workId, taskId);
   });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-}
-
-export async function addPlanningDependency(
-  predecessorTaskId: string,
-  successorTaskId: string,
-  workId: string,
-  lagDias = 0,
-) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-
-  if (predecessorTaskId === successorTaskId) {
-    throw new Error("Uma atividade não pode ser predecessora dela mesma.");
-  }
-
-  await prisma.planningDependency.create({
-    data: { predecessorTaskId, successorTaskId, lagDias },
-  });
-
-  await prisma.$transaction(async (tx) => {
-    await applyCascadeForTask(tx, workId, predecessorTaskId);
-  });
-
-  revalidatePath(`/obras/${workId}/planejamento`);
-}
-
-export async function removePlanningDependency(dependencyId: string, workId: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-
-  await prisma.planningDependency.delete({ where: { id: dependencyId } });
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 
