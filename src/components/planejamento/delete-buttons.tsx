@@ -17,7 +17,7 @@ export function DeleteStageButton({ stageId, workId }: { stageId: string; workId
       size="icon"
       disabled={isPending}
       onClick={() => {
-        if (!confirm("Excluir esta etapa/sub? Isso também apaga tudo dentro dela (subs e itens). Essa ação não pode ser desfeita.")) {
+        if (!confirm("Excluir esta etapa/sub? Isso também apaga tudo dentro dela (subs e atividades). Essa ação não pode ser desfeita.")) {
           return;
         }
         startTransition(async () => {
@@ -42,10 +42,10 @@ export function DeleteTaskButton({ taskId, workId }: { taskId: string; workId: s
       size="icon"
       disabled={isPending}
       onClick={() => {
-        if (!confirm("Excluir este item? Essa ação não pode ser desfeita.")) return;
+        if (!confirm("Excluir esta atividade? Essa ação não pode ser desfeita.")) return;
         startTransition(async () => {
           await deleteTask(taskId, workId);
-          toast.success("Item removido.");
+          toast.success("Atividade removida.");
           router.refresh();
         });
       }}

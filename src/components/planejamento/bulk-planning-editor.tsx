@@ -99,7 +99,8 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
     setRows((prev) => [...prev, newRow("ATIVIDADE", defaultParent)]);
   }
 
-  const canAddItem = existingOptions.length > 0 || etapaRows.length > 0;
+  const canAddAtividade = existingOptions.length > 0 || etapaRows.length > 0;
+  const rowNumber = new Map(rows.map((r, i) => [r.clientId, i + 1]));
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -110,6 +111,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
         <table className="w-full min-w-[1000px] text-sm">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
+              <th className="w-10 p-2">#</th>
               <th className="p-2">Tipo</th>
               <th className="p-2">Pai</th>
               <th className="p-2">Nome</th>
@@ -122,6 +124,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
           <tbody>
             {rows.map((row) => (
               <tr key={row.clientId} className="border-b last:border-0">
+                <td className="p-2 text-muted-foreground">{rowNumber.get(row.clientId)}</td>
                 <td className="p-2">
                   <Badge tipo={row.tipo} />
                 </td>
@@ -190,7 +193,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                         .filter((a) => a.clientId !== row.clientId)
                         .map((a) => (
                           <option key={a.clientId} value={a.clientId}>
-                            {a.nome || "(sem nome)"}
+                            {rowNumber.get(a.clientId)}
                           </option>
                         ))}
                     </select>
@@ -213,8 +216,8 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
         <Button type="button" variant="outline" size="sm" onClick={addEtapa}>
           <Plus /> Etapa
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={addAtividade} disabled={!canAddItem}>
-          <Plus /> Item
+        <Button type="button" variant="outline" size="sm" onClick={addAtividade} disabled={!canAddAtividade}>
+          <Plus /> Atividade
         </Button>
       </div>
 
@@ -236,7 +239,7 @@ function Badge({ tipo }: { tipo: "ETAPA" | "ATIVIDADE" }) {
         tipo === "ETAPA" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
       }`}
     >
-      {tipo === "ETAPA" ? "Etapa" : "Item"}
+      {tipo === "ETAPA" ? "Etapa" : "Atividade"}
     </span>
   );
 }

@@ -94,7 +94,7 @@ export function PredecessorsCell({
                 }
                 if (e.key === "Escape") setOpen(false);
               }}
-              placeholder="Código (etapa ou item)"
+              placeholder="Código (etapa ou atividade)"
               className="h-6 w-28 rounded border px-1.5 text-xs"
             />
             <Button size="icon-xs" variant="ghost" disabled={isPending || !codeInput.trim()} onClick={handleAdd}>
@@ -104,7 +104,7 @@ export function PredecessorsCell({
           {error ? <span className="text-[0.65rem] text-destructive">{error}</span> : null}
         </div>
       ) : (
-        <Button size="icon-xs" variant="ghost" onClick={() => setOpen(true)} title="Adicionar predecessora (etapa ou item, pelo código)">
+        <Button size="icon-xs" variant="ghost" onClick={() => setOpen(true)} title="Adicionar predecessora (etapa ou atividade, pelo código)">
           <Plus className="size-3" />
         </Button>
       )}

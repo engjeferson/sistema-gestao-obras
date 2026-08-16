@@ -26,7 +26,7 @@ export default async function ImportarPlanejamentoPage({ params }: { params: Pro
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Lançamento em bloco</h1>
         <p className="text-muted-foreground">
-          Monte o plano completo — etapas, itens, datas e predecessoras — e salve tudo de uma vez.
+          Monte o plano completo — etapas, atividades, datas e predecessoras — e salve tudo de uma vez.
         </p>
       </div>
       <BulkPlanningEditor workId={id} stages={stages} />

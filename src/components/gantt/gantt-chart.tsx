@@ -267,7 +267,7 @@ export function GanttChart({ stages, workId }: { stages: PlainStage[]; workId: s
   function handleRenameTask(taskId: string, nome: string) {
     startTransition(async () => {
       await updateTaskName(taskId, workId, nome);
-      toast.success("Item renomeado.");
+      toast.success("Atividade renomeada.");
       router.refresh();
     });
   }
@@ -284,7 +284,7 @@ export function GanttChart({ stages, workId }: { stages: PlainStage[]; workId: s
   if (allTasksFlat.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        Nenhum item cadastrado ainda.
+        Nenhuma atividade cadastrada ainda.
       </p>
     );
   }
@@ -331,7 +331,7 @@ export function GanttChart({ stages, workId }: { stages: PlainStage[]; workId: s
                 style={{ gridTemplateColumns: LEFT_GRID, height: HEADER_HEIGHT }}
               >
                 <span>ID</span>
-                <span>Etapa / Item</span>
+                <span>Etapa / Atividade</span>
                 <span>Início</span>
                 <span>Término</span>
                 <span>Dias</span>

@@ -69,6 +69,8 @@ export function StageList({ stages, workId }: { stages: PlainStage[]; workId: st
 
 // Grupo de etapas/subs irmãs sob o mesmo pai — permite arrastar (grip handle) pra reordenar,
 // além dos botões de mover pra cima/baixo já existentes.
+// Usa Pointer Events (não o HTML5 Drag and Drop nativo, que se mostrou pouco confiável em uso
+// real) — mesmo padrão já usado pra arrastar as barras do Gantt.
 function DraggableStageGroup({
   stages,
   workId,
@@ -82,7 +84,12 @@ function DraggableStageGroup({
 }) {
   const router = useRouter();
   const [order, setOrder] = useState(() => stages.map((s) => s.id));
-  const draggedId = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+  const initialOrderRef = useRef(order);
+  const draggingIdRef = useRef<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   useEffect(() => {
     setOrder(stages.map((s) => s.id));
@@ -91,31 +98,66 @@ function DraggableStageGroup({
   const byId = new Map(stages.map((s) => [s.id, s]));
   const ordered = order.map((id) => byId.get(id)).filter((s): s is PlainStage => !!s);
 
-  function handleDrop(targetId: string) {
-    const dragged = draggedId.current;
-    draggedId.current = null;
-    if (!dragged || dragged === targetId) return;
+  useEffect(() => {
+    function handlePointerMove(e: PointerEvent) {
+      const draggedId = draggingIdRef.current;
+      if (!draggedId) return;
+      for (const [id, el] of rowRefs.current) {
+        if (id === draggedId) continue;
+        const rect = el.getBoundingClientRect();
+        if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          setOrder((prev) => {
+            if (!prev.includes(draggedId) || !prev.includes(id)) return prev;
+            const next = prev.filter((x) => x !== draggedId);
+            next.splice(next.indexOf(id), 0, draggedId);
+            return next;
+          });
+          break;
+        }
+      }
+    }
+    function handlePointerUp() {
+      const draggedId = draggingIdRef.current;
+      draggingIdRef.current = null;
+      setDraggingId(null);
+      document.body.style.removeProperty("user-select");
+      if (draggedId && JSON.stringify(initialOrderRef.current) !== JSON.stringify(orderRef.current)) {
+        reorderStages(workId, parentId, orderRef.current).then(() => router.refresh());
+      }
+    }
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [workId, parentId, router]);
 
-    const next = order.filter((id) => id !== dragged);
-    const targetIndex = next.indexOf(targetId);
-    next.splice(targetIndex, 0, dragged);
-    setOrder(next);
-    reorderStages(workId, parentId, next).then(() => router.refresh());
+  function startDrag(id: string) {
+    draggingIdRef.current = id;
+    initialOrderRef.current = orderRef.current;
+    setDraggingId(id);
+    document.body.style.userSelect = "none";
   }
 
   return (
     <div className={depth === 0 ? "flex flex-col gap-6" : "flex flex-col gap-4 border-l pl-4"}>
       {ordered.map((stage, index) => (
-        <div key={stage.id} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(stage.id)}>
+        <div
+          key={stage.id}
+          ref={(el) => {
+            if (el) rowRefs.current.set(stage.id, el);
+            else rowRefs.current.delete(stage.id);
+          }}
+          className={draggingId === stage.id ? "opacity-50" : ""}
+        >
           <StageCard
             stage={stage}
             workId={workId}
             depth={depth}
             isFirst={index === 0}
             isLast={index === ordered.length - 1}
-            onGripDragStart={() => {
-              draggedId.current = stage.id;
-            }}
+            onGripPointerDown={() => startDrag(stage.id)}
           />
         </div>
       ))}
@@ -129,14 +171,14 @@ function StageCard({
   depth,
   isFirst,
   isLast,
-  onGripDragStart,
+  onGripPointerDown,
 }: {
   stage: PlainStage;
   workId: string;
   depth: number;
   isFirst: boolean;
   isLast: boolean;
-  onGripDragStart: () => void;
+  onGripPointerDown: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -159,13 +201,12 @@ function StageCard({
   const moveButtons = (
     <div className="flex items-center gap-0.5">
       <span
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData("text/plain", stage.id);
-          onGripDragStart();
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onGripPointerDown();
         }}
         title="Arrastar para reordenar"
-        className="flex cursor-grab items-center px-1 text-muted-foreground active:cursor-grabbing"
+        className="flex touch-none cursor-grab items-center px-1 text-muted-foreground active:cursor-grabbing"
       >
         <GripVertical className="size-4" />
       </span>
@@ -205,7 +246,7 @@ function StageCard({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-20">Código</TableHead>
-                <TableHead>Item</TableHead>
+                <TableHead>Atividade</TableHead>
                 <TableHead>Início</TableHead>
                 <TableHead>Fim</TableHead>
                 <TableHead>Progresso</TableHead>
@@ -237,7 +278,7 @@ function StageCard({
           </Table>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">Nenhum item aqui ainda.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma atividade aqui ainda.</p>
       )}
 
       <AddTaskForm workId={workId} stageId={stage.id} />
