@@ -3,22 +3,24 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { AddStageForm } from "@/components/planejamento/add-stage-form";
 import { AddTaskForm } from "@/components/planejamento/add-task-form";
 import { DeleteStageButton, DeleteTaskButton } from "@/components/planejamento/delete-buttons";
 import { EditableName } from "@/components/planejamento/editable-name";
 import { TaskPredecessorsCell, type PredecessorLink } from "@/components/planejamento/task-predecessors-cell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
-import { updateStageName } from "@/server/actions/planejamento";
+import { moveStage, updateStageName } from "@/server/actions/planejamento";
 
-export type TaskOption = { id: string; codigo: string | null; nome: string; stageNome: string };
+export type TaskOption = { id: string; codigo: string; nome: string };
 
 export type PlainTask = {
   id: string;
-  codigo: string | null;
+  codigo: string;
   nome: string;
   dataInicioPrevista: Date;
   dataFimPrevista: Date;
@@ -29,7 +31,7 @@ export type PlainTask = {
 
 export type PlainStage = {
   id: string;
-  codigo: string | null;
+  codigo: string;
   nome: string;
   tasks: PlainTask[];
   children: PlainStage[];
@@ -54,8 +56,16 @@ export function StageList({
 
   return (
     <div className="flex flex-col gap-6">
-      {stages.map((stage) => (
-        <StageCard key={stage.id} stage={stage} workId={workId} allTasks={allTasks} depth={0} />
+      {stages.map((stage, index) => (
+        <StageCard
+          key={stage.id}
+          stage={stage}
+          workId={workId}
+          allTasks={allTasks}
+          depth={0}
+          isFirst={index === 0}
+          isLast={index === stages.length - 1}
+        />
       ))}
     </div>
   );
@@ -66,13 +76,17 @@ function StageCard({
   workId,
   allTasks,
   depth,
+  isFirst,
+  isLast,
 }: {
   stage: PlainStage;
   workId: string;
   allTasks: TaskOption[];
   depth: number;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function handleRename(nome: string) {
@@ -82,6 +96,36 @@ function StageCard({
       router.refresh();
     });
   }
+
+  function handleMove(direction: "up" | "down") {
+    startTransition(async () => {
+      await moveStage(stage.id, workId, direction);
+      router.refresh();
+    });
+  }
+
+  const moveButtons = (
+    <div className="flex items-center gap-0.5">
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={isPending || isFirst}
+        onClick={() => handleMove("up")}
+        title="Mover para cima"
+      >
+        <ArrowUp className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={isPending || isLast}
+        onClick={() => handleMove("down")}
+        title="Mover para baixo"
+      >
+        <ArrowDown className="size-4" />
+      </Button>
+    </div>
+  );
 
   const body = (
     <div className="flex flex-col gap-4">
@@ -138,8 +182,16 @@ function StageCard({
 
       {stage.children.length > 0 ? (
         <div className="flex flex-col gap-4 border-l pl-4">
-          {stage.children.map((child) => (
-            <StageCard key={child.id} stage={child} workId={workId} allTasks={allTasks} depth={depth + 1} />
+          {stage.children.map((child, index) => (
+            <StageCard
+              key={child.id}
+              stage={child}
+              workId={workId}
+              allTasks={allTasks}
+              depth={depth + 1}
+              isFirst={index === 0}
+              isLast={index === stage.children.length - 1}
+            />
           ))}
         </div>
       ) : null}
@@ -151,10 +203,13 @@ function StageCard({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            {stage.codigo ? <span className="text-muted-foreground">{stage.codigo}</span> : null}
+            <span className="text-muted-foreground">{stage.codigo}</span>
             <EditableName value={stage.nome} bold onCommit={handleRename} />
           </CardTitle>
-          <DeleteStageButton stageId={stage.id} workId={workId} />
+          <div className="flex items-center gap-1">
+            {moveButtons}
+            <DeleteStageButton stageId={stage.id} workId={workId} />
+          </div>
         </CardHeader>
         <CardContent>{body}</CardContent>
       </Card>
@@ -165,10 +220,13 @@ function StageCard({
     <div className="rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 font-medium">
-          {stage.codigo ? <span className="text-muted-foreground">{stage.codigo}</span> : null}
+          <span className="text-muted-foreground">{stage.codigo}</span>
           <EditableName value={stage.nome} bold onCommit={handleRename} />
         </div>
-        <DeleteStageButton stageId={stage.id} workId={workId} />
+        <div className="flex items-center gap-1">
+          {moveButtons}
+          <DeleteStageButton stageId={stage.id} workId={workId} />
+        </div>
       </div>
       {body}
     </div>

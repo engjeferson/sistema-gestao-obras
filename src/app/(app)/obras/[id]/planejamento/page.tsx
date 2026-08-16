@@ -9,14 +9,15 @@ import { SaveAsTemplateButton } from "@/components/planejamento/save-as-template
 import { Button } from "@/components/ui/button";
 import type { PlainStage } from "@/components/planejamento/stage-list";
 
+// O código (ID) sempre é calculado por posição em listStagesWithTasks — nunca fica null na prática.
 function mapStage(stage: StageTreeNode): PlainStage {
   return {
     id: stage.id,
-    codigo: stage.codigo,
+    codigo: stage.codigo!,
     nome: stage.nome,
     tasks: stage.tasks.map((task) => ({
       id: task.id,
-      codigo: task.codigo,
+      codigo: task.codigo!,
       nome: task.nome,
       dataInicioPrevista: task.dataInicioPrevista,
       dataFimPrevista: task.dataFimPrevista,
@@ -39,12 +40,7 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
 
   const stages = stagesRaw.map(mapStage);
 
-  const allTasks = allTasksRaw.map((task) => ({
-    id: task.id,
-    codigo: task.codigo,
-    nome: task.nome,
-    stageNome: task.stage.nome,
-  }));
+  const allTasks = allTasksRaw.map((task) => ({ id: task.id, codigo: task.codigo!, nome: task.nome }));
 
   if (stages.length === 0) {
     const templates = await listPlanningTemplates();

@@ -3,14 +3,12 @@ import { z } from "zod";
 export const stageFormSchema = z.object({
   workId: z.string().min(1),
   parentId: z.string().min(1).optional(),
-  codigo: z.string().trim().optional(),
   nome: z.string().trim().min(1, "Informe o nome da etapa."),
 });
 
 export const taskFormSchema = z.object({
   workId: z.string().min(1),
   stageId: z.string().min(1, "Selecione a etapa."),
-  codigo: z.string().trim().optional(),
   nome: z.string().trim().min(1, "Informe o nome da atividade."),
   dataInicioPrevista: z.string().min(1, "Informe a data de início."),
   dataFimPrevista: z.string().min(1, "Informe a data de fim."),

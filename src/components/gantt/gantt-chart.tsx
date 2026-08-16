@@ -29,13 +29,6 @@ function collectAllTasks(stage: PlainStage): PlainTask[] {
   return [...stage.tasks, ...stage.children.flatMap(collectAllTasks)];
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  NAO_INICIADA: "bg-muted-foreground/40",
-  EM_ANDAMENTO: "bg-warning",
-  CONCLUIDA: "bg-success",
-  ATRASADA: "bg-destructive",
-};
-
 const ROW_HEIGHT = 40;
 const HEADER_HEIGHT = 34;
 const INDENT = 14;
@@ -495,14 +488,16 @@ export function GanttChart({
                     const barEnd = isDragging ? dragPreview!.end : task.dataFimPrevista;
                     const left = xForDate(barStart);
                     const width = (differenceInCalendarDays(barEnd, barStart) + 1) * pxPerDay;
+                    const progressPct = Math.min(Math.max(Number(task.percentualExecutado), 0), 100);
+                    const remainderColor = task.status === "ATRASADA" ? "bg-destructive" : "bg-warning";
                     return (
                       <div
                         key={task.id}
-                        className={`absolute cursor-grab overflow-hidden rounded-md bg-muted select-none ${
+                        className={`absolute cursor-grab overflow-hidden rounded-md select-none ${
                           isDragging ? "ring-2 ring-brand-teal" : ""
                         }`}
                         style={{ top: i * ROW_HEIGHT + 9, height: ROW_HEIGHT - 18, left, width: Math.max(width, 4) }}
-                        title={`${task.nome} — ${PLANNING_STATUS_LABELS[task.status]}`}
+                        title={`${task.nome} — ${PLANNING_STATUS_LABELS[task.status]} (${progressPct.toFixed(0)}%)`}
                         onPointerDown={(e) => {
                           if (isPending || drag) return;
                           e.preventDefault();
@@ -515,10 +510,10 @@ export function GanttChart({
                           });
                         }}
                       >
-                        <div
-                          className={`h-full ${STATUS_COLORS[task.status] ?? "bg-muted-foreground/40"}`}
-                          style={{ width: `${Math.min(Number(task.percentualExecutado), 100)}%` }}
-                        />
+                        <div className="flex h-full w-full">
+                          <div className="h-full bg-success" style={{ width: `${progressPct}%` }} />
+                          <div className={`h-full ${remainderColor}`} style={{ width: `${100 - progressPct}%` }} />
+                        </div>
                         <div
                           className="absolute top-0 bottom-0 left-0 w-1.5 cursor-ew-resize"
                           onPointerDown={(e) => {

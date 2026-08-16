@@ -16,13 +16,16 @@ export function DeleteStageButton({ stageId, workId }: { stageId: string; workId
       variant="ghost"
       size="icon"
       disabled={isPending}
-      onClick={() =>
+      onClick={() => {
+        if (!confirm("Excluir esta etapa/sub? Isso também apaga tudo dentro dela (subs e itens). Essa ação não pode ser desfeita.")) {
+          return;
+        }
         startTransition(async () => {
           await deleteStage(stageId, workId);
           toast.success("Etapa removida.");
           router.refresh();
-        })
-      }
+        });
+      }}
     >
       <Trash2 className="size-4" />
     </Button>
@@ -38,13 +41,14 @@ export function DeleteTaskButton({ taskId, workId }: { taskId: string; workId: s
       variant="ghost"
       size="icon"
       disabled={isPending}
-      onClick={() =>
+      onClick={() => {
+        if (!confirm("Excluir este item? Essa ação não pode ser desfeita.")) return;
         startTransition(async () => {
           await deleteTask(taskId, workId);
-          toast.success("Atividade removida.");
+          toast.success("Item removido.");
           router.refresh();
-        })
-      }
+        });
+      }}
     >
       <Trash2 className="size-4" />
     </Button>

@@ -10,17 +10,51 @@ import { stageFormSchema, taskFormSchema, bulkPlanningSchema } from "@/lib/valid
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
+/** Próxima posição (0-based) pra uma nova etapa/sub, entre as etapas/subs que já existem sob `parentId`. */
+async function nextStageOrdem(client: TxClient, workId: string, parentId: string | null) {
+  return client.planningStage.count({ where: { workId, parentId } });
+}
+
 /**
- * Próximo ordinal (1-based) pra um novo filho direto de `parentStageId` (etapa/sub ou item),
- * contando etapas/subs e itens juntos — é isso que faz "1.1" valer tanto pra uma sub quanto
- * pra um item, dependendo de qual foi criado primeiro (numeração tipo EAP).
+ * Próxima posição (0-based) pra um novo filho direto de `parentStageId` (sub OU item),
+ * contando os dois tipos juntos — é o que garante que a numeração (calculada por posição,
+ * ver `assignCodes`) fique sequencial mesmo intercalando subs e itens.
  */
-async function nextChildOrdinal(client: TxClient, workId: string, parentStageId: string | null) {
+async function nextChildOrdem(client: TxClient, workId: string, parentStageId: string) {
   const [childStageCount, directItemCount] = await Promise.all([
     client.planningStage.count({ where: { workId, parentId: parentStageId } }),
-    parentStageId ? client.planningTask.count({ where: { stageId: parentStageId } }) : Promise.resolve(0),
+    client.planningTask.count({ where: { stageId: parentStageId } }),
   ]);
-  return childStageCount + directItemCount + 1;
+  return childStageCount + directItemCount;
+}
+
+type TaskNode = { id: string; ordem: number; codigo: string | null; [key: string]: unknown };
+type StageNode = { id: string; ordem: number; codigo: string | null; tasks: TaskNode[]; children: StageNode[]; [key: string]: unknown };
+
+/**
+ * Calcula o ID (1, 1.1, 1.1.1...) de cada etapa/sub/item a partir da posição real na árvore
+ * (`ordem`), não de um valor gravado — garante que o ID esteja sempre presente, em sequência
+ * e sem buracos, inclusive depois de mover/excluir itens.
+ */
+function assignChildCodes(node: StageNode) {
+  const combined = [
+    ...node.children.map((c) => ({ kind: "stage" as const, ordem: c.ordem, ref: c })),
+    ...node.tasks.map((t) => ({ kind: "task" as const, ordem: t.ordem, ref: t })),
+  ].sort((a, b) => a.ordem - b.ordem);
+
+  combined.forEach((entry, index) => {
+    const code = `${node.codigo}.${index + 1}`;
+    entry.ref.codigo = code;
+    if (entry.kind === "stage") assignChildCodes(entry.ref);
+  });
+}
+
+function assignCodes(roots: StageNode[]) {
+  const sorted = [...roots].sort((a, b) => a.ordem - b.ordem);
+  sorted.forEach((root, index) => {
+    root.codigo = String(index + 1);
+    assignChildCodes(root);
+  });
 }
 
 export async function applyCascadeForTask(tx: TxClient, workId: string, changedTaskId: string) {
@@ -126,7 +160,42 @@ export async function listStagesWithTasks(workId: string) {
       roots.push(node);
     }
   }
+  assignCodes(roots as unknown as StageNode[]);
+
+  // Os `predecessors[].predecessorTask.codigo` vieram de um select à parte (não fazem parte da
+  // árvore acima), então ficaram com o código antigo/cru do banco — corrige pelo código já calculado.
+  const codeByTaskId = new Map<string, string>();
+  (function collectCodes(nodes: Node[]) {
+    for (const n of nodes) {
+      for (const t of n.tasks) if (t.codigo) codeByTaskId.set(t.id, t.codigo);
+      collectCodes(n.children);
+    }
+  })(roots);
+  (function patchPredecessorCodes(nodes: Node[]) {
+    for (const n of nodes) {
+      for (const t of n.tasks) {
+        for (const dep of t.predecessors) {
+          const code = codeByTaskId.get(dep.predecessorTask.id);
+          if (code) dep.predecessorTask.codigo = code;
+        }
+      }
+      patchPredecessorCodes(n.children);
+    }
+  })(roots);
+
   return roots;
+}
+
+export async function listTasksForDependencyPicker(workId: string) {
+  const roots = await listStagesWithTasks(workId);
+
+  function flatten(nodes: StageTreeNode[]): { id: string; codigo: string | null; nome: string }[] {
+    return nodes.flatMap((node) => [
+      ...node.tasks.map((task) => ({ id: task.id, codigo: task.codigo, nome: task.nome })),
+      ...flatten(node.children),
+    ]);
+  }
+  return flatten(roots);
 }
 
 export async function createStage(_prevState: string | undefined, formData: FormData) {
@@ -136,7 +205,6 @@ export async function createStage(_prevState: string | undefined, formData: Form
   const parsed = stageFormSchema.safeParse({
     workId: formData.get("workId"),
     parentId: formData.get("parentId") || undefined,
-    codigo: formData.get("codigo") ?? undefined,
     nome: formData.get("nome"),
   });
   if (!parsed.success) {
@@ -145,13 +213,9 @@ export async function createStage(_prevState: string | undefined, formData: Form
   const data = parsed.data;
   const parentId = data.parentId ?? null;
 
-  const [ordinal, parent] = await Promise.all([
-    nextChildOrdinal(prisma, data.workId, parentId),
-    parentId ? prisma.planningStage.findUnique({ where: { id: parentId }, select: { codigo: true } }) : Promise.resolve(null),
-  ]);
-  const codigo = data.codigo || (parent?.codigo ? `${parent.codigo}.${ordinal}` : String(ordinal));
+  const ordem = parentId ? await nextChildOrdem(prisma, data.workId, parentId) : await nextStageOrdem(prisma, data.workId, null);
   await prisma.planningStage.create({
-    data: { workId: data.workId, parentId, codigo, nome: data.nome, ordem: ordinal - 1 },
+    data: { workId: data.workId, parentId, nome: data.nome, ordem },
   });
 
   revalidatePath(`/obras/${data.workId}/planejamento`);
@@ -177,6 +241,30 @@ export async function deleteStage(stageId: string, workId: string) {
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 
+export async function moveStage(stageId: string, workId: string, direction: "up" | "down") {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const stage = await prisma.planningStage.findUniqueOrThrow({ where: { id: stageId } });
+  const siblings = await prisma.planningStage.findMany({
+    where: { workId, parentId: stage.parentId },
+    orderBy: { ordem: "asc" },
+  });
+
+  const index = siblings.findIndex((s) => s.id === stageId);
+  const swapIndex = direction === "up" ? index - 1 : index + 1;
+  if (index === -1 || swapIndex < 0 || swapIndex >= siblings.length) return;
+
+  const a = siblings[index];
+  const b = siblings[swapIndex];
+  await prisma.$transaction([
+    prisma.planningStage.update({ where: { id: a.id }, data: { ordem: b.ordem } }),
+    prisma.planningStage.update({ where: { id: b.id }, data: { ordem: a.ordem } }),
+  ]);
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
 export async function createTask(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
@@ -184,7 +272,6 @@ export async function createTask(_prevState: string | undefined, formData: FormD
   const parsed = taskFormSchema.safeParse({
     workId: formData.get("workId"),
     stageId: formData.get("stageId"),
-    codigo: formData.get("codigo") ?? undefined,
     nome: formData.get("nome"),
     dataInicioPrevista: formData.get("dataInicioPrevista"),
     dataFimPrevista: formData.get("dataFimPrevista"),
@@ -194,18 +281,13 @@ export async function createTask(_prevState: string | undefined, formData: FormD
   }
   const data = parsed.data;
 
-  const [ordinal, stage] = await Promise.all([
-    nextChildOrdinal(prisma, data.workId, data.stageId),
-    prisma.planningStage.findUnique({ where: { id: data.stageId }, select: { codigo: true } }),
-  ]);
-  const codigo = data.codigo || `${stage?.codigo ?? ""}.${ordinal}`;
+  const ordem = await nextChildOrdem(prisma, data.workId, data.stageId);
   await prisma.planningTask.create({
     data: {
       workId: data.workId,
       stageId: data.stageId,
-      codigo,
       nome: data.nome,
-      ordem: ordinal - 1,
+      ordem,
       dataInicioPrevista: new Date(data.dataInicioPrevista),
       dataFimPrevista: new Date(data.dataFimPrevista),
     },
@@ -247,14 +329,6 @@ export async function updatePlanningTaskDates(taskId: string, workId: string, st
   });
 
   revalidatePath(`/obras/${workId}/planejamento`);
-}
-
-export async function listTasksForDependencyPicker(workId: string) {
-  return prisma.planningTask.findMany({
-    where: { workId },
-    include: { stage: true },
-    orderBy: [{ stage: { ordem: "asc" } }, { ordem: "asc" }],
-  });
 }
 
 export async function addPlanningDependency(

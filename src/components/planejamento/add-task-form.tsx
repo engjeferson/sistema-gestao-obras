@@ -23,10 +23,6 @@ export function AddTaskForm({ workId, stageId }: { workId: string; stageId: stri
       <input type="hidden" name="workId" value={workId} />
       <input type="hidden" name="stageId" value={stageId} />
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Código</label>
-        <Input name="codigo" placeholder="02.01" className="w-20" />
-      </div>
-      <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Item</label>
         <Input name="nome" placeholder="Ex: Escavação" required className="w-48" />
       </div>
