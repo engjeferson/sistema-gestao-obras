@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const stageFormSchema = z.object({
   workId: z.string().min(1),
+  parentId: z.string().min(1).optional(),
   codigo: z.string().trim().optional(),
   nome: z.string().trim().min(1, "Informe o nome da etapa."),
 });

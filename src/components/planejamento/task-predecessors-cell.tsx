@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
 import { addPlanningDependency, removePlanningDependency } from "@/server/actions/planejamento";
 import type { TaskOption } from "@/components/planejamento/stage-list";
 
@@ -23,24 +22,39 @@ export function TaskPredecessorsCell({
   allTasks: TaskOption[];
 }) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState("");
+  const [codeInput, setCodeInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const usedIds = new Set([taskId, ...predecessors.map((p) => p.taskId)]);
-  const options = allTasks.filter((t) => !usedIds.has(t.id));
-
   function handleAdd() {
-    if (!selected) return;
+    const trimmed = codeInput.trim();
+    if (!trimmed) return;
+
+    const match = allTasks.find((t) => t.codigo === trimmed);
+    if (!match) {
+      setError("Código não encontrado.");
+      return;
+    }
+    if (match.id === taskId) {
+      setError("Um item não pode ser predecessor dele mesmo.");
+      return;
+    }
+    if (predecessors.some((p) => p.taskId === match.id)) {
+      setError("Essa predecessora já foi adicionada.");
+      return;
+    }
+
+    setError(null);
     startTransition(async () => {
       try {
-        await addPlanningDependency(selected, taskId, workId);
+        await addPlanningDependency(match.id, taskId, workId);
         toast.success("Predecessora adicionada.");
         setOpen(false);
-        setSelected("");
+        setCodeInput("");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível adicionar.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível adicionar.");
       }
     });
   }
@@ -73,26 +87,33 @@ export function TaskPredecessorsCell({
       ))}
 
       {open ? (
-        <div className="flex items-center gap-1">
-          <NativeSelect
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="h-6 text-xs"
-          >
-            <option value="">Selecione...</option>
-            {options.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.codigo ? `${t.codigo} — ` : ""}
-                {t.nome}
-              </option>
-            ))}
-          </NativeSelect>
-          <Button size="icon-xs" variant="ghost" disabled={isPending || !selected} onClick={handleAdd}>
-            <Plus className="size-3" />
-          </Button>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={codeInput}
+              onChange={(e) => {
+                setCodeInput(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAdd();
+                }
+                if (e.key === "Escape") setOpen(false);
+              }}
+              placeholder="Código (ex: 2.1)"
+              className="h-6 w-24 rounded border px-1.5 text-xs"
+            />
+            <Button size="icon-xs" variant="ghost" disabled={isPending || !codeInput.trim()} onClick={handleAdd}>
+              <Plus className="size-3" />
+            </Button>
+          </div>
+          {error ? <span className="text-[0.65rem] text-destructive">{error}</span> : null}
         </div>
       ) : (
-        <Button size="icon-xs" variant="ghost" onClick={() => setOpen(true)} title="Adicionar predecessora">
+        <Button size="icon-xs" variant="ghost" onClick={() => setOpen(true)} title="Adicionar predecessora pelo código">
           <Plus className="size-3" />
         </Button>
       )}

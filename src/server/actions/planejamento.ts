@@ -10,6 +10,19 @@ import { stageFormSchema, taskFormSchema, bulkPlanningSchema } from "@/lib/valid
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
+/**
+ * Próximo ordinal (1-based) pra um novo filho direto de `parentStageId` (etapa/sub ou item),
+ * contando etapas/subs e itens juntos — é isso que faz "1.1" valer tanto pra uma sub quanto
+ * pra um item, dependendo de qual foi criado primeiro (numeração tipo EAP).
+ */
+async function nextChildOrdinal(client: TxClient, workId: string, parentStageId: string | null) {
+  const [childStageCount, directItemCount] = await Promise.all([
+    client.planningStage.count({ where: { workId, parentId: parentStageId } }),
+    parentStageId ? client.planningTask.count({ where: { stageId: parentStageId } }) : Promise.resolve(0),
+  ]);
+  return childStageCount + directItemCount + 1;
+}
+
 export async function applyCascadeForTask(tx: TxClient, workId: string, changedTaskId: string) {
   const [tasks, dependencies] = await Promise.all([
     tx.planningTask.findMany({
@@ -61,6 +74,8 @@ export async function listUpcomingTasks(workId: string) {
   });
 }
 
+export type StageTreeNode = Awaited<ReturnType<typeof listStagesWithTasks>>[number];
+
 export async function listStagesWithTasks(workId: string) {
   const stages = await prisma.planningStage.findMany({
     where: { workId },
@@ -74,19 +89,21 @@ export async function listStagesWithTasks(workId: string) {
   });
 
   const toUpdate: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
-  const healed = stages.map((stage) => ({
-    ...stage,
-    tasks: stage.tasks.map((task) => {
-      const effectiveStatus = getEffectiveStatus({
-        percentualExecutado: Number(task.percentualExecutado),
-        dataFimPrevista: task.dataFimPrevista,
-      });
-      if (effectiveStatus !== task.status) {
-        toUpdate.push({ id: task.id, status: effectiveStatus });
-      }
-      return { ...task, status: effectiveStatus };
-    }),
-  }));
+  const healedTasksByStage = new Map(
+    stages.map((stage) => [
+      stage.id,
+      stage.tasks.map((task) => {
+        const effectiveStatus = getEffectiveStatus({
+          percentualExecutado: Number(task.percentualExecutado),
+          dataFimPrevista: task.dataFimPrevista,
+        });
+        if (effectiveStatus !== task.status) {
+          toUpdate.push({ id: task.id, status: effectiveStatus });
+        }
+        return { ...task, status: effectiveStatus };
+      }),
+    ]),
+  );
 
   if (toUpdate.length > 0) {
     await prisma.$transaction(
@@ -94,7 +111,22 @@ export async function listStagesWithTasks(workId: string) {
     );
   }
 
-  return healed;
+  // Monta a árvore em memória (profundidade livre) a partir da lista plana.
+  type Node = (typeof stages)[number] & { tasks: NonNullable<ReturnType<typeof healedTasksByStage.get>>; children: Node[] };
+  const nodeById = new Map<string, Node>();
+  for (const stage of stages) {
+    nodeById.set(stage.id, { ...stage, tasks: healedTasksByStage.get(stage.id) ?? [], children: [] });
+  }
+  const roots: Node[] = [];
+  for (const stage of stages) {
+    const node = nodeById.get(stage.id)!;
+    if (stage.parentId) {
+      nodeById.get(stage.parentId)?.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
 }
 
 export async function createStage(_prevState: string | undefined, formData: FormData) {
@@ -103,20 +135,26 @@ export async function createStage(_prevState: string | undefined, formData: Form
 
   const parsed = stageFormSchema.safeParse({
     workId: formData.get("workId"),
+    parentId: formData.get("parentId") || undefined,
     codigo: formData.get("codigo") ?? undefined,
     nome: formData.get("nome"),
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
+  const data = parsed.data;
+  const parentId = data.parentId ?? null;
 
-  const count = await prisma.planningStage.count({ where: { workId: parsed.data.workId } });
-  const codigo = parsed.data.codigo || String(count + 1).padStart(2, "0");
+  const [ordinal, parent] = await Promise.all([
+    nextChildOrdinal(prisma, data.workId, parentId),
+    parentId ? prisma.planningStage.findUnique({ where: { id: parentId }, select: { codigo: true } }) : Promise.resolve(null),
+  ]);
+  const codigo = data.codigo || (parent?.codigo ? `${parent.codigo}.${ordinal}` : String(ordinal));
   await prisma.planningStage.create({
-    data: { workId: parsed.data.workId, codigo, nome: parsed.data.nome, ordem: count },
+    data: { workId: data.workId, parentId, codigo, nome: data.nome, ordem: ordinal - 1 },
   });
 
-  revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
+  revalidatePath(`/obras/${data.workId}/planejamento`);
   return undefined;
 }
 
@@ -156,18 +194,18 @@ export async function createTask(_prevState: string | undefined, formData: FormD
   }
   const data = parsed.data;
 
-  const [count, stage] = await Promise.all([
-    prisma.planningTask.count({ where: { stageId: data.stageId } }),
+  const [ordinal, stage] = await Promise.all([
+    nextChildOrdinal(prisma, data.workId, data.stageId),
     prisma.planningStage.findUnique({ where: { id: data.stageId }, select: { codigo: true } }),
   ]);
-  const codigo = data.codigo || `${stage?.codigo ?? ""}.${String(count + 1).padStart(2, "0")}`;
+  const codigo = data.codigo || `${stage?.codigo ?? ""}.${ordinal}`;
   await prisma.planningTask.create({
     data: {
       workId: data.workId,
       stageId: data.stageId,
       codigo,
       nome: data.nome,
-      ordem: count,
+      ordem: ordinal - 1,
       dataInicioPrevista: new Date(data.dataInicioPrevista),
       dataFimPrevista: new Date(data.dataFimPrevista),
     },
@@ -286,7 +324,7 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
     const existingStageCount = await tx.planningStage.count({ where: { workId: data.workId } });
 
     for (const [index, row] of etapaRows.entries()) {
-      const codigo = row.codigo || String(existingStageCount + index + 1).padStart(2, "0");
+      const codigo = row.codigo || String(existingStageCount + index + 1);
       const created = await tx.planningStage.create({
         data: { workId: data.workId, codigo, nome: row.nome, ordem: existingStageCount + index },
       });
@@ -303,7 +341,7 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
 
       const countSoFar = taskCountByStage.get(stageId) ?? (await tx.planningTask.count({ where: { stageId } }));
       const stageCodigo = stageCodigoMap.get(row.parentClientId!) ?? "";
-      const codigo = row.codigo || `${stageCodigo}.${String(countSoFar + 1).padStart(2, "0")}`;
+      const codigo = row.codigo || `${stageCodigo}.${countSoFar + 1}`;
 
       const created = await tx.planningTask.create({
         data: {

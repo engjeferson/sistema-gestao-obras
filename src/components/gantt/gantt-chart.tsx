@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addDays, differenceInCalendarDays, eachDayOfInterval } from "date-fns";
@@ -8,6 +8,7 @@ import { ChevronDown, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut } from
 import { Button } from "@/components/ui/button";
 import { updatePlanningTaskDates, updateStageName, updateTaskName } from "@/server/actions/planejamento";
 import { TaskPredecessorsCell } from "@/components/planejamento/task-predecessors-cell";
+import { EditableName } from "@/components/planejamento/editable-name";
 import type { PlainStage, PlainTask, TaskOption } from "@/components/planejamento/stage-list";
 import { PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 
@@ -24,6 +25,9 @@ function formatMonthLabel(date: Date) {
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
+function collectAllTasks(stage: PlainStage): PlainTask[] {
+  return [...stage.tasks, ...stage.children.flatMap(collectAllTasks)];
+}
 
 const STATUS_COLORS: Record<string, string> = {
   NAO_INICIADA: "bg-muted-foreground/40",
@@ -34,63 +38,37 @@ const STATUS_COLORS: Record<string, string> = {
 
 const ROW_HEIGHT = 40;
 const HEADER_HEIGHT = 34;
+const INDENT = 14;
 const LEFT_GRID = "44px minmax(160px,1fr) 92px 92px 56px 150px";
 const LEFT_WIDTH = 44 + 160 + 92 + 92 + 56 + 150;
 const ZOOM_LEVELS = [8, 14, 22, 34, 50];
 
 type Row =
-  | { type: "stage"; stage: PlainStage; start: Date; end: Date }
-  | { type: "task"; task: PlainTask; stage: PlainStage };
+  | { type: "stage"; stage: PlainStage; start: Date; end: Date; depth: number }
+  | { type: "task"; task: PlainTask; depth: number };
 
-function EditableName({
-  value,
-  bold,
-  onCommit,
-}: {
-  value: string;
-  bold?: boolean;
-  onCommit: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+type DragMode = "move" | "resize-start" | "resize-end";
+type DragState = { taskId: string; mode: DragMode; startClientX: number; originalStart: Date; originalEnd: Date };
 
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          const trimmed = draft.trim();
-          if (trimmed && trimmed !== value) onCommit(trimmed);
-          else setDraft(value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") {
-            setDraft(value);
-            setEditing(false);
-          }
-        }}
-        className="w-full rounded border px-1 py-0.5 text-xs"
-      />
-    );
+function buildRows(stages: PlainStage[], depth: number, collapsed: Set<string>, out: Row[]) {
+  for (const stage of stages) {
+    const descendantTasks = collectAllTasks(stage);
+    const starts = descendantTasks.map((t) => t.dataInicioPrevista.getTime());
+    const ends = descendantTasks.map((t) => t.dataFimPrevista.getTime());
+    const start = starts.length ? new Date(Math.min(...starts)) : new Date();
+    const end = ends.length ? new Date(Math.max(...ends)) : new Date();
+    out.push({ type: "stage", stage, start, end, depth });
+    if (!collapsed.has(stage.id)) {
+      for (const task of stage.tasks) {
+        out.push({ type: "task", task, depth: depth + 1 });
+      }
+      buildRows(stage.children, depth + 1, collapsed, out);
+    }
   }
+}
 
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(value);
-        setEditing(true);
-      }}
-      title={value}
-      className={`w-full truncate text-left hover:underline ${bold ? "font-semibold" : ""}`}
-    >
-      {value}
-    </button>
-  );
+function collectStageIds(stages: PlainStage[]): string[] {
+  return stages.flatMap((s) => [s.id, ...collectStageIds(s.children)]);
 }
 
 export function GanttChart({
@@ -106,9 +84,12 @@ export function GanttChart({
   const [zoomIndex, setZoomIndex] = useState(2);
   const [fullscreen, setFullscreen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ start: Date; end: Date } | null>(null);
+  const dragPreviewRef = useRef<{ start: Date; end: Date } | null>(null);
   const router = useRouter();
 
-  const allTasksFlat = useMemo(() => stages.flatMap((s) => s.tasks), [stages]);
+  const allTasksFlat = useMemo(() => stages.flatMap(collectAllTasks), [stages]);
   const pxPerDay = ZOOM_LEVELS[zoomIndex];
 
   const { rangeStart, totalDays } = useMemo(() => {
@@ -135,20 +116,9 @@ export function GanttChart({
   }
 
   const rows = useMemo<Row[]>(() => {
-    const list: Row[] = [];
-    for (const stage of stages) {
-      const starts = stage.tasks.map((t) => t.dataInicioPrevista.getTime());
-      const ends = stage.tasks.map((t) => t.dataFimPrevista.getTime());
-      const start = starts.length ? new Date(Math.min(...starts)) : new Date();
-      const end = ends.length ? new Date(Math.max(...ends)) : new Date();
-      list.push({ type: "stage", stage, start, end });
-      if (!collapsed.has(stage.id)) {
-        for (const task of stage.tasks) {
-          list.push({ type: "task", task, stage });
-        }
-      }
-    }
-    return list;
+    const out: Row[] = [];
+    buildRows(stages, 0, collapsed, out);
+    return out;
   }, [stages, collapsed]);
 
   const taskRowIndex = useMemo(() => {
@@ -200,32 +170,80 @@ export function GanttChart({
   const todayX = xForDate(today);
   const showTodayLine = todayX >= 0 && todayX <= timelineWidth;
 
-  function handleDateChange(task: PlainTask, field: "start" | "end", value: string) {
-    if (!value) return;
-    const start = field === "start" ? value : task.dataInicioPrevista.toISOString().slice(0, 10);
-    const end = field === "end" ? value : task.dataFimPrevista.toISOString().slice(0, 10);
+  function commitTaskDates(taskId: string, start: Date, end: Date) {
     startTransition(async () => {
-      await updatePlanningTaskDates(task.id, workId, start, end);
+      await updatePlanningTaskDates(taskId, workId, toDateInputValue(start), toDateInputValue(end));
       toast.success("Datas atualizadas.");
       router.refresh();
     });
   }
 
+  // Arrastar (mover) ou redimensionar (bordas) uma barra de item na linha do tempo.
+  useEffect(() => {
+    if (!drag) return;
+    const activeDrag = drag;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = activeDrag.mode === "move" ? "grabbing" : "ew-resize";
+    document.body.style.userSelect = "none";
+
+    function onMove(e: PointerEvent) {
+      const deltaPx = e.clientX - activeDrag.startClientX;
+      const deltaDays = Math.round(deltaPx / pxPerDay);
+      let next: { start: Date; end: Date } | null = null;
+      if (activeDrag.mode === "move") {
+        next = { start: addDays(activeDrag.originalStart, deltaDays), end: addDays(activeDrag.originalEnd, deltaDays) };
+      } else if (activeDrag.mode === "resize-start") {
+        const newStart = addDays(activeDrag.originalStart, deltaDays);
+        if (newStart.getTime() <= activeDrag.originalEnd.getTime()) next = { start: newStart, end: activeDrag.originalEnd };
+      } else {
+        const newEnd = addDays(activeDrag.originalEnd, deltaDays);
+        if (newEnd.getTime() >= activeDrag.originalStart.getTime()) next = { start: activeDrag.originalStart, end: newEnd };
+      }
+      if (next) {
+        dragPreviewRef.current = next;
+        setDragPreview(next);
+      }
+    }
+
+    function onUp() {
+      const finalPreview = dragPreviewRef.current;
+      dragPreviewRef.current = null;
+      setDrag(null);
+      setDragPreview(null);
+      if (finalPreview) {
+        commitTaskDates(activeDrag.taskId, finalPreview.start, finalPreview.end);
+      }
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag, pxPerDay, workId]);
+
+  function handleDateChange(task: PlainTask, field: "start" | "end", value: string) {
+    if (!value) return;
+    const start = field === "start" ? new Date(value) : task.dataInicioPrevista;
+    const end = field === "end" ? new Date(value) : task.dataFimPrevista;
+    commitTaskDates(task.id, start, end);
+  }
+
   function handleDurationChange(task: PlainTask, value: string) {
     const duration = Math.max(1, Number(value) || 1);
-    const start = task.dataInicioPrevista;
-    const newEnd = addDays(start, duration - 1);
-    startTransition(async () => {
-      await updatePlanningTaskDates(task.id, workId, toDateInputValue(start), toDateInputValue(newEnd));
-      toast.success("Duração atualizada.");
-      router.refresh();
-    });
+    const newEnd = addDays(task.dataInicioPrevista, duration - 1);
+    commitTaskDates(task.id, task.dataInicioPrevista, newEnd);
   }
 
   function handleRenameStage(stageId: string, nome: string) {
     startTransition(async () => {
       await updateStageName(stageId, workId, nome);
-      toast.success("Etapa renomeada.");
+      toast.success("Renomeado.");
       router.refresh();
     });
   }
@@ -233,7 +251,7 @@ export function GanttChart({
   function handleRenameTask(taskId: string, nome: string) {
     startTransition(async () => {
       await updateTaskName(taskId, workId, nome);
-      toast.success("Atividade renomeada.");
+      toast.success("Item renomeado.");
       router.refresh();
     });
   }
@@ -250,7 +268,7 @@ export function GanttChart({
   if (allTasksFlat.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        Nenhuma atividade cadastrada ainda.
+        Nenhum item cadastrado ainda.
       </p>
     );
   }
@@ -258,7 +276,7 @@ export function GanttChart({
   return (
     <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-background p-4" : "flex flex-col gap-3"}>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set(stages.map((s) => s.id)))}>
+        <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set(collectStageIds(stages)))}>
           Recolher tudo
         </Button>
         <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())}>
@@ -297,7 +315,7 @@ export function GanttChart({
                 style={{ gridTemplateColumns: LEFT_GRID, height: HEADER_HEIGHT }}
               >
                 <span>ID</span>
-                <span>Atividade</span>
+                <span>Etapa / Item</span>
                 <span>Início</span>
                 <span>Término</span>
                 <span>Dias</span>
@@ -317,6 +335,7 @@ export function GanttChart({
                         type="button"
                         onClick={() => toggleStage(row.stage.id)}
                         className="flex items-center gap-0.5 text-muted-foreground"
+                        style={{ paddingLeft: row.depth * INDENT }}
                       >
                         {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                         {row.stage.codigo}
@@ -344,8 +363,10 @@ export function GanttChart({
                     className="grid items-center border-b px-1 text-xs"
                     style={{ gridTemplateColumns: LEFT_GRID, height: ROW_HEIGHT }}
                   >
-                    <span className="pl-4 text-muted-foreground">{task.codigo}</span>
-                    <div className="pl-4">
+                    <span className="text-muted-foreground" style={{ paddingLeft: row.depth * INDENT }}>
+                      {task.codigo}
+                    </span>
+                    <div style={{ paddingLeft: row.depth * INDENT }}>
                       <EditableName value={task.nome} onCommit={(v) => handleRenameTask(task.id, v)} />
                     </div>
                     <input
@@ -450,11 +471,18 @@ export function GanttChart({
                     if (row.type === "stage") {
                       const left = xForDate(row.start);
                       const width = (differenceInCalendarDays(row.end, row.start) + 1) * pxPerDay;
+                      const opacity = Math.max(0.55, 1 - row.depth * 0.15);
                       return (
                         <div
                           key={row.stage.id}
                           className="absolute flex items-center rounded-md bg-brand-navy px-2 text-[0.65rem] font-medium text-white"
-                          style={{ top: i * ROW_HEIGHT + 8, height: ROW_HEIGHT - 16, left, width: Math.max(width, 4) }}
+                          style={{
+                            top: i * ROW_HEIGHT + 8,
+                            height: ROW_HEIGHT - 16,
+                            left,
+                            width: Math.max(width, 4),
+                            opacity,
+                          }}
                         >
                           {row.stage.nome}
                         </div>
@@ -462,18 +490,62 @@ export function GanttChart({
                     }
 
                     const task = row.task;
-                    const left = xForDate(task.dataInicioPrevista);
-                    const width = (differenceInCalendarDays(task.dataFimPrevista, task.dataInicioPrevista) + 1) * pxPerDay;
+                    const isDragging = drag?.taskId === task.id && dragPreview;
+                    const barStart = isDragging ? dragPreview!.start : task.dataInicioPrevista;
+                    const barEnd = isDragging ? dragPreview!.end : task.dataFimPrevista;
+                    const left = xForDate(barStart);
+                    const width = (differenceInCalendarDays(barEnd, barStart) + 1) * pxPerDay;
                     return (
                       <div
                         key={task.id}
-                        className="absolute overflow-hidden rounded-md bg-muted"
+                        className={`absolute cursor-grab overflow-hidden rounded-md bg-muted select-none ${
+                          isDragging ? "ring-2 ring-brand-teal" : ""
+                        }`}
                         style={{ top: i * ROW_HEIGHT + 9, height: ROW_HEIGHT - 18, left, width: Math.max(width, 4) }}
                         title={`${task.nome} — ${PLANNING_STATUS_LABELS[task.status]}`}
+                        onPointerDown={(e) => {
+                          if (isPending || drag) return;
+                          e.preventDefault();
+                          setDrag({
+                            taskId: task.id,
+                            mode: "move",
+                            startClientX: e.clientX,
+                            originalStart: task.dataInicioPrevista,
+                            originalEnd: task.dataFimPrevista,
+                          });
+                        }}
                       >
                         <div
                           className={`h-full ${STATUS_COLORS[task.status] ?? "bg-muted-foreground/40"}`}
                           style={{ width: `${Math.min(Number(task.percentualExecutado), 100)}%` }}
+                        />
+                        <div
+                          className="absolute top-0 bottom-0 left-0 w-1.5 cursor-ew-resize"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (isPending || drag) return;
+                            setDrag({
+                              taskId: task.id,
+                              mode: "resize-start",
+                              startClientX: e.clientX,
+                              originalStart: task.dataInicioPrevista,
+                              originalEnd: task.dataFimPrevista,
+                            });
+                          }}
+                        />
+                        <div
+                          className="absolute top-0 right-0 bottom-0 w-1.5 cursor-ew-resize"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (isPending || drag) return;
+                            setDrag({
+                              taskId: task.id,
+                              mode: "resize-end",
+                              startClientX: e.clientX,
+                              originalStart: task.dataInicioPrevista,
+                              originalEnd: task.dataFimPrevista,
+                            });
+                          }}
                         />
                       </div>
                     );

@@ -13,7 +13,7 @@ export function AddTaskForm({ workId, stageId }: { workId: string; stageId: stri
   if (!open) {
     return (
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <Plus /> Adicionar atividade
+        <Plus /> Adicionar item
       </Button>
     );
   }
@@ -27,7 +27,7 @@ export function AddTaskForm({ workId, stageId }: { workId: string; stageId: stri
         <Input name="codigo" placeholder="02.01" className="w-20" />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Atividade</label>
+        <label className="text-xs text-muted-foreground">Item</label>
         <Input name="nome" placeholder="Ex: Escavação" required className="w-48" />
       </div>
       <div className="flex flex-col gap-1">

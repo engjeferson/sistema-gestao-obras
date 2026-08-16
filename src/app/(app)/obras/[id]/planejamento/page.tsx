@@ -1,18 +1,16 @@
 import Link from "next/link";
 import { Import } from "lucide-react";
-import { listStagesWithTasks, listTasksForDependencyPicker } from "@/server/actions/planejamento";
+import { listStagesWithTasks, listTasksForDependencyPicker, type StageTreeNode } from "@/server/actions/planejamento";
 import { listPlanningTemplates } from "@/server/actions/planejamento-templates";
 import { AddStageForm } from "@/components/planejamento/add-stage-form";
 import { PlanningView } from "@/components/planejamento/planning-view";
 import { ApplyTemplatePicker } from "@/components/planejamento/apply-template-picker";
 import { SaveAsTemplateButton } from "@/components/planejamento/save-as-template-dialog";
 import { Button } from "@/components/ui/button";
+import type { PlainStage } from "@/components/planejamento/stage-list";
 
-export default async function PlanejamentoPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const [stagesRaw, allTasksRaw] = await Promise.all([listStagesWithTasks(id), listTasksForDependencyPicker(id)]);
-
-  const stages = stagesRaw.map((stage) => ({
+function mapStage(stage: StageTreeNode): PlainStage {
+  return {
     id: stage.id,
     codigo: stage.codigo,
     nome: stage.nome,
@@ -31,7 +29,15 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
         nome: dep.predecessorTask.nome,
       })),
     })),
-  }));
+    children: stage.children.map(mapStage),
+  };
+}
+
+export default async function PlanejamentoPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const [stagesRaw, allTasksRaw] = await Promise.all([listStagesWithTasks(id), listTasksForDependencyPicker(id)]);
+
+  const stages = stagesRaw.map(mapStage);
 
   const allTasks = allTasksRaw.map((task) => ({
     id: task.id,

@@ -476,6 +476,7 @@ model ContractMeasurement {
 model PlanningStage {
   id        String   @id @default(cuid())
   workId    String
+  parentId  String?
   codigo    String?
   nome      String
   ordem     Int      @default(0)
@@ -483,12 +484,15 @@ model PlanningStage {
   updatedAt DateTime @updatedAt
 
   work                  Work                    @relation(fields: [workId], references: [id], onDelete: Cascade)
+  parent                PlanningStage?          @relation("StageChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children              PlanningStage[]         @relation("StageChildren")
   tasks                 PlanningTask[]
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   stockMovements        StockMovement[]
 
   @@index([workId])
+  @@index([parentId])
 }
 
 model PlanningTask {
