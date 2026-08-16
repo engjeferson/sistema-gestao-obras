@@ -20,8 +20,9 @@ export type TaskFormValues = z.infer<typeof taskFormSchema>;
 export const bulkPlanningRowSchema = z.object({
   clientId: z.string().min(1),
   tipo: z.enum(["ETAPA", "ATIVIDADE"]),
+  // Pai pode ser: vazio (nível superior, só ETAPA), "existing:<id>" (etapa/sub já existente no
+  // banco) ou o clientId de outra linha ETAPA deste mesmo lote.
   parentClientId: z.string().optional(),
-  codigo: z.string().trim().optional(),
   nome: z.string().trim().min(1, "Informe o nome."),
   dataInicioPrevista: z.string().optional(),
   dataFimPrevista: z.string().optional(),

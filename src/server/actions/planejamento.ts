@@ -115,6 +115,8 @@ export type StageTreeNode = {
   codigo: string | null;
   nome: string;
   ordem: number;
+  dataInicioPrevista: Date | null;
+  dataFimPrevista: Date | null;
   predecessorChips: PredecessorChip[];
   tasks: {
     id: string;
@@ -393,6 +395,22 @@ export async function updateStageName(stageId: string, workId: string, nome: str
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 
+/**
+ * Data "manual" da etapa/sub — só faz sentido (e só é editável na UI) enquanto ela ainda não
+ * tem nenhum item dentro; a partir daí a data exibida vira sempre o agregado dos itens.
+ */
+export async function updateStageDates(stageId: string, workId: string, start: string, end: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  await prisma.planningStage.update({
+    where: { id: stageId },
+    data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
+  });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
 export async function deleteStage(stageId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
@@ -421,6 +439,20 @@ export async function moveStage(stageId: string, workId: string, direction: "up"
     prisma.planningStage.update({ where: { id: a.id }, data: { ordem: b.ordem } }),
     prisma.planningStage.update({ where: { id: b.id }, data: { ordem: a.ordem } }),
   ]);
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
+/** Reordena (arrastar) as etapas/subs irmãs sob `parentId` pra bater com `orderedStageIds`. */
+export async function reorderStages(workId: string, parentId: string | null, orderedStageIds: string[]) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  await prisma.$transaction(
+    orderedStageIds.map((id, index) =>
+      prisma.planningStage.updateMany({ where: { id, workId, parentId }, data: { ordem: index } }),
+    ),
+  );
 
   revalidatePath(`/obras/${workId}/planejamento`);
 }
@@ -520,44 +552,65 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    const stageIdMap = new Map<string, string>();
-    const stageCodigoMap = new Map<string, string>();
-    const existingStageCount = await tx.planningStage.count({ where: { workId: data.workId } });
+  const EXISTING_PREFIX = "existing:";
 
-    for (const [index, row] of etapaRows.entries()) {
-      const codigo = row.codigo || String(existingStageCount + index + 1);
-      const created = await tx.planningStage.create({
-        data: { workId: data.workId, codigo, nome: row.nome, ordem: existingStageCount + index },
-      });
-      stageIdMap.set(row.clientId, created.id);
-      stageCodigoMap.set(row.clientId, codigo);
+  await prisma.$transaction(async (tx) => {
+    const stageIdMap = new Map<string, string>(); // clientId (deste lote) -> id real
+
+    function resolveParentStageId(parentClientId: string | undefined): string | null {
+      if (!parentClientId) return null;
+      if (parentClientId.startsWith(EXISTING_PREFIX)) return parentClientId.slice(EXISTING_PREFIX.length);
+      return stageIdMap.get(parentClientId) ?? null;
+    }
+
+    // Cria as ETAPA em ordem topológica: uma linha só é criada depois que sua etapa-pai (quando
+    // é outra linha ETAPA deste mesmo lote) já tiver sido criada — permite aninhar em qualquer
+    // nível dentro do próprio lote, além de aninhar em etapas/subs já existentes.
+    const pending = [...etapaRows];
+    let progressed = true;
+    while (pending.length > 0 && progressed) {
+      progressed = false;
+      for (let i = pending.length - 1; i >= 0; i--) {
+        const row = pending[i];
+        const parentId = row.parentClientId;
+        const waitingOnBatchParent =
+          parentId && !parentId.startsWith(EXISTING_PREFIX) && etapaRows.some((e) => e.clientId === parentId) && !stageIdMap.has(parentId);
+        if (waitingOnBatchParent) continue;
+
+        const resolvedParentId = resolveParentStageId(parentId);
+        const ordem = resolvedParentId
+          ? await nextChildOrdem(tx, data.workId, resolvedParentId)
+          : await nextStageOrdem(tx, data.workId, null);
+        const created = await tx.planningStage.create({
+          data: { workId: data.workId, parentId: resolvedParentId, nome: row.nome, ordem },
+        });
+        stageIdMap.set(row.clientId, created.id);
+        pending.splice(i, 1);
+        progressed = true;
+      }
+    }
+    if (pending.length > 0) {
+      throw new Error("Referência circular entre etapas do lote.");
     }
 
     const taskIdMap = new Map<string, string>();
-    const taskCountByStage = new Map<string, number>();
 
     for (const row of atividadeRows) {
-      const stageId = stageIdMap.get(row.parentClientId!);
+      const stageId = resolveParentStageId(row.parentClientId);
       if (!stageId) continue;
 
-      const countSoFar = taskCountByStage.get(stageId) ?? (await tx.planningTask.count({ where: { stageId } }));
-      const stageCodigo = stageCodigoMap.get(row.parentClientId!) ?? "";
-      const codigo = row.codigo || `${stageCodigo}.${countSoFar + 1}`;
-
+      const ordem = await nextChildOrdem(tx, data.workId, stageId);
       const created = await tx.planningTask.create({
         data: {
           workId: data.workId,
           stageId,
-          codigo,
           nome: row.nome,
-          ordem: countSoFar,
+          ordem,
           dataInicioPrevista: new Date(row.dataInicioPrevista!),
           dataFimPrevista: new Date(row.dataFimPrevista!),
         },
       });
       taskIdMap.set(row.clientId, created.id);
-      taskCountByStage.set(stageId, countSoFar + 1);
     }
 
     for (const row of atividadeRows) {

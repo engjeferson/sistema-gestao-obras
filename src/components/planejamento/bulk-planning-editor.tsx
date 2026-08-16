@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { importPlanningBulk } from "@/server/actions/planejamento";
+import { flattenStageOptions } from "@/components/planejamento/add-stage-form";
+import type { PlainStage } from "@/components/planejamento/stage-list";
+
+const EXISTING_PREFIX = "existing:";
 
 type BulkRow = {
   clientId: string;
   tipo: "ETAPA" | "ATIVIDADE";
   parentClientId: string;
-  codigo: string;
   nome: string;
   dataInicioPrevista: string;
   dataFimPrevista: string;
@@ -23,7 +26,6 @@ function newRow(tipo: "ETAPA" | "ATIVIDADE", parentClientId = ""): BulkRow {
     clientId: crypto.randomUUID(),
     tipo,
     parentClientId,
-    codigo: "",
     nome: "",
     dataInicioPrevista: "",
     dataFimPrevista: "",
@@ -31,12 +33,46 @@ function newRow(tipo: "ETAPA" | "ATIVIDADE", parentClientId = ""): BulkRow {
   };
 }
 
-export function BulkPlanningEditor({ workId }: { workId: string }) {
+function existingDepthMap(stages: PlainStage[], depth = 0, map = new Map<string, number>()) {
+  for (const stage of stages) {
+    map.set(stage.id, depth);
+    existingDepthMap(stage.children, depth + 1, map);
+  }
+  return map;
+}
+
+function batchEtapaDepth(row: BulkRow, etapaRows: BulkRow[], depthMap: Map<string, number>, guard = 0): number {
+  if (!row.parentClientId || guard > etapaRows.length) return 0;
+  if (row.parentClientId.startsWith(EXISTING_PREFIX)) {
+    return (depthMap.get(row.parentClientId.slice(EXISTING_PREFIX.length)) ?? 0) + 1;
+  }
+  const parent = etapaRows.find((r) => r.clientId === row.parentClientId);
+  if (!parent) return 0;
+  return batchEtapaDepth(parent, etapaRows, depthMap, guard + 1) + 1;
+}
+
+export function BulkPlanningEditor({ workId, stages }: { workId: string; stages: PlainStage[] }) {
   const [errorMessage, formAction, isPending] = useActionState(importPlanningBulk, undefined);
   const [rows, setRows] = useState<BulkRow[]>([newRow("ETAPA")]);
 
   const etapaRows = rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = rows.filter((r) => r.tipo === "ATIVIDADE");
+
+  const existingOptions = flattenStageOptions(stages).map((o) => ({
+    value: `${EXISTING_PREFIX}${o.id}`,
+    label: o.label,
+  }));
+  const depthMap = existingDepthMap(stages);
+
+  function parentOptionsFor(excludeClientId?: string) {
+    const batchOptions = etapaRows
+      .filter((r) => r.clientId !== excludeClientId)
+      .map((r) => ({
+        value: r.clientId,
+        label: `${"— ".repeat(batchEtapaDepth(r, etapaRows, depthMap))}${r.nome || "(sem nome)"}`,
+      }));
+    return [...existingOptions, ...batchOptions];
+  }
 
   function updateRow(clientId: string, patch: Partial<BulkRow>) {
     setRows((prev) => prev.map((r) => (r.clientId === clientId ? { ...r, ...patch } : r)));
@@ -59,8 +95,11 @@ export function BulkPlanningEditor({ workId }: { workId: string }) {
   }
 
   function addAtividade() {
-    setRows((prev) => [...prev, newRow("ATIVIDADE", etapaRows[0]?.clientId ?? "")]);
+    const defaultParent = existingOptions[0]?.value ?? etapaRows[0]?.clientId ?? "";
+    setRows((prev) => [...prev, newRow("ATIVIDADE", defaultParent)]);
   }
+
+  const canAddItem = existingOptions.length > 0 || etapaRows.length > 0;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -72,8 +111,7 @@ export function BulkPlanningEditor({ workId }: { workId: string }) {
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="p-2">Tipo</th>
-              <th className="p-2">Etapa</th>
-              <th className="p-2">Código</th>
+              <th className="p-2">Pai</th>
               <th className="p-2">Nome</th>
               <th className="p-2">Início</th>
               <th className="p-2">Fim</th>
@@ -88,32 +126,23 @@ export function BulkPlanningEditor({ workId }: { workId: string }) {
                   <Badge tipo={row.tipo} />
                 </td>
                 <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
-                    <NativeSelect
-                      value={row.parentClientId}
-                      onChange={(e) => updateRow(row.clientId, { parentClientId: e.target.value })}
-                      className="min-w-[160px]"
-                    >
+                  <NativeSelect
+                    value={row.parentClientId}
+                    onChange={(e) => updateRow(row.clientId, { parentClientId: e.target.value })}
+                    className="min-w-[180px]"
+                  >
+                    {row.tipo === "ETAPA" ? <option value="">— Nível superior —</option> : null}
+                    {row.tipo === "ATIVIDADE" ? (
                       <option value="" disabled>
                         Selecione a etapa
                       </option>
-                      {etapaRows.map((etapa) => (
-                        <option key={etapa.clientId} value={etapa.clientId}>
-                          {etapa.nome || "(sem nome)"}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  <Input
-                    value={row.codigo}
-                    onChange={(e) => updateRow(row.clientId, { codigo: e.target.value })}
-                    placeholder="auto"
-                    className="w-20"
-                  />
+                    ) : null}
+                    {parentOptionsFor(row.clientId).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
                 </td>
                 <td className="p-2">
                   <Input
@@ -184,8 +213,8 @@ export function BulkPlanningEditor({ workId }: { workId: string }) {
         <Button type="button" variant="outline" size="sm" onClick={addEtapa}>
           <Plus /> Etapa
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={addAtividade} disabled={etapaRows.length === 0}>
-          <Plus /> Atividade
+        <Button type="button" variant="outline" size="sm" onClick={addAtividade} disabled={!canAddItem}>
+          <Plus /> Item
         </Button>
       </div>
 
@@ -207,7 +236,7 @@ function Badge({ tipo }: { tipo: "ETAPA" | "ATIVIDADE" }) {
         tipo === "ETAPA" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
       }`}
     >
-      {tipo === "ETAPA" ? "Etapa" : "Atividade"}
+      {tipo === "ETAPA" ? "Etapa" : "Item"}
     </span>
   );
 }

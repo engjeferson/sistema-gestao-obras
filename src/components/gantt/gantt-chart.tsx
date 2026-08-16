@@ -48,8 +48,8 @@ function buildRows(stages: PlainStage[], depth: number, collapsed: Set<string>, 
     const descendantTasks = collectAllTasks(stage);
     const starts = descendantTasks.map((t) => t.dataInicioPrevista.getTime());
     const ends = descendantTasks.map((t) => t.dataFimPrevista.getTime());
-    const start = starts.length ? new Date(Math.min(...starts)) : new Date();
-    const end = ends.length ? new Date(Math.max(...ends)) : new Date();
+    const start = starts.length ? new Date(Math.min(...starts)) : (stage.dataInicioPrevista ?? new Date());
+    const end = ends.length ? new Date(Math.max(...ends)) : (stage.dataFimPrevista ?? new Date());
     out.push({ type: "stage", stage, start, end, depth });
     if (!collapsed.has(stage.id)) {
       for (const task of stage.tasks) {

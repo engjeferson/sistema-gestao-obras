@@ -15,6 +15,8 @@ function mapStage(stage: StageTreeNode): PlainStage {
     id: stage.id,
     codigo: stage.codigo!,
     nome: stage.nome,
+    dataInicioPrevista: stage.dataInicioPrevista,
+    dataFimPrevista: stage.dataFimPrevista,
     predecessorChips: stage.predecessorChips,
     tasks: stage.tasks.map((task) => ({
       id: task.id,

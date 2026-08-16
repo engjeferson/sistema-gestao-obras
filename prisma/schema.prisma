@@ -474,14 +474,16 @@ model ContractMeasurement {
 }
 
 model PlanningStage {
-  id        String   @id @default(cuid())
-  workId    String
-  parentId  String?
-  codigo    String?
-  nome      String
-  ordem     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  workId             String
+  parentId           String?
+  codigo             String?
+  nome               String
+  ordem              Int       @default(0)
+  dataInicioPrevista DateTime? @db.Date
+  dataFimPrevista    DateTime? @db.Date
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   work                  Work                    @relation(fields: [workId], references: [id], onDelete: Cascade)
   parent                PlanningStage?          @relation("StageChildren", fields: [parentId], references: [id], onDelete: Cascade)
