@@ -18,7 +18,7 @@ async function nextStageOrdem(client: TxClient, workId: string, parentId: string
 /**
  * Próxima posição (0-based) pra um novo filho direto de `parentStageId` (sub OU item),
  * contando os dois tipos juntos — é o que garante que a numeração (calculada por posição,
- * ver `assignCodesFlat`) fique sequencial mesmo intercalando subs e itens.
+ * ver `assignCodes`) fique sequencial mesmo intercalando subs e itens.
  */
 async function nextChildOrdem(client: TxClient, workId: string, parentStageId: string) {
   const [childStageCount, directItemCount] = await Promise.all([
@@ -32,29 +32,28 @@ type TaskNode = { id: string; ordem: number; codigo: string | null; [key: string
 type StageNode = { id: string; ordem: number; codigo: string | null; tasks: TaskNode[]; children: StageNode[]; [key: string]: unknown };
 
 /**
- * Numera cada etapa/sub/item sequencialmente (1, 2, 3...) na ordem visual de cima pra baixo
- * (pré-ordem: o nó recebe o número antes dos filhos) — a partir da posição real na árvore
- * (`ordem`), não de um valor gravado, então nunca fica com buraco ou duplicado.
+ * Numera cada etapa/sub/item em formato EAP (1, 1.1, 1.2, 2, 2.1...) a partir da posição real na
+ * árvore (`ordem`), não de um valor gravado — garante que o código esteja sempre presente, em
+ * sequência e sem buracos, inclusive depois de mover/excluir itens.
  */
-function assignCodesFlat(roots: StageNode[]) {
-  let counter = 0;
-  function visit(node: StageNode) {
-    counter += 1;
-    node.codigo = String(counter);
-    const combined = [
-      ...node.children.map((c) => ({ kind: "stage" as const, ordem: c.ordem, ref: c })),
-      ...node.tasks.map((t) => ({ kind: "task" as const, ordem: t.ordem, ref: t })),
-    ].sort((a, b) => a.ordem - b.ordem);
-    for (const entry of combined) {
-      if (entry.kind === "stage") {
-        visit(entry.ref);
-      } else {
-        counter += 1;
-        entry.ref.codigo = String(counter);
-      }
-    }
-  }
-  for (const root of [...roots].sort((a, b) => a.ordem - b.ordem)) visit(root);
+function assignCodes(roots: StageNode[]) {
+  const sorted = [...roots].sort((a, b) => a.ordem - b.ordem);
+  sorted.forEach((root, index) => {
+    root.codigo = String(index + 1);
+    assignChildCodes(root);
+  });
+}
+
+function assignChildCodes(node: StageNode) {
+  const combined = [
+    ...node.children.map((c) => ({ kind: "stage" as const, ordem: c.ordem, ref: c })),
+    ...node.tasks.map((t) => ({ kind: "task" as const, ordem: t.ordem, ref: t })),
+  ].sort((a, b) => a.ordem - b.ordem);
+
+  combined.forEach((entry, index) => {
+    entry.ref.codigo = `${node.codigo}.${index + 1}`;
+    if (entry.kind === "stage") assignChildCodes(entry.ref);
+  });
 }
 
 export async function applyCascadeForTask(tx: TxClient, workId: string, changedTaskId: string) {
@@ -293,7 +292,7 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
       roots.push(node);
     }
   }
-  assignCodesFlat(roots as unknown as StageNode[]);
+  assignCodes(roots as unknown as StageNode[]);
 
   // Os `predecessors[].predecessorTask.codigo` vieram de um select à parte (não fazem parte da
   // árvore acima), então ficaram com o código antigo/cru do banco — corrige pelo código já calculado.
@@ -420,13 +419,26 @@ export async function deleteStage(stageId: string, workId: string) {
 }
 
 /** Reordena (arrastar) as etapas/subs irmãs sob `parentId` pra bater com `orderedStageIds`. */
-export async function reorderStages(workId: string, parentId: string | null, orderedStageIds: string[]) {
+/**
+ * Reordena (arrastar) os filhos diretos de `parentId` (`null` = nível superior) — subs e itens
+ * juntos, na mesma lista, já que aparecem intercalados na Lista.
+ */
+export async function reorderChildren(
+  workId: string,
+  parentId: string | null,
+  orderedItems: { id: string; kind: "stage" | "task" }[],
+) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
   await prisma.$transaction(
-    orderedStageIds.map((id, index) =>
-      prisma.planningStage.updateMany({ where: { id, workId, parentId }, data: { ordem: index } }),
+    orderedItems.map((item, index) =>
+      item.kind === "stage"
+        ? prisma.planningStage.updateMany({ where: { id: item.id, workId, parentId }, data: { ordem: index } })
+        : prisma.planningTask.updateMany({
+            where: { id: item.id, workId, stageId: parentId ?? undefined },
+            data: { ordem: index },
+          }),
     ),
   );
 

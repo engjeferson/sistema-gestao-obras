@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { differenceInCalendarDays } from "date-fns";
+import { addDays, differenceInCalendarDays } from "date-fns";
 import { GripVertical, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import {
   createTask,
   deleteStage,
   deleteTask,
-  reorderStages,
+  reorderChildren,
   updatePlanningTaskDates,
   updateStageDates,
   updateStageName,
@@ -54,12 +54,47 @@ function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+// O código é sempre "pai.N" (ex: "2.3") — o último segmento é a posição entre os irmãos, usado
+// pra intercalar subs e itens na ordem certa sem precisar de um campo `ordem` no tipo do cliente.
+function siblingIndex(codigo: string): number {
+  const parts = codigo.split(".");
+  return Number(parts[parts.length - 1]);
+}
+
 function collectAllTasks(stage: PlainStage): PlainTask[] {
   return [...stage.tasks, ...stage.children.flatMap(collectAllTasks)];
 }
 
 function hasAnyTask(stage: PlainStage): boolean {
   return stage.tasks.length > 0 || stage.children.some(hasAnyTask);
+}
+
+function combineEntries(stages: PlainStage[], tasks: PlainTask[]): CombinedEntry[] {
+  return [
+    ...stages.map((s): CombinedEntry => ({ kind: "stage", node: s })),
+    ...tasks.map((t): CombinedEntry => ({ kind: "task", node: t })),
+  ].sort((a, b) => siblingIndex(a.node.codigo) - siblingIndex(b.node.codigo));
+}
+
+// Índice pra cor alternada das linhas de sub (tudo que não é etapa de nível superior) — conta em
+// pré-ordem, contínuo por baixo de qualquer etapa/sub, pra listras ficarem consistentes mesmo
+// atravessando vários níveis de aninhamento.
+function computeStripeIndex(
+  stages: PlainStage[],
+  tasks: PlainTask[],
+  depth: number,
+  counter: { value: number },
+  map: Map<string, number>,
+) {
+  for (const entry of combineEntries(stages, tasks)) {
+    if (depth > 0) {
+      map.set(entry.node.id, counter.value);
+      counter.value += 1;
+    }
+    if (entry.kind === "stage") {
+      computeStripeIndex(entry.node.children, entry.node.tasks, depth + 1, counter, map);
+    }
+  }
 }
 
 export function StageList({ stages, workId }: { stages: PlainStage[]; workId: string }) {
@@ -106,7 +141,18 @@ export function StageList({ stages, workId }: { stages: PlainStage[]; workId: st
               </tr>
             </thead>
             <tbody>
-              <DraggableStageGroup stages={stages} tasks={[]} workId={workId} parentId={null} depth={0} />
+              <DraggableStageGroup
+                stages={stages}
+                tasks={[]}
+                workId={workId}
+                parentId={null}
+                depth={0}
+                stripeIndex={(() => {
+                  const map = new Map<string, number>();
+                  computeStripeIndex(stages, [], 0, { value: 0 }, map);
+                  return map;
+                })()}
+              />
             </tbody>
           </table>
         </div>
@@ -115,27 +161,29 @@ export function StageList({ stages, workId }: { stages: PlainStage[]; workId: st
   );
 }
 
-// Reordena (arrastar, Pointer Events) as etapas/subs irmãs sob `parentId` — o mesmo mecanismo já
-// usado nas barras do Gantt, mais confiável em uso real do que o HTML5 Drag and Drop nativo.
-// Itens (atividades) não são arrastáveis; ficam na posição em que foram criados. Pra exibição, as
-// duas listas (subs + itens) são intercaladas pelo código (numeração sequencial já calculada no
-// servidor, reflete a ordem combinada de verdade) — durante o arrasto, a ordem ao vivo das subs
-// substitui só os "slots" de sub na sequência original, sem mexer nos itens.
+// Reordena (arrastar, Pointer Events) os filhos diretos de `parentId` — subs e itens juntos, na
+// mesma lista, já que aparecem intercalados na Lista. Mesmo mecanismo já usado nas barras do
+// Gantt, mais confiável em uso real do que o HTML5 Drag and Drop nativo.
 function DraggableStageGroup({
   stages,
   tasks,
   workId,
   parentId,
   depth,
+  stripeIndex,
 }: {
   stages: PlainStage[];
   tasks: PlainTask[];
   workId: string;
   parentId: string | null;
   depth: number;
+  stripeIndex: Map<string, number>;
 }) {
   const router = useRouter();
-  const [order, setOrder] = useState(() => stages.map((s) => s.id));
+  const entries: CombinedEntry[] = combineEntries(stages, tasks);
+  const kindById = new Map(entries.map((e) => [e.node.id, e.kind]));
+
+  const [order, setOrder] = useState(() => entries.map((e) => e.node.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const orderRef = useRef(order);
   orderRef.current = order;
@@ -144,8 +192,9 @@ function DraggableStageGroup({
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
   useEffect(() => {
-    setOrder(stages.map((s) => s.id));
-  }, [stages]);
+    setOrder(entries.map((e) => e.node.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stages, tasks]);
 
   useEffect(() => {
     function handlePointerMove(e: PointerEvent) {
@@ -171,7 +220,8 @@ function DraggableStageGroup({
       setDraggingId(null);
       document.body.style.removeProperty("user-select");
       if (draggedId && JSON.stringify(initialOrderRef.current) !== JSON.stringify(orderRef.current)) {
-        reorderStages(workId, parentId, orderRef.current).then(() => router.refresh());
+        const orderedItems = orderRef.current.map((id) => ({ id, kind: kindById.get(id) ?? ("stage" as const) }));
+        reorderChildren(workId, parentId, orderedItems).then(() => router.refresh());
       }
     }
     window.addEventListener("pointermove", handlePointerMove);
@@ -180,7 +230,8 @@ function DraggableStageGroup({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [workId, parentId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workId, parentId, router, stages, tasks]);
 
   function startDrag(id: string) {
     draggingIdRef.current = id;
@@ -189,23 +240,12 @@ function DraggableStageGroup({
     document.body.style.userSelect = "none";
   }
 
-  const stageById = new Map(stages.map((s) => [s.id, s]));
-  const combined: CombinedEntry[] = [
-    ...stages.map((s): CombinedEntry => ({ kind: "stage", node: s })),
-    ...tasks.map((t): CombinedEntry => ({ kind: "task", node: t })),
-  ].sort((a, b) => Number(a.node.codigo) - Number(b.node.codigo));
-
-  const liveStageQueue = [...order];
-  const renderList: CombinedEntry[] = combined.map((entry) => {
-    if (entry.kind === "task") return entry;
-    const id = liveStageQueue.shift();
-    const node = (id ? stageById.get(id) : undefined) ?? entry.node;
-    return { kind: "stage", node };
-  });
+  const byId = new Map(entries.map((e) => [e.node.id, e]));
+  const ordered = order.map((id) => byId.get(id)).filter((e): e is CombinedEntry => !!e);
 
   return (
     <>
-      {renderList.map((entry) =>
+      {ordered.map((entry) =>
         entry.kind === "stage" ? (
           <StageRows
             key={entry.node.id}
@@ -213,6 +253,8 @@ function DraggableStageGroup({
             workId={workId}
             depth={depth}
             isDragging={draggingId === entry.node.id}
+            stripe={depth > 0 ? (stripeIndex.get(entry.node.id) ?? 0) % 2 === 1 : false}
+            stripeIndex={stripeIndex}
             rowRef={(el) => {
               if (el) rowRefs.current.set(entry.node.id, el);
               else rowRefs.current.delete(entry.node.id);
@@ -220,10 +262,40 @@ function DraggableStageGroup({
             onGripPointerDown={() => startDrag(entry.node.id)}
           />
         ) : (
-          <TaskRow key={entry.node.id} task={entry.node} workId={workId} depth={depth} />
+          <TaskRow
+            key={entry.node.id}
+            task={entry.node}
+            workId={workId}
+            depth={depth}
+            isDragging={draggingId === entry.node.id}
+            stripe={(stripeIndex.get(entry.node.id) ?? 0) % 2 === 1}
+            rowRef={(el) => {
+              if (el) rowRefs.current.set(entry.node.id, el);
+              else rowRefs.current.delete(entry.node.id);
+            }}
+            onGripPointerDown={() => startDrag(entry.node.id)}
+          />
         ),
       )}
     </>
+  );
+}
+
+function GripCell({ codigo, onGripPointerDown }: { codigo: string; onGripPointerDown: () => void }) {
+  return (
+    <td
+      onPointerDown={(e) => {
+        e.preventDefault();
+        onGripPointerDown();
+      }}
+      title="Arrastar para reordenar"
+      className="touch-none cursor-grab p-2 text-center text-muted-foreground active:cursor-grabbing"
+    >
+      <span className="flex items-center justify-center gap-1">
+        <GripVertical className="size-3.5" />
+        {codigo}
+      </span>
+    </td>
   );
 }
 
@@ -232,6 +304,8 @@ function StageRows({
   workId,
   depth,
   isDragging,
+  stripe,
+  stripeIndex,
   rowRef,
   onGripPointerDown,
 }: {
@@ -239,6 +313,8 @@ function StageRows({
   workId: string;
   depth: number;
   isDragging: boolean;
+  stripe: boolean;
+  stripeIndex: Map<string, number>;
   rowRef: (el: HTMLTableRowElement | null) => void;
   onGripPointerDown: () => void;
 }) {
@@ -292,20 +368,11 @@ function StageRows({
 
   return (
     <>
-      <tr ref={rowRef} className={`border-b bg-muted/20 ${isDragging ? "opacity-50" : ""}`}>
-        <td
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onGripPointerDown();
-          }}
-          title="Arrastar para reordenar"
-          className="touch-none cursor-grab p-2 text-center text-muted-foreground active:cursor-grabbing"
-        >
-          <span className="flex items-center justify-center gap-1">
-            <GripVertical className="size-3.5" />
-            {stage.codigo}
-          </span>
-        </td>
+      <tr
+        ref={rowRef}
+        className={`border-b ${depth === 0 ? "bg-muted/40" : stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""}`}
+      >
+        <GripCell codigo={stage.codigo} onGripPointerDown={onGripPointerDown} />
         <td className="p-2 font-semibold" style={{ paddingLeft: 8 + depth * INDENT }}>
           <EditableName value={stage.nome} bold onCommit={handleRename} />
         </td>
@@ -335,15 +402,23 @@ function StageRows({
         </td>
       </tr>
       {stage.children.length > 0 || stage.tasks.length > 0 ? (
-        <DraggableStageGroup stages={stage.children} tasks={stage.tasks} workId={workId} parentId={stage.id} depth={depth + 1} />
+        <DraggableStageGroup
+          stages={stage.children}
+          tasks={stage.tasks}
+          workId={workId}
+          parentId={stage.id}
+          depth={depth + 1}
+          stripeIndex={stripeIndex}
+        />
       ) : null}
     </>
   );
 }
 
 // Enquanto a etapa/sub não tem nenhuma atividade (nela ou em qualquer sub dela), a data é
-// "manual" e editável direto aqui. A partir da primeira atividade lançada em qualquer nível, a
-// data exibida vira sempre o agregado (menor início / maior fim) — só leitura.
+// "manual" e editável direto aqui (inclusive a duração, que recalcula o Fim). A partir da
+// primeira atividade lançada em qualquer nível, a data exibida vira sempre o agregado (menor
+// início / maior fim) — só leitura.
 function StageDateCells({ stage, workId }: { stage: PlainStage; workId: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -363,6 +438,7 @@ function StageDateCells({ stage, workId }: { stage: PlainStage; workId: string }
       <>
         <td className="p-2 text-muted-foreground">{formatDateBR(aggStart)}</td>
         <td className="p-2 text-muted-foreground">{formatDateBR(aggEnd)}</td>
+        <td className="p-2 text-muted-foreground">{differenceInCalendarDays(aggEnd, aggStart) + 1}</td>
       </>
     );
   }
@@ -374,6 +450,16 @@ function StageDateCells({ stage, workId }: { stage: PlainStage; workId: string }
       router.refresh();
     });
   }
+
+  function handleDurationChange(value: string) {
+    const dias = Number(value);
+    if (!start || !Number.isFinite(dias) || dias < 1) return;
+    const nextEnd = toDateInputValue(addDays(new Date(start), dias - 1));
+    setEnd(nextEnd);
+    commit(start, nextEnd);
+  }
+
+  const duration = start && end ? differenceInCalendarDays(new Date(end), new Date(start)) + 1 : "";
 
   return (
     <>
@@ -401,11 +487,37 @@ function StageDateCells({ stage, workId }: { stage: PlainStage; workId: string }
           className="rounded border bg-background px-1 py-0.5 text-xs"
         />
       </td>
+      <td className="p-2">
+        <input
+          type="number"
+          min={1}
+          value={duration}
+          disabled={isPending || !start}
+          onChange={(e) => handleDurationChange(e.target.value)}
+          className="w-16 rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
     </>
   );
 }
 
-function TaskRow({ task, workId, depth }: { task: PlainTask; workId: string; depth: number }) {
+function TaskRow({
+  task,
+  workId,
+  depth,
+  isDragging,
+  stripe,
+  rowRef,
+  onGripPointerDown,
+}: {
+  task: PlainTask;
+  workId: string;
+  depth: number;
+  isDragging: boolean;
+  stripe: boolean;
+  rowRef: (el: HTMLTableRowElement | null) => void;
+  onGripPointerDown: () => void;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [start, setStart] = useState(toDateInputValue(task.dataInicioPrevista));
@@ -431,6 +543,14 @@ function TaskRow({ task, workId, depth }: { task: PlainTask; workId: string; dep
     });
   }
 
+  function handleDurationChange(value: string) {
+    const dias = Number(value);
+    if (!start || !Number.isFinite(dias) || dias < 1) return;
+    const nextEnd = toDateInputValue(addDays(new Date(start), dias - 1));
+    setEnd(nextEnd);
+    commit(start, nextEnd);
+  }
+
   function handleDelete() {
     if (!confirm("Excluir esta atividade? Essa ação não pode ser desfeita.")) return;
     startTransition(async () => {
@@ -443,8 +563,8 @@ function TaskRow({ task, workId, depth }: { task: PlainTask; workId: string; dep
   const duration = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
 
   return (
-    <tr className="border-b">
-      <td className="p-2 text-center text-muted-foreground">{task.codigo}</td>
+    <tr ref={rowRef} className={`border-b ${stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""}`}>
+      <GripCell codigo={task.codigo} onGripPointerDown={onGripPointerDown} />
       <td className="p-2" style={{ paddingLeft: 8 + depth * INDENT }}>
         <EditableName value={task.nome} onCommit={handleRename} />
       </td>
@@ -472,7 +592,16 @@ function TaskRow({ task, workId, depth }: { task: PlainTask; workId: string; dep
           className="rounded border bg-background px-1 py-0.5 text-xs"
         />
       </td>
-      <td className="p-2 text-muted-foreground">{duration}</td>
+      <td className="p-2">
+        <input
+          type="number"
+          min={1}
+          value={duration}
+          disabled={isPending}
+          onChange={(e) => handleDurationChange(e.target.value)}
+          className="w-16 rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
       <td className="p-2">{Number(task.percentualExecutado).toFixed(0)}%</td>
       <td className="p-2">
         <Badge variant={PLANNING_STATUS_BADGE[task.status]}>{PLANNING_STATUS_LABELS[task.status]}</Badge>
