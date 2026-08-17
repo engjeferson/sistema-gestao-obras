@@ -18,7 +18,7 @@ async function nextStageOrdem(client: TxClient, workId: string, parentId: string
 /**
  * Próxima posição (0-based) pra um novo filho direto de `parentStageId` (sub OU item),
  * contando os dois tipos juntos — é o que garante que a numeração (calculada por posição,
- * ver `assignCodes`) fique sequencial mesmo intercalando subs e itens.
+ * ver `assignCodesFlat`) fique sequencial mesmo intercalando subs e itens.
  */
 async function nextChildOrdem(client: TxClient, workId: string, parentStageId: string) {
   const [childStageCount, directItemCount] = await Promise.all([
@@ -32,29 +32,29 @@ type TaskNode = { id: string; ordem: number; codigo: string | null; [key: string
 type StageNode = { id: string; ordem: number; codigo: string | null; tasks: TaskNode[]; children: StageNode[]; [key: string]: unknown };
 
 /**
- * Calcula o ID (1, 1.1, 1.1.1...) de cada etapa/sub/item a partir da posição real na árvore
- * (`ordem`), não de um valor gravado — garante que o ID esteja sempre presente, em sequência
- * e sem buracos, inclusive depois de mover/excluir itens.
+ * Numera cada etapa/sub/item sequencialmente (1, 2, 3...) na ordem visual de cima pra baixo
+ * (pré-ordem: o nó recebe o número antes dos filhos) — a partir da posição real na árvore
+ * (`ordem`), não de um valor gravado, então nunca fica com buraco ou duplicado.
  */
-function assignChildCodes(node: StageNode) {
-  const combined = [
-    ...node.children.map((c) => ({ kind: "stage" as const, ordem: c.ordem, ref: c })),
-    ...node.tasks.map((t) => ({ kind: "task" as const, ordem: t.ordem, ref: t })),
-  ].sort((a, b) => a.ordem - b.ordem);
-
-  combined.forEach((entry, index) => {
-    const code = `${node.codigo}.${index + 1}`;
-    entry.ref.codigo = code;
-    if (entry.kind === "stage") assignChildCodes(entry.ref);
-  });
-}
-
-function assignCodes(roots: StageNode[]) {
-  const sorted = [...roots].sort((a, b) => a.ordem - b.ordem);
-  sorted.forEach((root, index) => {
-    root.codigo = String(index + 1);
-    assignChildCodes(root);
-  });
+function assignCodesFlat(roots: StageNode[]) {
+  let counter = 0;
+  function visit(node: StageNode) {
+    counter += 1;
+    node.codigo = String(counter);
+    const combined = [
+      ...node.children.map((c) => ({ kind: "stage" as const, ordem: c.ordem, ref: c })),
+      ...node.tasks.map((t) => ({ kind: "task" as const, ordem: t.ordem, ref: t })),
+    ].sort((a, b) => a.ordem - b.ordem);
+    for (const entry of combined) {
+      if (entry.kind === "stage") {
+        visit(entry.ref);
+      } else {
+        counter += 1;
+        entry.ref.codigo = String(counter);
+      }
+    }
+  }
+  for (const root of [...roots].sort((a, b) => a.ordem - b.ordem)) visit(root);
 }
 
 export async function applyCascadeForTask(tx: TxClient, workId: string, changedTaskId: string) {
@@ -293,7 +293,7 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
       roots.push(node);
     }
   }
-  assignCodes(roots as unknown as StageNode[]);
+  assignCodesFlat(roots as unknown as StageNode[]);
 
   // Os `predecessors[].predecessorTask.codigo` vieram de um select à parte (não fazem parte da
   // árvore acima), então ficaram com o código antigo/cru do banco — corrige pelo código já calculado.
@@ -416,30 +416,6 @@ export async function deleteStage(stageId: string, workId: string) {
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
   await prisma.planningStage.delete({ where: { id: stageId } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-}
-
-export async function moveStage(stageId: string, workId: string, direction: "up" | "down") {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-
-  const stage = await prisma.planningStage.findUniqueOrThrow({ where: { id: stageId } });
-  const siblings = await prisma.planningStage.findMany({
-    where: { workId, parentId: stage.parentId },
-    orderBy: { ordem: "asc" },
-  });
-
-  const index = siblings.findIndex((s) => s.id === stageId);
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (index === -1 || swapIndex < 0 || swapIndex >= siblings.length) return;
-
-  const a = siblings[index];
-  const b = siblings[swapIndex];
-  await prisma.$transaction([
-    prisma.planningStage.update({ where: { id: a.id }, data: { ordem: b.ordem } }),
-    prisma.planningStage.update({ where: { id: b.id }, data: { ordem: a.ordem } }),
-  ]);
-
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 

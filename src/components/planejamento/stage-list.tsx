@@ -3,21 +3,24 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
-import { AddTaskForm } from "@/components/planejamento/add-task-form";
-import { DeleteStageButton, DeleteTaskButton } from "@/components/planejamento/delete-buttons";
-import { EditableName } from "@/components/planejamento/editable-name";
-import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
+import { differenceInCalendarDays } from "date-fns";
+import { GripVertical, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EditableName } from "@/components/planejamento/editable-name";
+import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
 import { PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 import {
-  moveStage,
+  createStage,
+  createTask,
+  deleteStage,
+  deleteTask,
   reorderStages,
+  updatePlanningTaskDates,
   updateStageDates,
   updateStageName,
+  updateTaskName,
   type PredecessorChip,
 } from "@/server/actions/planejamento";
 
@@ -43,6 +46,10 @@ export type PlainStage = {
   children: PlainStage[];
 };
 
+type CombinedEntry = { kind: "stage"; node: PlainStage } | { kind: "task"; node: PlainTask };
+
+const INDENT = 20;
+
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -56,28 +63,73 @@ function hasAnyTask(stage: PlainStage): boolean {
 }
 
 export function StageList({ stages, workId }: { stages: PlainStage[]; workId: string }) {
-  if (stages.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        Nenhuma etapa cadastrada ainda.
-      </p>
-    );
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleAddRootStage() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("workId", workId);
+      fd.set("nome", "Nova etapa");
+      const error = await createStage(undefined, fd);
+      if (error) toast.error(error);
+      else router.refresh();
+    });
   }
 
-  return <DraggableStageGroup stages={stages} workId={workId} parentId={null} depth={0} />;
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <Button variant="outline" size="sm" disabled={isPending} onClick={handleAddRootStage}>
+          <Plus /> Etapa
+        </Button>
+      </div>
+
+      {stages.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          Nenhuma etapa cadastrada ainda.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[1000px] text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground uppercase">
+                <th className="w-16 p-2">#</th>
+                <th className="p-2">Atividade</th>
+                <th className="p-2">Início</th>
+                <th className="p-2">Fim</th>
+                <th className="p-2">Duração (dias)</th>
+                <th className="p-2">Progresso</th>
+                <th className="p-2">Status</th>
+                <th className="p-2">Predecessoras</th>
+                <th className="w-10 p-2" />
+              </tr>
+            </thead>
+            <tbody>
+              <DraggableStageGroup stages={stages} tasks={[]} workId={workId} parentId={null} depth={0} />
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
-// Grupo de etapas/subs irmãs sob o mesmo pai — permite arrastar (grip handle) pra reordenar,
-// além dos botões de mover pra cima/baixo já existentes.
-// Usa Pointer Events (não o HTML5 Drag and Drop nativo, que se mostrou pouco confiável em uso
-// real) — mesmo padrão já usado pra arrastar as barras do Gantt.
+// Reordena (arrastar, Pointer Events) as etapas/subs irmãs sob `parentId` — o mesmo mecanismo já
+// usado nas barras do Gantt, mais confiável em uso real do que o HTML5 Drag and Drop nativo.
+// Itens (atividades) não são arrastáveis; ficam na posição em que foram criados. Pra exibição, as
+// duas listas (subs + itens) são intercaladas pelo código (numeração sequencial já calculada no
+// servidor, reflete a ordem combinada de verdade) — durante o arrasto, a ordem ao vivo das subs
+// substitui só os "slots" de sub na sequência original, sem mexer nos itens.
 function DraggableStageGroup({
   stages,
+  tasks,
   workId,
   parentId,
   depth,
 }: {
   stages: PlainStage[];
+  tasks: PlainTask[];
   workId: string;
   parentId: string | null;
   depth: number;
@@ -89,14 +141,11 @@ function DraggableStageGroup({
   orderRef.current = order;
   const initialOrderRef = useRef(order);
   const draggingIdRef = useRef<string | null>(null);
-  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
   useEffect(() => {
     setOrder(stages.map((s) => s.id));
   }, [stages]);
-
-  const byId = new Map(stages.map((s) => [s.id, s]));
-  const ordered = order.map((id) => byId.get(id)).filter((s): s is PlainStage => !!s);
 
   useEffect(() => {
     function handlePointerMove(e: PointerEvent) {
@@ -140,194 +189,162 @@ function DraggableStageGroup({
     document.body.style.userSelect = "none";
   }
 
+  const stageById = new Map(stages.map((s) => [s.id, s]));
+  const combined: CombinedEntry[] = [
+    ...stages.map((s): CombinedEntry => ({ kind: "stage", node: s })),
+    ...tasks.map((t): CombinedEntry => ({ kind: "task", node: t })),
+  ].sort((a, b) => Number(a.node.codigo) - Number(b.node.codigo));
+
+  const liveStageQueue = [...order];
+  const renderList: CombinedEntry[] = combined.map((entry) => {
+    if (entry.kind === "task") return entry;
+    const id = liveStageQueue.shift();
+    const node = (id ? stageById.get(id) : undefined) ?? entry.node;
+    return { kind: "stage", node };
+  });
+
   return (
-    <div className={depth === 0 ? "flex flex-col gap-6" : "flex flex-col gap-4 border-l pl-4"}>
-      {ordered.map((stage, index) => (
-        <div
-          key={stage.id}
-          ref={(el) => {
-            if (el) rowRefs.current.set(stage.id, el);
-            else rowRefs.current.delete(stage.id);
-          }}
-          className={draggingId === stage.id ? "opacity-50" : ""}
-        >
-          <StageCard
-            stage={stage}
+    <>
+      {renderList.map((entry) =>
+        entry.kind === "stage" ? (
+          <StageRows
+            key={entry.node.id}
+            stage={entry.node}
             workId={workId}
             depth={depth}
-            isFirst={index === 0}
-            isLast={index === ordered.length - 1}
-            onGripPointerDown={() => startDrag(stage.id)}
+            isDragging={draggingId === entry.node.id}
+            rowRef={(el) => {
+              if (el) rowRefs.current.set(entry.node.id, el);
+              else rowRefs.current.delete(entry.node.id);
+            }}
+            onGripPointerDown={() => startDrag(entry.node.id)}
           />
-        </div>
-      ))}
-    </div>
+        ) : (
+          <TaskRow key={entry.node.id} task={entry.node} workId={workId} depth={depth} />
+        ),
+      )}
+    </>
   );
 }
 
-function StageCard({
+function StageRows({
   stage,
   workId,
   depth,
-  isFirst,
-  isLast,
+  isDragging,
+  rowRef,
   onGripPointerDown,
 }: {
   stage: PlainStage;
   workId: string;
   depth: number;
-  isFirst: boolean;
-  isLast: boolean;
+  isDragging: boolean;
+  rowRef: (el: HTMLTableRowElement | null) => void;
   onGripPointerDown: () => void;
 }) {
-  const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   function handleRename(nome: string) {
     startTransition(async () => {
       await updateStageName(stage.id, workId, nome);
-      toast.success("Renomeado.");
       router.refresh();
     });
   }
 
-  function handleMove(direction: "up" | "down") {
+  function handleAddTask() {
     startTransition(async () => {
-      await moveStage(stage.id, workId, direction);
-      router.refresh();
+      const today = new Date().toISOString().slice(0, 10);
+      const fd = new FormData();
+      fd.set("workId", workId);
+      fd.set("stageId", stage.id);
+      fd.set("nome", "Nova atividade");
+      fd.set("dataInicioPrevista", today);
+      fd.set("dataFimPrevista", today);
+      const error = await createTask(undefined, fd);
+      if (error) toast.error(error);
+      else router.refresh();
     });
   }
 
-  const moveButtons = (
-    <div className="flex items-center gap-0.5">
-      <span
-        onPointerDown={(e) => {
-          e.preventDefault();
-          onGripPointerDown();
-        }}
-        title="Arrastar para reordenar"
-        className="flex touch-none cursor-grab items-center px-1 text-muted-foreground active:cursor-grabbing"
-      >
-        <GripVertical className="size-4" />
-      </span>
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={isPending || isFirst}
-        onClick={() => handleMove("up")}
-        title="Mover para cima"
-      >
-        <ArrowUp className="size-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        disabled={isPending || isLast}
-        onClick={() => handleMove("down")}
-        title="Mover para baixo"
-      >
-        <ArrowDown className="size-4" />
-      </Button>
-    </div>
-  );
+  function handleAddSubStage() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("workId", workId);
+      fd.set("parentId", stage.id);
+      fd.set("nome", "Nova sub-etapa");
+      const error = await createStage(undefined, fd);
+      if (error) toast.error(error);
+      else router.refresh();
+    });
+  }
 
-  const body = (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Predecessoras da etapa:</span>
-        <PredecessorsCell workId={workId} ownerStageId={stage.id} chips={stage.predecessorChips} />
-      </div>
-
-      <StageDates stage={stage} workId={workId} />
-
-      {stage.tasks.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">Código</TableHead>
-                <TableHead>Atividade</TableHead>
-                <TableHead>Início</TableHead>
-                <TableHead>Fim</TableHead>
-                <TableHead>Progresso</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Predecessoras</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stage.tasks.map((task) => (
-                <TableRow key={task.id}>
-                  <TableCell className="text-muted-foreground">{task.codigo}</TableCell>
-                  <TableCell className="font-medium">{task.nome}</TableCell>
-                  <TableCell>{formatDateBR(task.dataInicioPrevista)}</TableCell>
-                  <TableCell>{formatDateBR(task.dataFimPrevista)}</TableCell>
-                  <TableCell>{Number(task.percentualExecutado).toFixed(0)}%</TableCell>
-                  <TableCell>
-                    <Badge variant={PLANNING_STATUS_BADGE[task.status]}>{PLANNING_STATUS_LABELS[task.status]}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <PredecessorsCell workId={workId} ownerTaskId={task.id} chips={task.predecessorChips} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DeleteTaskButton taskId={task.id} workId={workId} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">Nenhuma atividade aqui ainda.</p>
-      )}
-
-      <AddTaskForm workId={workId} stageId={stage.id} />
-
-      {stage.children.length > 0 ? (
-        <DraggableStageGroup stages={stage.children} workId={workId} parentId={stage.id} depth={depth + 1} />
-      ) : null}
-    </div>
-  );
-
-  if (depth === 0) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <span className="text-muted-foreground">{stage.codigo}</span>
-            <EditableName value={stage.nome} bold onCommit={handleRename} />
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            {moveButtons}
-            <DeleteStageButton stageId={stage.id} workId={workId} />
-          </div>
-        </CardHeader>
-        <CardContent>{body}</CardContent>
-      </Card>
-    );
+  function handleDelete() {
+    if (!confirm("Excluir esta etapa/sub? Isso também apaga tudo dentro dela (subs e atividades). Essa ação não pode ser desfeita.")) {
+      return;
+    }
+    startTransition(async () => {
+      await deleteStage(stage.id, workId);
+      toast.success("Etapa removida.");
+      router.refresh();
+    });
   }
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 font-medium">
-          <span className="text-muted-foreground">{stage.codigo}</span>
+    <>
+      <tr ref={rowRef} className={`border-b bg-muted/20 ${isDragging ? "opacity-50" : ""}`}>
+        <td
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onGripPointerDown();
+          }}
+          title="Arrastar para reordenar"
+          className="touch-none cursor-grab p-2 text-center text-muted-foreground active:cursor-grabbing"
+        >
+          <span className="flex items-center justify-center gap-1">
+            <GripVertical className="size-3.5" />
+            {stage.codigo}
+          </span>
+        </td>
+        <td className="p-2 font-semibold" style={{ paddingLeft: 8 + depth * INDENT }}>
           <EditableName value={stage.nome} bold onCommit={handleRename} />
-        </div>
-        <div className="flex items-center gap-1">
-          {moveButtons}
-          <DeleteStageButton stageId={stage.id} workId={workId} />
-        </div>
-      </div>
-      {body}
-    </div>
+        </td>
+        <StageDateCells stage={stage} workId={workId} />
+        <td className="p-2 text-muted-foreground">—</td>
+        <td className="p-2 text-muted-foreground">—</td>
+        <td className="p-2">
+          <PredecessorsCell workId={workId} ownerStageId={stage.id} chips={stage.predecessorChips} />
+        </td>
+        <td className="p-2 text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" disabled={isPending}>
+                  <MoreVertical className="size-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleAddTask}>+ Atividade</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleAddSubStage}>+ Sub etapa</DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </td>
+      </tr>
+      {stage.children.length > 0 || stage.tasks.length > 0 ? (
+        <DraggableStageGroup stages={stage.children} tasks={stage.tasks} workId={workId} parentId={stage.id} depth={depth + 1} />
+      ) : null}
+    </>
   );
 }
 
-// Enquanto a etapa/sub não tem nenhum item (nela ou em qualquer sub dela), a data é "manual" e
-// editável direto aqui. A partir do primeiro item lançado em qualquer nível, a data exibida vira
-// sempre o agregado (menor início / maior fim) dos itens — só leitura.
-function StageDates({ stage, workId }: { stage: PlainStage; workId: string }) {
+// Enquanto a etapa/sub não tem nenhuma atividade (nela ou em qualquer sub dela), a data é
+// "manual" e editável direto aqui. A partir da primeira atividade lançada em qualquer nível, a
+// data exibida vira sempre o agregado (menor início / maior fim) — só leitura.
+function StageDateCells({ stage, workId }: { stage: PlainStage; workId: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [start, setStart] = useState(stage.dataInicioPrevista ? toDateInputValue(stage.dataInicioPrevista) : "");
@@ -343,9 +360,10 @@ function StageDates({ stage, workId }: { stage: PlainStage; workId: string }) {
     const aggStart = new Date(Math.min(...tasks.map((t) => t.dataInicioPrevista.getTime())));
     const aggEnd = new Date(Math.max(...tasks.map((t) => t.dataFimPrevista.getTime())));
     return (
-      <p className="text-sm text-muted-foreground">
-        {formatDateBR(aggStart)} – {formatDateBR(aggEnd)}
-      </p>
+      <>
+        <td className="p-2 text-muted-foreground">{formatDateBR(aggStart)}</td>
+        <td className="p-2 text-muted-foreground">{formatDateBR(aggEnd)}</td>
+      </>
     );
   }
 
@@ -358,29 +376,115 @@ function StageDates({ stage, workId }: { stage: PlainStage; workId: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Datas:</span>
-      <input
-        type="date"
-        value={start}
-        disabled={isPending}
-        onChange={(e) => {
-          setStart(e.target.value);
-          commit(e.target.value, end);
-        }}
-        className="rounded border bg-background px-1 py-0.5 text-xs"
-      />
-      <span className="text-muted-foreground">até</span>
-      <input
-        type="date"
-        value={end}
-        disabled={isPending}
-        onChange={(e) => {
-          setEnd(e.target.value);
-          commit(start, e.target.value);
-        }}
-        className="rounded border bg-background px-1 py-0.5 text-xs"
-      />
-    </div>
+    <>
+      <td className="p-2">
+        <input
+          type="date"
+          value={start}
+          disabled={isPending}
+          onChange={(e) => {
+            setStart(e.target.value);
+            commit(e.target.value, end);
+          }}
+          className="rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
+      <td className="p-2">
+        <input
+          type="date"
+          value={end}
+          disabled={isPending}
+          onChange={(e) => {
+            setEnd(e.target.value);
+            commit(start, e.target.value);
+          }}
+          className="rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
+    </>
+  );
+}
+
+function TaskRow({ task, workId, depth }: { task: PlainTask; workId: string; depth: number }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [start, setStart] = useState(toDateInputValue(task.dataInicioPrevista));
+  const [end, setEnd] = useState(toDateInputValue(task.dataFimPrevista));
+
+  useEffect(() => {
+    setStart(toDateInputValue(task.dataInicioPrevista));
+    setEnd(toDateInputValue(task.dataFimPrevista));
+  }, [task.dataInicioPrevista, task.dataFimPrevista]);
+
+  function handleRename(nome: string) {
+    startTransition(async () => {
+      await updateTaskName(task.id, workId, nome);
+      router.refresh();
+    });
+  }
+
+  function commit(nextStart: string, nextEnd: string) {
+    if (!nextStart || !nextEnd) return;
+    startTransition(async () => {
+      await updatePlanningTaskDates(task.id, workId, nextStart, nextEnd);
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("Excluir esta atividade? Essa ação não pode ser desfeita.")) return;
+    startTransition(async () => {
+      await deleteTask(task.id, workId);
+      toast.success("Atividade removida.");
+      router.refresh();
+    });
+  }
+
+  const duration = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+
+  return (
+    <tr className="border-b">
+      <td className="p-2 text-center text-muted-foreground">{task.codigo}</td>
+      <td className="p-2" style={{ paddingLeft: 8 + depth * INDENT }}>
+        <EditableName value={task.nome} onCommit={handleRename} />
+      </td>
+      <td className="p-2">
+        <input
+          type="date"
+          value={start}
+          disabled={isPending}
+          onChange={(e) => {
+            setStart(e.target.value);
+            commit(e.target.value, end);
+          }}
+          className="rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
+      <td className="p-2">
+        <input
+          type="date"
+          value={end}
+          disabled={isPending}
+          onChange={(e) => {
+            setEnd(e.target.value);
+            commit(start, e.target.value);
+          }}
+          className="rounded border bg-background px-1 py-0.5 text-xs"
+        />
+      </td>
+      <td className="p-2 text-muted-foreground">{duration}</td>
+      <td className="p-2">{Number(task.percentualExecutado).toFixed(0)}%</td>
+      <td className="p-2">
+        <Badge variant={PLANNING_STATUS_BADGE[task.status]}>{PLANNING_STATUS_LABELS[task.status]}</Badge>
+      </td>
+      <td className="p-2">
+        <PredecessorsCell workId={workId} ownerTaskId={task.id} chips={task.predecessorChips} />
+      </td>
+      <td className="p-2 text-right">
+        <Button variant="ghost" size="icon-sm" onClick={handleDelete} disabled={isPending} title="Excluir">
+          <Trash2 className="size-4" />
+        </Button>
+      </td>
+    </tr>
   );
 }
