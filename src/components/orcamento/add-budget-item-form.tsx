@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createBudgetItem } from "@/server/actions/orcamento";
@@ -56,11 +57,11 @@ export function AddBudgetItemForm({ workId, taskId }: { workId: string; taskId: 
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Valor unit. (R$)</label>
-        <Input name="valorUnitarioPrevisto" type="number" step="0.01" min="0" className="w-28" />
+        <CurrencyInput name="valorUnitarioPrevisto" className="w-28" />
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Ou valor total (R$)</label>
-        <Input name="valorTotalPrevisto" type="number" step="0.01" min="0" className="w-28" />
+        <CurrencyInput name="valorTotalPrevisto" className="w-28" />
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Observações</label>

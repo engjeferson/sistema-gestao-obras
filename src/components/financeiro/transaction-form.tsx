@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -182,16 +183,7 @@ export function TransactionForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valor">Valor (R$){parcelar ? " total" : ""}</Label>
-          <Input
-            id="valor"
-            name="valor"
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={valor || ""}
-            onChange={(e) => setValor(Number(e.target.value))}
-            required
-          />
+          <CurrencyInput id="valor" name="valor" value={valor} onValueChange={setValor} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="status">Status</Label>

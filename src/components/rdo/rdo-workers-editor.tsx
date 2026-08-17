@@ -30,7 +30,7 @@ export function RdoWorkersEditor({
             type="number"
             min="1"
             placeholder="Qtd."
-            value={worker.quantidade}
+            value={worker.quantidade || ""}
             onChange={(e) => update(index, { quantidade: Number(e.target.value) })}
             className="w-20"
           />
@@ -43,7 +43,7 @@ export function RdoWorkersEditor({
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => onChange([...workers, { funcao: "", quantidade: 1 }])}
+        onClick={() => onChange([...workers, { funcao: "", quantidade: 0 }])}
       >
         <Plus /> Adicionar função
       </Button>

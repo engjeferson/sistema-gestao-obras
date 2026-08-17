@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -96,15 +97,7 @@ export function ObraForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valorContrato">Valor do contrato (R$)</Label>
-          <Input
-            id="valorContrato"
-            name="valorContrato"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={defaultValues?.valorContrato?.toString()}
-            required
-          />
+          <CurrencyInput id="valorContrato" name="valorContrato" defaultValue={defaultValues?.valorContrato} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="areaConstruida">Área construída (m²)</Label>

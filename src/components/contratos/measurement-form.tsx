@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,7 +67,7 @@ export function MeasurementForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valor">Valor (R$)</Label>
-          <Input id="valor" name="valor" type="number" step="0.01" min="0.01" required />
+          <CurrencyInput id="valor" name="valor" required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="categoriaId">Categoria</Label>

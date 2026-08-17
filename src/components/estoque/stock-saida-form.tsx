@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -89,7 +90,7 @@ export function StockSaidaForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valorUnitario">Valor unitário</Label>
-          <Input id="valorUnitario" name="valorUnitario" type="number" step="0.01" min="0" />
+          <CurrencyInput id="valorUnitario" name="valorUnitario" />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="data">Data</Label>

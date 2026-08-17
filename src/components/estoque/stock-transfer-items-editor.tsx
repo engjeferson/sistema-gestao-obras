@@ -25,7 +25,7 @@ export function StockTransferItemsEditor({
   }
 
   function addItem() {
-    onChange([...items, { materialId: "", quantidade: 1 }]);
+    onChange([...items, { materialId: "", quantidade: 0 }]);
   }
 
   function removeItem(index: number) {
@@ -78,7 +78,7 @@ export function StockTransferItemsEditor({
                       type="number"
                       step="0.001"
                       min="0.001"
-                      value={item.quantidade}
+                      value={item.quantidade || ""}
                       onChange={(e) => updateItem(index, { quantidade: Number(e.target.value) })}
                       className="w-28"
                       required

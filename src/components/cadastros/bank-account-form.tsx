@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,13 +62,7 @@ export function BankAccountForm({
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="saldoInicial">Saldo inicial (R$)</Label>
-          <Input
-            id="saldoInicial"
-            name="saldoInicial"
-            type="number"
-            step="0.01"
-            defaultValue={defaultValues?.saldoInicial?.toString() ?? ""}
-          />
+          <CurrencyInput id="saldoInicial" name="saldoInicial" defaultValue={defaultValues?.saldoInicial ?? undefined} />
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacoes">Observações</Label>

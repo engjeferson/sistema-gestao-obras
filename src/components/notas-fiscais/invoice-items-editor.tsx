@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatCurrencyBRL } from "@/lib/status-labels";
@@ -19,7 +20,7 @@ const UNIT_LABELS: Record<string, string> = {
   LITRO: "litro",
 };
 
-const EMPTY_ITEM: InvoiceItemValues = { material: "", quantidade: 1, unidade: "UN", valorUnitario: 0 };
+const EMPTY_ITEM: InvoiceItemValues = { material: "", quantidade: 0, unidade: "UN", valorUnitario: 0 };
 
 export function InvoiceItemsEditor({
   items,
@@ -100,7 +101,7 @@ export function InvoiceItemsEditor({
                     type="number"
                     step="0.001"
                     min="0"
-                    value={item.quantidade}
+                    value={item.quantidade || ""}
                     onChange={(e) => updateItem(index, { quantidade: Number(e.target.value) })}
                   />
                 </td>
@@ -117,12 +118,9 @@ export function InvoiceItemsEditor({
                   </NativeSelect>
                 </td>
                 <td className="p-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <CurrencyInput
                     value={item.valorUnitario}
-                    onChange={(e) => updateItem(index, { valorUnitario: Number(e.target.value) })}
+                    onValueChange={(valorUnitario) => updateItem(index, { valorUnitario })}
                   />
                 </td>
                 <td className="p-2 whitespace-nowrap">

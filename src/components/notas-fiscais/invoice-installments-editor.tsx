@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { addMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrencyBRL } from "@/lib/status-labels";
@@ -79,15 +80,7 @@ export function InvoiceInstallmentsEditor({
         <div className="grid gap-4 sm:max-w-lg sm:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Label htmlFor="valorEntrada">Valor da entrada (R$)</Label>
-            <Input
-              id="valorEntrada"
-              name="valorEntrada"
-              type="number"
-              step="0.01"
-              min="0"
-              value={valorEntrada || ""}
-              onChange={(e) => setValorEntrada(Number(e.target.value))}
-            />
+            <CurrencyInput id="valorEntrada" name="valorEntrada" value={valorEntrada} onValueChange={setValorEntrada} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="dataEntrada">Data da entrada</Label>
@@ -167,13 +160,7 @@ export function InvoiceInstallmentsEditor({
                     />
                   </td>
                   <td className="p-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={parcela.valor}
-                      onChange={(e) => updateParcela(index, { valor: Number(e.target.value) })}
-                    />
+                    <CurrencyInput value={parcela.valor} onValueChange={(valor) => updateParcela(index, { valor })} />
                   </td>
                 </tr>
               ))}

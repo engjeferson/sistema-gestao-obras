@@ -27,7 +27,7 @@ export function StockTransferenciaForm({
   const [errorMessage, formAction, isPending] = useActionState(createStockTransferencia, undefined);
   const [origemWorkId, setOrigemWorkId] = useState(defaultOrigemWorkId ?? "");
   const [destinoWorkId, setDestinoWorkId] = useState("");
-  const [items, setItems] = useState<StockTransferItemValues[]>([{ materialId: "", quantidade: 1 }]);
+  const [items, setItems] = useState<StockTransferItemValues[]>([{ materialId: "", quantidade: 0 }]);
   const saldosOrigem = balances[origemWorkId || "geral"] ?? {};
   const stagesForWork = stagesByWork[destinoWorkId] ?? [];
 
