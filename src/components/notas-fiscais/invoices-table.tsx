@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, ExternalLink } from "lucide-react";
+import { Trash2, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteInvoice } from "@/server/actions/notas-fiscais";
@@ -98,6 +98,14 @@ export function InvoicesTable({
               <TableCell>{formatCurrencyBRL(invoice.valorTotal)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    render={<Link href={`/notas-fiscais/${invoice.id}`} />}
+                    nativeButton={false}
+                  >
+                    <Eye /> Ver detalhes
+                  </Button>
                   {showObraColumn ? (
                     <Button
                       variant="outline"

@@ -30,7 +30,16 @@ export async function listInvoices(workId?: string, page = 1) {
 export async function getInvoice(invoiceId: string) {
   return prisma.invoice.findUnique({
     where: { id: invoiceId },
-    include: { work: true, supplier: true, categoria: true, items: true, financialTransactions: true },
+    include: {
+      work: true,
+      supplier: true,
+      categoria: true,
+      items: true,
+      financialTransactions: true,
+      stage: { select: { id: true, codigo: true, nome: true } },
+      task: { select: { id: true, codigo: true, nome: true } },
+      incomingNFe: { select: { id: true } },
+    },
   });
 }
 

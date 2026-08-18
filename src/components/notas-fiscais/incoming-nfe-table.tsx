@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { EyeOff, Undo2, FileText, ExternalLink } from "lucide-react";
+import { EyeOff, Undo2, FileText, ExternalLink, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,7 +21,7 @@ type IncomingNFeRow = {
   dataEmissao: Date | null;
   valorTotal: number | null;
   status: "PENDENTE" | "LANCADA" | "IGNORADA";
-  invoiceLink: { workId: string | null; workLabel: string | null } | null;
+  invoiceLink: { invoiceId: string; workId: string | null; workLabel: string | null } | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -56,19 +56,25 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
   }
 
   if (row.status === "LANCADA") {
-    const href = row.invoiceLink ? (row.invoiceLink.workId ? `/obras/${row.invoiceLink.workId}/materiais` : "/estoque") : null;
-    return href ? (
-      <Button
-        variant="outline"
-        size="sm"
-        render={<Link href={href} />}
-        nativeButton={false}
-        title={row.invoiceLink?.workLabel ?? "Estoque da Empresa"}
-      >
-        <ExternalLink /> Ver na obra
-      </Button>
-    ) : (
-      <span className="text-xs text-muted-foreground">—</span>
+    if (!row.invoiceLink) {
+      return <span className="text-xs text-muted-foreground">—</span>;
+    }
+    const href = row.invoiceLink.workId ? `/obras/${row.invoiceLink.workId}/materiais` : "/estoque";
+    return (
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" render={<Link href={`/notas-fiscais/${row.invoiceLink.invoiceId}`} />} nativeButton={false}>
+          <Eye /> Ver detalhes
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          render={<Link href={href} />}
+          nativeButton={false}
+          title={row.invoiceLink.workLabel ?? "Estoque da Empresa"}
+        >
+          <ExternalLink /> Ver na obra
+        </Button>
+      </div>
     );
   }
 

@@ -16,6 +16,7 @@ export default async function RadarNFePage() {
     status: item.status,
     invoiceLink: item.invoice
       ? {
+          invoiceId: item.invoice.id,
           workId: item.invoice.workId,
           workLabel: item.invoice.work ? `${item.invoice.work.codigo} — ${item.invoice.work.nome}` : null,
         }
