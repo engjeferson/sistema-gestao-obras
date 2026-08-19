@@ -16,7 +16,7 @@ export const rdoWorkerSchema = z.object({
 
 export const rdoActivitySchema = z.object({
   planningTaskId: z.string().min(1),
-  descricaoServico: z.string().trim().min(1),
+  descricaoServico: z.string().trim().optional(),
   percentualAtual: z.coerce.number().min(0).max(100),
 });
 

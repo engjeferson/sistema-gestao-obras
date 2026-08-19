@@ -36,7 +36,7 @@ export async function createRdoWithSync(data: RdoFormValues, responsavelId: stri
         data: {
           rdoId: rdo.id,
           planningTaskId: activity.planningTaskId,
-          descricaoServico: activity.descricaoServico,
+          descricaoServico: activity.descricaoServico ?? "",
           percentualAnterior,
           percentualAtual: activity.percentualAtual,
         },
@@ -111,7 +111,7 @@ export async function updateRdoWithSync(rdoId: string, data: RdoFormValues) {
         data: {
           rdoId,
           planningTaskId: activity.planningTaskId,
-          descricaoServico: activity.descricaoServico,
+          descricaoServico: activity.descricaoServico ?? "",
           percentualAnterior: Number(planningTask.percentualExecutado),
           percentualAtual: activity.percentualAtual,
         },

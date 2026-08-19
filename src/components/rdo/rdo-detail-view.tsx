@@ -74,7 +74,7 @@ export function RdoDetailView({ rdo, basePath }: { rdo: RdoWithRelations; basePa
                 <p className="text-sm font-medium">
                   {a.planningTask.stage.nome} — {a.planningTask.nome}
                 </p>
-                <p className="text-sm text-muted-foreground">{a.descricaoServico}</p>
+                {a.descricaoServico ? <p className="text-sm text-muted-foreground">{a.descricaoServico}</p> : null}
                 <p className="text-sm">
                   {Number(a.percentualAnterior).toFixed(0)}% → {Number(a.percentualAtual).toFixed(0)}%
                 </p>

@@ -44,12 +44,17 @@ export function RdoActivitiesEditor({
     <div className="flex flex-col gap-4">
       {activities.map((activity, index) => {
         const task = findTask(activity.planningTaskId);
+        const anterior = task ? task.percentualExecutado : 0;
+        const medicaoHoje = Math.max(0, activity.percentualAtual - anterior);
         return (
           <div key={index} className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
               <NativeSelect
                 value={activity.planningTaskId}
-                onChange={(e) => update(index, { planningTaskId: e.target.value })}
+                onChange={(e) => {
+                  const novoAnterior = findTask(e.target.value)?.percentualExecutado ?? 0;
+                  update(index, { planningTaskId: e.target.value, percentualAtual: novoAnterior });
+                }}
                 className="flex-1"
               >
                 <option value="" disabled>
@@ -75,27 +80,29 @@ export function RdoActivitiesEditor({
               </Button>
             </div>
             <Textarea
-              placeholder="Descrição do serviço realizado"
-              value={activity.descricaoServico}
+              placeholder="Descrição do serviço realizado (opcional)"
+              value={activity.descricaoServico ?? ""}
               onChange={(e) => update(index, { descricaoServico: e.target.value })}
             />
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                Anterior: {task ? task.percentualExecutado.toFixed(0) : "—"}%
-              </span>
+              <span className="text-sm text-muted-foreground">Anterior: {anterior.toFixed(0)}%</span>
               <div className="flex items-center gap-2">
-                <label className="text-sm">Após hoje:</label>
+                <label className="text-sm">Medição de hoje:</label>
                 <Input
                   type="number"
                   min="0"
-                  max="100"
-                  value={activity.percentualAtual === 0 ? "" : activity.percentualAtual}
+                  max={100 - anterior}
+                  value={medicaoHoje === 0 ? "" : medicaoHoje}
                   onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) => update(index, { percentualAtual: e.target.value === "" ? 0 : Number(e.target.value) })}
+                  onChange={(e) => {
+                    const digitado = e.target.value === "" ? 0 : Number(e.target.value);
+                    update(index, { percentualAtual: Math.min(100, anterior + digitado) });
+                  }}
                   className="w-20"
                 />
                 <span className="text-sm">%</span>
               </div>
+              <span className="text-sm text-muted-foreground">→ Total: {activity.percentualAtual.toFixed(0)}%</span>
             </div>
           </div>
         );
@@ -107,7 +114,11 @@ export function RdoActivitiesEditor({
         onClick={() =>
           onChange([
             ...activities,
-            { planningTaskId: allTasks[0]?.id ?? "", descricaoServico: "", percentualAtual: 0 },
+            {
+              planningTaskId: allTasks[0]?.id ?? "",
+              descricaoServico: "",
+              percentualAtual: allTasks[0]?.percentualExecutado ?? 0,
+            },
           ])
         }
         disabled={allTasks.length === 0}

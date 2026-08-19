@@ -191,6 +191,11 @@ export function InvoiceForm({
         {arquivoXmlUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
       </div>
 
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="nome">Nome do pedido (opcional)</Label>
+        <Input id="nome" name="nome" placeholder="Ex: Aço, Madeiras tapume" />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="workId">Obra</Label>

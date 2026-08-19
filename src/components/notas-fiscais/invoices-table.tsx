@@ -13,6 +13,7 @@ import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
 type InvoiceRow = {
   id: string;
   workId: string | null;
+  nome: string | null;
   numero: string;
   dataEmissao: Date;
   valorTotal: number;
@@ -79,6 +80,7 @@ export function InvoicesTable({
         <TableHeader>
           <TableRow>
             <TableHead>NF</TableHead>
+            <TableHead>Nome</TableHead>
             {showObraColumn ? <TableHead>Obra</TableHead> : null}
             <TableHead>Fornecedor</TableHead>
             <TableHead>Categoria</TableHead>
@@ -91,6 +93,7 @@ export function InvoicesTable({
           {invoices.map((invoice) => (
             <TableRow key={invoice.id}>
               <TableCell className="font-medium">{invoice.numero}</TableCell>
+              <TableCell>{invoice.nome ?? "—"}</TableCell>
               {showObraColumn ? <TableCell>{invoice.work?.codigo ?? "Estoque Geral"}</TableCell> : null}
               <TableCell>{invoice.supplier.nome}</TableCell>
               <TableCell>{invoice.categoria.nome}</TableCell>

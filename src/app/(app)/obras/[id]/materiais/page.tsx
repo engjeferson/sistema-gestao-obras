@@ -19,6 +19,7 @@ export default async function MateriaisPage({
   const invoices = result.items.map((invoice) => ({
     id: invoice.id,
     workId: invoice.workId,
+    nome: invoice.nome,
     numero: invoice.numero,
     dataEmissao: invoice.dataEmissao,
     valorTotal: Number(invoice.valorTotal),

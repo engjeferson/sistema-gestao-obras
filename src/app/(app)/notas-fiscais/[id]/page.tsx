@@ -47,10 +47,13 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Nota Fiscal Nº {invoice.numero}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {invoice.nome ? invoice.nome : `Nota Fiscal Nº ${invoice.numero}`}
+            </h1>
             <Badge variant="secondary">{invoice.work ? invoice.work.codigo : "Estoque Geral"}</Badge>
           </div>
           <p className="text-muted-foreground">
+            {invoice.nome ? `NF Nº ${invoice.numero} · ` : ""}
             {invoice.supplier.nome} · {invoice.categoria.nome} · {formatDateBR(invoice.dataEmissao)}
           </p>
         </div>

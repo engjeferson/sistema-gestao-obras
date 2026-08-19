@@ -40,6 +40,7 @@ export async function createInvoiceWithFinancialEntry(
         supplierId,
         stageId,
         taskId,
+        nome: data.nome || null,
         numero: data.numero,
         dataEmissao: new Date(data.dataEmissao),
         valorTotal,

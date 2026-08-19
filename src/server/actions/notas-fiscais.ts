@@ -73,6 +73,7 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
   const parsed = invoiceFormSchema.safeParse({
     workId: formData.get("workId"),
     supplierNome: formData.get("supplierNome"),
+    nome: formData.get("nome") ?? undefined,
     stageId: formData.get("stageId") ?? undefined,
     taskId: formData.get("taskId") ?? undefined,
     numero: formData.get("numero"),

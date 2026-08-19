@@ -29,6 +29,7 @@ export const invoiceFormSchema = z
       .min(1, "Selecione a obra ou o Estoque da Empresa.")
       .transform((value) => (value === ESTOQUE_GERAL_VALUE ? null : value)),
     supplierNome: z.string().trim().min(1, "Informe o fornecedor."),
+    nome: z.string().trim().optional(),
     stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
     taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
     numero: z.string().trim().min(1, "Informe o número da NF."),

@@ -364,6 +364,7 @@ model Invoice {
   supplierId    String
   stageId       String?
   taskId        String?
+  nome          String?
   numero        String
   dataEmissao   DateTime @db.Date
   valorTotal    Decimal  @db.Decimal(14, 2)
