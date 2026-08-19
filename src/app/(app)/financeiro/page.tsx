@@ -5,6 +5,7 @@ import { listTransactions, listFinancialCategories } from "@/server/actions/fina
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
+import { FinanceiroTabsNav } from "@/components/financeiro/financeiro-tabs-nav";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
@@ -53,6 +54,8 @@ export default async function FinanceiroPage({
           </Button>
         ) : null}
       </div>
+
+      <FinanceiroTabsNav />
 
       <TransactionFilters categorias={categorias} />
 

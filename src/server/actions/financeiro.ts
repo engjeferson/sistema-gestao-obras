@@ -16,6 +16,7 @@ export type TransactionFilters = {
   categoriaId?: string;
   status?: TransactionStatus;
   favorecido?: string;
+  supplierId?: string;
   dataInicio?: string;
   dataFim?: string;
   dataPagamentoInicio?: string;
@@ -56,6 +57,25 @@ async function resolveFavorecidoIds(tipo: "PAGAR" | "RECEBER", nome: string) {
 
 const PAGE_SIZE = 20;
 
+function buildTransactionWhere(filters?: TransactionFilters) {
+  return {
+    workId: filters?.workId,
+    tipo: filters?.tipo,
+    categoriaId: filters?.categoriaId,
+    status: filters?.status,
+    supplierId: filters?.supplierId,
+    favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
+    dataVencimento: {
+      gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,
+      lte: filters?.dataFim ? new Date(filters.dataFim) : undefined,
+    },
+    dataPagamento: {
+      gte: filters?.dataPagamentoInicio ? new Date(filters.dataPagamentoInicio) : undefined,
+      lte: filters?.dataPagamentoFim ? new Date(filters.dataPagamentoFim) : undefined,
+    },
+  };
+}
+
 async function healOverdueTransactions(filters?: TransactionFilters) {
   const hoje = new Date();
   hoje.setUTCHours(0, 0, 0, 0);
@@ -64,6 +84,7 @@ async function healOverdueTransactions(filters?: TransactionFilters) {
     where: {
       workId: filters?.workId,
       categoriaId: filters?.categoriaId,
+      supplierId: filters?.supplierId,
       favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" } : undefined,
       status: "PENDENTE",
       dataVencimento: { lt: hoje },
@@ -82,21 +103,7 @@ async function healOverdueTransactions(filters?: TransactionFilters) {
 export async function listTransactions(filters?: TransactionFilters, page = 1) {
   await healOverdueTransactions(filters);
 
-  const where = {
-    workId: filters?.workId,
-    tipo: filters?.tipo,
-    categoriaId: filters?.categoriaId,
-    status: filters?.status,
-    favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
-    dataVencimento: {
-      gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,
-      lte: filters?.dataFim ? new Date(filters.dataFim) : undefined,
-    },
-    dataPagamento: {
-      gte: filters?.dataPagamentoInicio ? new Date(filters.dataPagamentoInicio) : undefined,
-      lte: filters?.dataPagamentoFim ? new Date(filters.dataPagamentoFim) : undefined,
-    },
-  };
+  const where = buildTransactionWhere(filters);
 
   const [transactions, totalCount] = await Promise.all([
     prisma.financialTransaction.findMany({
@@ -112,6 +119,40 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
   const items = transactions.map((t) => ({ ...t, effectiveStatus: t.status as TransactionStatus }));
 
   return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), page };
+}
+
+export async function listOpenTransactionsForBatchPayment(filters: TransactionFilters) {
+  await healOverdueTransactions(filters);
+
+  const transactions = await prisma.financialTransaction.findMany({
+    where: { ...buildTransactionWhere(filters), status: { in: ["PENDENTE", "VENCIDO"] } },
+    include: { work: true, categoria: true },
+    orderBy: { dataVencimento: "asc" },
+  });
+
+  return transactions.map((t) => ({ ...t, effectiveStatus: t.status as TransactionStatus }));
+}
+
+export async function batchMarkAsPago(transactionIds: string[], formaPagamento?: PaymentMethod) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  if (transactionIds.length === 0) return;
+
+  const transactions = await prisma.financialTransaction.findMany({
+    where: { id: { in: transactionIds } },
+    select: { workId: true },
+  });
+
+  await prisma.financialTransaction.updateMany({
+    where: { id: { in: transactionIds } },
+    data: { status: "PAGO", dataPagamento: new Date(), formaPagamento },
+  });
+
+  revalidatePath("/financeiro");
+  revalidatePath("/financeiro/pagamento-em-lote");
+  for (const workId of new Set(transactions.map((t) => t.workId).filter((id): id is string => !!id))) {
+    revalidatePath(`/obras/${workId}/financeiro`);
+  }
 }
 
 export async function listFinancialCategories() {
