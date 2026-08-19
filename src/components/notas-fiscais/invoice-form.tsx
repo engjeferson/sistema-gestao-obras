@@ -263,8 +263,8 @@ export function InvoiceForm({
           </>
         ) : null}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="numero">Número da NF</Label>
-          <Input id="numero" name="numero" required />
+          <Label htmlFor="numero">Número da NF (opcional)</Label>
+          <Input id="numero" name="numero" />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="dataEmissao">Data</Label>

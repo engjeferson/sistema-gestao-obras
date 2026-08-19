@@ -92,7 +92,7 @@ export function InvoicesTable({
         <TableBody>
           {invoices.map((invoice) => (
             <TableRow key={invoice.id}>
-              <TableCell className="font-medium">{invoice.numero}</TableCell>
+              <TableCell className="font-medium">{invoice.numero || "—"}</TableCell>
               <TableCell>{invoice.nome ?? "—"}</TableCell>
               {showObraColumn ? <TableCell>{invoice.work?.codigo ?? "Estoque Geral"}</TableCell> : null}
               <TableCell>{invoice.supplier.nome}</TableCell>

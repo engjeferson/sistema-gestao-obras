@@ -115,7 +115,7 @@ export default async function FornecedorDetailPage({ params }: { params: Promise
                 <TableBody>
                   {ultimasCompras.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell>{invoice.numero}</TableCell>
+                      <TableCell>{invoice.numero || "—"}</TableCell>
                       <TableCell>{formatDateBR(invoice.dataEmissao)}</TableCell>
                       <TableCell>{invoice.workNome}</TableCell>
                       <TableCell>{formatCurrencyBRL(invoice.valorTotal)}</TableCell>

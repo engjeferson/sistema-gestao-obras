@@ -220,7 +220,9 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
               notasFiscais.items.slice(0, 5).map((invoice) => (
                 <div key={invoice.id} className="flex items-center justify-between py-2 text-sm first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">NF {invoice.numero}</p>
+                    <p className="truncate font-medium">
+                      {invoice.nome ? invoice.nome : invoice.numero ? `NF ${invoice.numero}` : "Nota fiscal"}
+                    </p>
                     <p className="text-muted-foreground">{invoice.supplier.nome}</p>
                   </div>
                   <div className="shrink-0 text-right">

@@ -32,7 +32,7 @@ export const invoiceFormSchema = z
     nome: z.string().trim().optional(),
     stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
     taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
-    numero: z.string().trim().min(1, "Informe o número da NF."),
+    numero: z.string().trim().optional(),
     dataEmissao: z.string().min(1, "Informe a data."),
     categoriaId: z.string().min(1, "Selecione a categoria."),
     observacao: z.string().trim().optional(),

@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatCurrencyBRL } from "@/lib/status-labels";
-import { normalizeSearch } from "@/lib/text";
+import { normalizeSearch, textSimilarity } from "@/lib/text";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
+
+const SIMILARITY_THRESHOLD = 0.72;
 
 const UNIT_LABELS: Record<string, string> = {
   UN: "un",
@@ -33,6 +36,22 @@ export function InvoiceItemsEditor({
 }) {
   const materialByName = new Map(materials.map((m) => [m.nome, m]));
   const materialByNormalized = new Map(materials.map((m) => [normalizeSearch(m.nome), m]));
+  // Guarda, por linha, o texto pro qual o usuário já disse "não, é um material diferente" —
+  // evita ficar reexibindo a mesma sugestão de material parecido depois que ele já recusou.
+  const [dismissed, setDismissed] = useState<Record<number, string>>({});
+
+  function findSimilarMaterial(nome: string) {
+    const normalized = normalizeSearch(nome);
+    if (normalized.length < 3 || materialByNormalized.has(normalized)) return null;
+    let best: { material: (typeof materials)[number]; score: number } | null = null;
+    for (const material of materials) {
+      const score = textSimilarity(normalized, normalizeSearch(material.nome));
+      if (score >= SIMILARITY_THRESHOLD && (!best || score > best.score)) {
+        best = { material, score };
+      }
+    }
+    return best?.material ?? null;
+  }
 
   function updateItem(index: number, patch: Partial<InvoiceItemValues>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -45,6 +64,17 @@ export function InvoiceItemsEditor({
     } else {
       updateItem(index, { material: nome });
     }
+  }
+
+  function acceptSuggestion(index: number, material: { nome: string; unidadePadrao: string | null }) {
+    updateItem(index, {
+      material: material.nome,
+      ...(material.unidadePadrao ? { unidade: material.unidadePadrao as InvoiceItemValues["unidade"] } : {}),
+    });
+  }
+
+  function dismissSuggestion(index: number, nome: string) {
+    setDismissed((prev) => ({ ...prev, [index]: nome }));
   }
 
   function removeItem(index: number) {
@@ -77,7 +107,12 @@ export function InvoiceItemsEditor({
             </tr>
           </thead>
           <tbody>
-            {items.map((item, index) => (
+            {items.map((item, index) => {
+              const isExact = materialByNormalized.has(normalizeSearch(item.material));
+              const isDismissed = dismissed[index] === item.material;
+              const similar = item.material.trim() && !isExact && !isDismissed ? findSimilarMaterial(item.material) : null;
+
+              return (
               <tr key={index} className="border-b last:border-0">
                 <td className="p-2">
                   <Input
@@ -87,8 +122,34 @@ export function InvoiceItemsEditor({
                     list="materiais-cadastrados"
                   />
                   {item.material.trim() ? (
-                    materialByNormalized.has(normalizeSearch(item.material)) ? (
+                    isExact ? (
                       <p className="mt-1 text-xs text-success">Cadastrado</p>
+                    ) : similar ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs">
+                        <span>
+                          Parece com <strong>{similar.nome}</strong>, já cadastrado. É o mesmo material?
+                        </span>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => acceptSuggestion(index, similar)}
+                          >
+                            Sim, usar este
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => dismissSuggestion(index, item.material)}
+                          >
+                            Não, são diferentes
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
                       <p className="mt-1 text-xs text-warning">
                         Novo material — será cadastrado com este nome
@@ -138,7 +199,8 @@ export function InvoiceItemsEditor({
                   </Button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
