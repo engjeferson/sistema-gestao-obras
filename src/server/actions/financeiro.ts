@@ -121,6 +121,27 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
   return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), page };
 }
 
+export async function getTransactionsSummary(filters?: TransactionFilters) {
+  const baseFilters: TransactionFilters = { ...filters, status: undefined };
+  await healOverdueTransactions(baseFilters);
+  const where = buildTransactionWhere(baseFilters);
+
+  const [aPagar, pagas, pendentes] = await Promise.all([
+    prisma.financialTransaction.aggregate({ where: { ...where, tipo: "PAGAR" }, _sum: { valor: true } }),
+    prisma.financialTransaction.aggregate({ where: { ...where, status: "PAGO" }, _sum: { valor: true } }),
+    prisma.financialTransaction.aggregate({
+      where: { ...where, status: { in: ["PENDENTE", "VENCIDO"] } },
+      _sum: { valor: true },
+    }),
+  ]);
+
+  return {
+    totalAPagar: Number(aPagar._sum.valor ?? 0),
+    totalPagas: Number(pagas._sum.valor ?? 0),
+    totalPendentes: Number(pendentes._sum.valor ?? 0),
+  };
+}
+
 export async function listOpenTransactionsForBatchPayment(filters: TransactionFilters) {
   await healOverdueTransactions(filters);
 

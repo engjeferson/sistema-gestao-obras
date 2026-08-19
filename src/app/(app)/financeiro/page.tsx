@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { listTransactions, listFinancialCategories } from "@/server/actions/financeiro";
+import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
 import { FinanceiroTabsNav } from "@/components/financeiro/financeiro-tabs-nav";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export default async function FinanceiroPage({
@@ -17,6 +18,8 @@ export default async function FinanceiroPage({
     tipo?: string;
     categoriaId?: string;
     favorecido?: string;
+    dataInicio?: string;
+    dataFim?: string;
     dataPagamentoInicio?: string;
     dataPagamentoFim?: string;
     page?: string;
@@ -24,20 +27,21 @@ export default async function FinanceiroPage({
 }) {
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
-  const [session, result, categorias] = await Promise.all([
+  const filters = {
+    status: params.status as TransactionStatus | undefined,
+    tipo: params.tipo as TransactionType | undefined,
+    categoriaId: params.categoriaId || undefined,
+    favorecido: params.favorecido || undefined,
+    dataInicio: params.dataInicio || undefined,
+    dataFim: params.dataFim || undefined,
+    dataPagamentoInicio: params.dataPagamentoInicio || undefined,
+    dataPagamentoFim: params.dataPagamentoFim || undefined,
+  };
+  const [session, result, categorias, summary] = await Promise.all([
     auth(),
-    listTransactions(
-      {
-        status: params.status as TransactionStatus | undefined,
-        tipo: params.tipo as TransactionType | undefined,
-        categoriaId: params.categoriaId || undefined,
-        favorecido: params.favorecido || undefined,
-        dataPagamentoInicio: params.dataPagamentoInicio || undefined,
-        dataPagamentoFim: params.dataPagamentoFim || undefined,
-      },
-      page,
-    ),
+    listTransactions(filters, page),
     listFinancialCategories(),
+    getTransactionsSummary(filters),
   ]);
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
 
@@ -60,6 +64,24 @@ export default async function FinanceiroPage({
       <TransactionFilters categorias={categorias} />
 
       <TransactionsTable transactions={result.items} canEdit={canEdit} />
+
+      <div className="flex flex-wrap gap-6 rounded-lg border bg-muted/30 p-4">
+        <div>
+          <p className="text-xs text-muted-foreground">Total a pagar</p>
+          <p className="text-lg font-heading font-semibold">{formatCurrencyBRL(summary.totalAPagar)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Total pagas</p>
+          <p className="text-lg font-heading font-semibold text-success">{formatCurrencyBRL(summary.totalPagas)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Total pendentes</p>
+          <p className="text-lg font-heading font-semibold text-warning">
+            {formatCurrencyBRL(summary.totalPendentes)}
+          </p>
+        </div>
+      </div>
+
       <PaginationControls page={result.page} totalPages={result.totalPages} />
     </div>
   );

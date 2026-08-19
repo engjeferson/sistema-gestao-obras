@@ -61,11 +61,17 @@ export function TransactionsTable({
             <TableRow key={t.id}>
               <TableCell>
                 {canEdit ? (
-                  <Link href={`/financeiro/${t.id}/editar`} className="font-medium hover:underline">
+                  <Link
+                    href={`/financeiro/${t.id}/editar`}
+                    title={t.descricao}
+                    className="block max-w-[220px] truncate font-medium hover:underline"
+                  >
                     {t.descricao}
                   </Link>
                 ) : (
-                  <span className="font-medium">{t.descricao}</span>
+                  <span title={t.descricao} className="block max-w-[220px] truncate font-medium">
+                    {t.descricao}
+                  </span>
                 )}
               </TableCell>
               {showObraColumn ? (
