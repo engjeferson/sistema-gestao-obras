@@ -80,7 +80,7 @@ export function InvoicesTable({
         <TableHeader>
           <TableRow>
             <TableHead>NF</TableHead>
-            <TableHead>Nome</TableHead>
+            <TableHead>Descrição</TableHead>
             {showObraColumn ? <TableHead>Obra</TableHead> : null}
             <TableHead>Fornecedor</TableHead>
             <TableHead>Categoria</TableHead>

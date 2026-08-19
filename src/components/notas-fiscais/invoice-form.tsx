@@ -192,7 +192,7 @@ export function InvoiceForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="nome">Nome do pedido (opcional)</Label>
+        <Label htmlFor="nome">Descrição do pedido (opcional)</Label>
         <Input id="nome" name="nome" placeholder="Ex: Aço, Madeiras tapume" />
       </div>
 
