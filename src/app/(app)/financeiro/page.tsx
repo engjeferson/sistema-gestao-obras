@@ -46,8 +46,8 @@ export default async function FinanceiroPage({
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-4 border-b bg-background px-4 pt-4 pb-4 md:-mx-6 md:-mt-6 md:px-6 md:pt-6">
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 flex flex-col gap-4 border-b bg-background p-4 md:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
@@ -65,11 +65,13 @@ export default async function FinanceiroPage({
         <TransactionFilters categorias={categorias} />
       </div>
 
-      <TransactionsTable transactions={result.items} canEdit={canEdit} />
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        <TransactionsTable transactions={result.items} canEdit={canEdit} />
 
-      <PaginationControls page={result.page} totalPages={result.totalPages} />
+        <PaginationControls page={result.page} totalPages={result.totalPages} />
+      </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-wrap gap-6 border-t bg-background px-4 py-4 md:-mx-6 md:-mb-6 md:px-6">
+      <div className="sticky bottom-0 z-10 flex flex-wrap gap-6 border-t bg-background p-4 md:p-6">
         <div>
           <p className="text-xs text-muted-foreground">Total a pagar</p>
           <p className="text-lg font-heading font-semibold">{formatCurrencyBRL(summary.totalAPagar)}</p>

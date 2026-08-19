@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { AppMain } from "@/components/layout/app-main";
 import { CollapsibleSidebar } from "@/components/layout/collapsible-sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -37,9 +38,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <UserMenu name={session.user.name ?? session.user.email ?? "Usuário"} role={session.user.role} />
           </div>
         </header>
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 [overflow-anchor:none]">
+        <AppMain>
           <PageTransition>{children}</PageTransition>
-        </main>
+        </AppMain>
       </div>
     </div>
   );
