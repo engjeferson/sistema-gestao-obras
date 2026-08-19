@@ -85,7 +85,10 @@ export function TransactionsTable({
               <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
               <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
               <TableCell>
-                <Badge variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}>
+                <Badge
+                  variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}
+                  className={t.effectiveStatus === "VENCIDO" ? "animate-pulse-subtle" : undefined}
+                >
                   {TRANSACTION_STATUS_LABELS[t.effectiveStatus]}
                 </Badge>
               </TableCell>

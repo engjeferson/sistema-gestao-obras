@@ -23,9 +23,14 @@ export function KpiCard({
   tone?: Tone;
 }) {
   return (
-    <Card className="transition-shadow hover:shadow-md">
+    <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
       <CardContent className="flex items-center gap-3 pt-6">
-        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", TONE_STYLES[tone])}>
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover/card:scale-110",
+            TONE_STYLES[tone],
+          )}
+        >
           <Icon className="size-4.5" />
         </span>
         <div className="flex min-w-0 flex-col">

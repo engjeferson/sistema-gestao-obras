@@ -1,13 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+// Fonte variável oficial do Google (fonts.google.com/specimen/Google+Sans+Flex,
+// licença Open Font License) — baixada e hospedada localmente (não está no
+// catálogo embutido do next/font/google ainda, é recente demais).
+const googleSansFlex = localFont({
+  src: "./fonts/GoogleSansFlex-Variable.woff2",
+  variable: "--font-google-sans-flex",
+  weight: "100 900",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -37,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="pt-BR"
-      className={`${montserrat.variable} h-full antialiased`}
+      className={`${googleSansFlex.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

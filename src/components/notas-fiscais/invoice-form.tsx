@@ -355,7 +355,10 @@ export function InvoiceForm({
                     type="checkbox"
                     name="contaPaga"
                     checked={contaPaga}
-                    onChange={(e) => setContaPaga(e.target.checked)}
+                    onChange={(e) => {
+                      setContaPaga(e.target.checked);
+                      if (e.target.checked) setParcelar(false);
+                    }}
                     className="size-4"
                   />
                   Já foi paga (à vista)
@@ -379,16 +382,18 @@ export function InvoiceForm({
               </div>
             ) : null}
 
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                name="parcelar"
-                checked={parcelar}
-                onChange={(e) => setParcelar(e.target.checked)}
-                className="size-4"
-              />
-              Parcelar esta conta a pagar
-            </label>
+            {!contaPaga ? (
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  name="parcelar"
+                  checked={parcelar}
+                  onChange={(e) => setParcelar(e.target.checked)}
+                  className="size-4"
+                />
+                Parcelar esta conta a pagar
+              </label>
+            ) : null}
 
             {parcelar ? (
               <InvoiceInstallmentsEditor totalValor={totalValor} parcelas={parcelas} onChange={setParcelas} />

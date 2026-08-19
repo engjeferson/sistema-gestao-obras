@@ -100,7 +100,10 @@ export function MeasurementsTable({
               <TableCell>{formatCurrencyBRL(measurement.valor)}</TableCell>
               <TableCell>
                 {measurement.status ? (
-                  <Badge variant={TRANSACTION_STATUS_BADGE[measurement.status]}>
+                  <Badge
+                    variant={TRANSACTION_STATUS_BADGE[measurement.status]}
+                    className={measurement.status === "VENCIDO" ? "animate-pulse-subtle" : undefined}
+                  >
                     {TRANSACTION_STATUS_LABELS[measurement.status]}
                   </Badge>
                 ) : (

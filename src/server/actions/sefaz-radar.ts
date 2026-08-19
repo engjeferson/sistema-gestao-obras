@@ -9,12 +9,22 @@ import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefa
 
 const MAX_LOTES_POR_SYNC = 10;
 
-export async function listIncomingNFes() {
-  return prisma.incomingNFe.findMany({
-    orderBy: { dataEmissao: "desc" },
-    take: 200,
-    include: { invoice: { include: { work: true } } },
-  });
+export async function listIncomingNFes(page = 1, pageSize = 20) {
+  const [items, totalCount] = await Promise.all([
+    prisma.incomingNFe.findMany({
+      orderBy: { dataEmissao: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { invoice: { include: { work: true } } },
+    }),
+    prisma.incomingNFe.count(),
+  ]);
+
+  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)), page, pageSize };
+}
+
+export async function countPendingIncomingNFes() {
+  return prisma.incomingNFe.count({ where: { status: "PENDENTE" } });
 }
 
 /**

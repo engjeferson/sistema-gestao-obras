@@ -152,7 +152,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       {transaction.formaPagamento ? PAYMENT_METHOD_LABELS[transaction.formaPagamento] : "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={TRANSACTION_STATUS_BADGE[transaction.status]}>
+                      <Badge
+                        variant={TRANSACTION_STATUS_BADGE[transaction.status]}
+                        className={transaction.status === "VENCIDO" ? "animate-pulse-subtle" : undefined}
+                      >
                         {TRANSACTION_STATUS_LABELS[transaction.status]}
                       </Badge>
                     </TableCell>

@@ -604,7 +604,12 @@ function TaskRow({
       </td>
       <td className="p-2">{Number(task.percentualExecutado).toFixed(0)}%</td>
       <td className="p-2">
-        <Badge variant={PLANNING_STATUS_BADGE[task.status]}>{PLANNING_STATUS_LABELS[task.status]}</Badge>
+        <Badge
+          variant={PLANNING_STATUS_BADGE[task.status]}
+          className={task.status === "ATRASADA" ? "animate-pulse-subtle" : undefined}
+        >
+          {PLANNING_STATUS_LABELS[task.status]}
+        </Badge>
       </td>
       <td className="p-2">
         <PredecessorsCell workId={workId} ownerTaskId={task.id} chips={task.predecessorChips} />

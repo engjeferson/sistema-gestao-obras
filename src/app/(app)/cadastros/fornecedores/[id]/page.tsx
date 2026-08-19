@@ -157,7 +157,10 @@ export default async function FornecedorDetailPage({ params }: { params: Promise
                       <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
                       <TableCell>{formatCurrencyBRL(t.valor)}</TableCell>
                       <TableCell>
-                        <Badge variant={TRANSACTION_STATUS_BADGE[t.status]}>
+                        <Badge
+                          variant={TRANSACTION_STATUS_BADGE[t.status]}
+                          className={t.status === "VENCIDO" ? "animate-pulse-subtle" : undefined}
+                        >
                           {TRANSACTION_STATUS_LABELS[t.status]}
                         </Badge>
                       </TableCell>

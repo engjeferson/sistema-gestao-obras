@@ -1,10 +1,23 @@
-import { listIncomingNFes } from "@/server/actions/sefaz-radar";
+import { listIncomingNFes, countPendingIncomingNFes } from "@/server/actions/sefaz-radar";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 
-export default async function RadarNFePage() {
-  const items = await listIncomingNFes();
-  const itemsOptions = items.map((item) => ({
+export default async function RadarNFePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+}) {
+  const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
+  const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
+  const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
+
+  const [result, pendentes] = await Promise.all([
+    listIncomingNFes(page, pageSize),
+    countPendingIncomingNFes(),
+  ]);
+
+  const itemsOptions = result.items.map((item) => ({
     id: item.id,
     chaveAcesso: item.chaveAcesso,
     emitenteCnpj: item.emitenteCnpj,
@@ -22,7 +35,6 @@ export default async function RadarNFePage() {
         }
       : null,
   }));
-  const pendentes = itemsOptions.filter((item) => item.status === "PENDENTE").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -38,6 +50,7 @@ export default async function RadarNFePage() {
       </div>
 
       <IncomingNFeTable items={itemsOptions} />
+      <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
     </div>
   );
 }

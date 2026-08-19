@@ -9,22 +9,22 @@ import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
 import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
-export async function listInvoices(workId?: string, page = 1) {
+export async function listInvoices(workId?: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   const where = workId ? { workId } : {};
   const [items, totalCount] = await Promise.all([
     prisma.invoice.findMany({
       where,
       include: { work: true, supplier: true, categoria: true, items: true },
       orderBy: { dataEmissao: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.invoice.count({ where }),
   ]);
 
-  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), page };
+  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)), page, pageSize };
 }
 
 export async function getInvoice(invoiceId: string) {

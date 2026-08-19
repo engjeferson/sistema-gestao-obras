@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Radar } from "lucide-react";
 import { listInvoices } from "@/server/actions/notas-fiscais";
-import { listIncomingNFes } from "@/server/actions/sefaz-radar";
+import { countPendingIncomingNFes } from "@/server/actions/sefaz-radar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InvoicesTable } from "@/components/notas-fiscais/invoices-table";
@@ -10,12 +10,15 @@ import { PaginationControls } from "@/components/ui/pagination-controls";
 export default async function NotasFiscaisPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
-  const [result, incomingNFes] = await Promise.all([listInvoices(undefined, page), listIncomingNFes()]);
-  const pendentesRadar = incomingNFes.filter((item) => item.status === "PENDENTE").length;
+  const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
+  const [result, pendentesRadar] = await Promise.all([
+    listInvoices(undefined, page, pageSize),
+    countPendingIncomingNFes(),
+  ]);
   const invoices = result.items.map((invoice) => ({
     id: invoice.id,
     workId: invoice.workId,
@@ -47,7 +50,7 @@ export default async function NotasFiscaisPage({
       </div>
 
       <InvoicesTable invoices={invoices} />
-      <PaginationControls page={result.page} totalPages={result.totalPages} />
+      <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
     </div>
   );
 }

@@ -42,7 +42,12 @@ export function ObraCard({ obra }: { obra: ObraDashboardRow }) {
   const saudePositiva = obra.saudeFinanceira >= 0;
 
   return (
-    <Card className={cn("border-l-4 shadow-sm transition-shadow hover:shadow-md", WORK_STATUS_ACCENT[obra.status])}>
+    <Card
+      className={cn(
+        "border-l-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg",
+        WORK_STATUS_ACCENT[obra.status],
+      )}
+    >
       <CardContent className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <PersonMini label="Responsável técnico" person={obra.responsavelTecnico} />
