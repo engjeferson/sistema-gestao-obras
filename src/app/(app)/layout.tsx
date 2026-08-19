@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <UserMenu name={session.user.name ?? session.user.email ?? "Usuário"} role={session.user.role} />
           </div>
         </header>
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 [overflow-anchor:none]">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

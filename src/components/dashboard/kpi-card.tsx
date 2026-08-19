@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -16,13 +17,15 @@ export function KpiCard({
   label,
   value,
   tone = "default",
+  href,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   tone?: Tone;
+  href?: string;
 }) {
-  return (
+  const card = (
     <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
       <CardContent className="flex items-center gap-3 pt-6">
         <span
@@ -40,4 +43,14 @@ export function KpiCard({
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block">
+        {card}
+      </Link>
+    );
+  }
+
+  return card;
 }

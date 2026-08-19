@@ -43,6 +43,7 @@ export function ObrasDashboard({
     despesasEmAberto: number;
     receitasEmAberto: number;
     saudeFinanceiraGlobal: number;
+    hojeDateStr: string;
   };
   clients: { id: string; nome: string }[];
 }) {
@@ -71,24 +72,28 @@ export function ObrasDashboard({
           label="Despesas do dia"
           value={formatCurrencyBRL(kpis.despesasDoDia)}
           tone="destructive"
+          href={`/financeiro?tipo=PAGAR&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
         />
         <KpiCard
           icon={PiggyBank}
           label="Receitas do dia"
           value={formatCurrencyBRL(kpis.receitasDoDia)}
           tone="success"
+          href={`/financeiro?tipo=RECEBER&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
         />
         <KpiCard
           icon={ArrowDownCircle}
           label="Despesas em aberto"
           value={formatCurrencyBRL(kpis.despesasEmAberto)}
           tone="destructive"
+          href="/financeiro?tipo=PAGAR&status=PENDENTE"
         />
         <KpiCard
           icon={ArrowUpCircle}
           label="Receitas em aberto"
           value={formatCurrencyBRL(kpis.receitasEmAberto)}
           tone="success"
+          href="/financeiro?tipo=RECEBER&status=PENDENTE"
         />
         <KpiCard
           icon={kpis.saudeFinanceiraGlobal >= 0 ? TrendingUp : TrendingDown}

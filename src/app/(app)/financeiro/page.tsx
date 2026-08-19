@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import type { TransactionStatus } from "@/generated/prisma/enums";
+import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; categoriaId?: string; favorecido?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    tipo?: string;
+    categoriaId?: string;
+    favorecido?: string;
+    dataPagamentoInicio?: string;
+    dataPagamentoFim?: string;
+    page?: string;
+  }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
@@ -20,8 +28,11 @@ export default async function FinanceiroPage({
     listTransactions(
       {
         status: params.status as TransactionStatus | undefined,
+        tipo: params.tipo as TransactionType | undefined,
         categoriaId: params.categoriaId || undefined,
         favorecido: params.favorecido || undefined,
+        dataPagamentoInicio: params.dataPagamentoInicio || undefined,
+        dataPagamentoFim: params.dataPagamentoFim || undefined,
       },
       page,
     ),

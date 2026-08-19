@@ -8,15 +8,18 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
-import type { PaymentMethod, TransactionStatus } from "@/generated/prisma/enums";
+import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export type TransactionFilters = {
   workId?: string;
+  tipo?: TransactionType;
   categoriaId?: string;
   status?: TransactionStatus;
   favorecido?: string;
   dataInicio?: string;
   dataFim?: string;
+  dataPagamentoInicio?: string;
+  dataPagamentoFim?: string;
 };
 
 function parseTransactionForm(formData: FormData) {
@@ -81,12 +84,17 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
 
   const where = {
     workId: filters?.workId,
+    tipo: filters?.tipo,
     categoriaId: filters?.categoriaId,
     status: filters?.status,
     favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
     dataVencimento: {
       gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,
       lte: filters?.dataFim ? new Date(filters.dataFim) : undefined,
+    },
+    dataPagamento: {
+      gte: filters?.dataPagamentoInicio ? new Date(filters.dataPagamentoInicio) : undefined,
+      lte: filters?.dataPagamentoFim ? new Date(filters.dataPagamentoFim) : undefined,
     },
   };
 

@@ -288,6 +288,7 @@ export async function getObrasDashboard() {
       despesasEmAberto: Number(despesasEmAberto._sum.valor ?? 0),
       receitasEmAberto: Number(receitasEmAberto._sum.valor ?? 0),
       saudeFinanceiraGlobal: Number(receitasRecebidasGlobal._sum.valor ?? 0) - Number(despesasPagasGlobal._sum.valor ?? 0),
+      hojeDateStr: inicioHoje.toISOString().slice(0, 10),
     },
   };
 }

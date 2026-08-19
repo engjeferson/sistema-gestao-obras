@@ -38,7 +38,7 @@ export default async function RadarNFePage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between border-b bg-background px-4 py-4 md:-mx-6 md:-mt-6 md:px-6 md:py-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Radar de NF-e</h1>
           <p className="text-muted-foreground">
