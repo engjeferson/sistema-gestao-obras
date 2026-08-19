@@ -37,8 +37,8 @@ export default async function RadarNFePage({
   }));
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between border-b bg-background px-4 py-4 md:-mx-6 md:-mt-6 md:px-6 md:py-6">
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Radar de NF-e</h1>
           <p className="text-muted-foreground">
@@ -49,8 +49,13 @@ export default async function RadarNFePage({
         <RadarSyncButton />
       </div>
 
-      <IncomingNFeTable items={itemsOptions} />
-      <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
+      <div className="p-4 md:p-6">
+        <IncomingNFeTable items={itemsOptions} />
+      </div>
+
+      <div className="sticky bottom-0 z-10 border-t bg-background p-4 md:p-6">
+        <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
+      </div>
     </div>
   );
 }

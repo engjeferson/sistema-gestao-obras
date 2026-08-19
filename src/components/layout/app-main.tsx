@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 // Routes that manage their own edge-to-edge padding (sticky headers/footers
 // that need to bleed flush to main's edge — impossible if main itself has padding,
 // since position:sticky clamps to the scroll container's padding edge regardless of margin).
-const NO_PADDING_ROUTES = ["/financeiro"];
+const NO_PADDING_ROUTES = ["/financeiro", "/notas-fiscais", "/notas-fiscais/radar"];
 
 export function AppMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

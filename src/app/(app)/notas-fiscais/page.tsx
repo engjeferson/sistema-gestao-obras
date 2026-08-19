@@ -32,8 +32,8 @@ export default async function NotasFiscaisPage({
   }));
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Notas Fiscais</h1>
           <p className="text-muted-foreground">Compras e materiais lançados em todas as obras.</p>
@@ -49,8 +49,13 @@ export default async function NotasFiscaisPage({
         </div>
       </div>
 
-      <InvoicesTable invoices={invoices} />
-      <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
+      <div className="p-4 md:p-6">
+        <InvoicesTable invoices={invoices} />
+      </div>
+
+      <div className="sticky bottom-0 z-10 border-t bg-background p-4 md:p-6">
+        <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
+      </div>
     </div>
   );
 }
