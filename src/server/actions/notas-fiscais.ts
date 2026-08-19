@@ -82,6 +82,7 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
     observacao: formData.get("observacao") ?? undefined,
     items: itemsParsed,
     gerarContaPagar: formData.get("gerarContaPagar") === "on",
+    contaPaga: formData.get("contaPaga") === "on",
     dataVencimento: formData.get("dataVencimento") || undefined,
     bankAccountId: formData.get("bankAccountId") || undefined,
     parcelar: formData.get("parcelar") === "on",
@@ -110,9 +111,16 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
 
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
   const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
+  const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
   const radarId = (formData.get("radarId") as string) || null;
 
-  const { invoice } = await createInvoiceWithFinancialEntry(data, session.user.id, arquivoUrl, arquivoXmlUrl);
+  const { invoice } = await createInvoiceWithFinancialEntry(
+    data,
+    session.user.id,
+    arquivoUrl,
+    arquivoXmlUrl,
+    comprovanteUrl,
+  );
 
   if (radarId) {
     await markIncomingNFeLancada(radarId, invoice.id);

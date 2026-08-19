@@ -135,6 +135,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TableHead>Valor</TableHead>
                   <TableHead>Forma de pagamento</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Comprovante</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -154,6 +155,20 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       <Badge variant={TRANSACTION_STATUS_BADGE[transaction.status]}>
                         {TRANSACTION_STATUS_LABELS[transaction.status]}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {transaction.comprovanteUrl ? (
+                        <a
+                          href={`/api/files?key=${encodeURIComponent(transaction.comprovanteUrl)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <Paperclip className="size-3.5" /> Ver
+                        </a>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

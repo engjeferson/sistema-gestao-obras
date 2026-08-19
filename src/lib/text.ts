@@ -35,6 +35,33 @@ export function textSimilarity(a: string, b: string) {
   return 1 - levenshteinDistance(a, b) / maxLen;
 }
 
+const SIMILARITY_THRESHOLD = 0.72;
+
+/**
+ * Acha, numa lista de materiais já cadastrados, o mais parecido com o nome digitado —
+ * sem contar match exato (que já é tratado separadamente como "Cadastrado"). Usado tanto
+ * na tabela de itens da nota quanto na revisão de itens importados de XML, pro mesmo
+ * critério valer nos dois lugares.
+ */
+export function findSimilarMaterial<T extends { nome: string }>(
+  nome: string,
+  materials: T[],
+  threshold = SIMILARITY_THRESHOLD,
+): T | null {
+  const normalized = normalizeSearch(nome);
+  if (normalized.length < 3) return null;
+  let best: { material: T; score: number } | null = null;
+  for (const material of materials) {
+    const materialNormalized = normalizeSearch(material.nome);
+    if (materialNormalized === normalized) return null; // é exato, não é "parecido"
+    const score = textSimilarity(normalized, materialNormalized);
+    if (score >= threshold && (!best || score > best.score)) {
+      best = { material, score };
+    }
+  }
+  return best?.material ?? null;
+}
+
 export function getInitials(name: string) {
   const parts = name.trim().split(/\s+/);
   const first = parts[0]?.[0] ?? "";

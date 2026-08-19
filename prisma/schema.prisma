@@ -315,6 +315,7 @@ model FinancialTransaction {
   formaPagamento PaymentMethod?
   status         TransactionStatus @default(PENDENTE)
   observacao     String?
+  comprovanteUrl String?
   invoiceId      String?
   contractMeasurementId String?    @unique
   parcelaGrupoId String?

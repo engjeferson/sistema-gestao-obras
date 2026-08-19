@@ -38,6 +38,7 @@ export const invoiceFormSchema = z
     observacao: z.string().trim().optional(),
     items: z.array(invoiceItemSchema).min(1, "Adicione ao menos um item."),
     gerarContaPagar: z.boolean().optional(),
+    contaPaga: z.boolean().optional(),
     dataVencimento: z.string().optional(),
     bankAccountId: z.string().optional().or(z.literal("").transform(() => undefined)),
     parcelar: z.boolean().optional(),

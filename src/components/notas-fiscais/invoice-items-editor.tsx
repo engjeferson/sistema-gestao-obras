@@ -7,10 +7,8 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatCurrencyBRL } from "@/lib/status-labels";
-import { normalizeSearch, textSimilarity } from "@/lib/text";
+import { findSimilarMaterial, normalizeSearch } from "@/lib/text";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
-
-const SIMILARITY_THRESHOLD = 0.72;
 
 const UNIT_LABELS: Record<string, string> = {
   UN: "un",
@@ -39,19 +37,6 @@ export function InvoiceItemsEditor({
   // Guarda, por linha, o texto pro qual o usuário já disse "não, é um material diferente" —
   // evita ficar reexibindo a mesma sugestão de material parecido depois que ele já recusou.
   const [dismissed, setDismissed] = useState<Record<number, string>>({});
-
-  function findSimilarMaterial(nome: string) {
-    const normalized = normalizeSearch(nome);
-    if (normalized.length < 3 || materialByNormalized.has(normalized)) return null;
-    let best: { material: (typeof materials)[number]; score: number } | null = null;
-    for (const material of materials) {
-      const score = textSimilarity(normalized, normalizeSearch(material.nome));
-      if (score >= SIMILARITY_THRESHOLD && (!best || score > best.score)) {
-        best = { material, score };
-      }
-    }
-    return best?.material ?? null;
-  }
 
   function updateItem(index: number, patch: Partial<InvoiceItemValues>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -110,7 +95,7 @@ export function InvoiceItemsEditor({
             {items.map((item, index) => {
               const isExact = materialByNormalized.has(normalizeSearch(item.material));
               const isDismissed = dismissed[index] === item.material;
-              const similar = item.material.trim() && !isExact && !isDismissed ? findSimilarMaterial(item.material) : null;
+              const similar = item.material.trim() && !isExact && !isDismissed ? findSimilarMaterial(item.material, materials) : null;
 
               return (
               <tr key={index} className="border-b last:border-0">

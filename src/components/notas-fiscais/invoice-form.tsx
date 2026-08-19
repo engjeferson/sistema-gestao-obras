@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { InvoiceItemsEditor } from "@/components/notas-fiscais/invoice-items-editor";
 import { InvoiceInstallmentsEditor } from "@/components/notas-fiscais/invoice-installments-editor";
+import { XmlItemsReviewDialog } from "@/components/notas-fiscais/xml-items-review-dialog";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { parseNFeXml } from "@/lib/parse-nfe-xml";
 import { ESTOQUE_GERAL_VALUE } from "@/lib/validations/notas-fiscais";
@@ -58,9 +59,13 @@ export function InvoiceForm({
   const tasksForStage = stagesForWork.find((s) => s.id === selectedStageId)?.tasks ?? [];
   const [arquivoUrl, setArquivoUrl] = useState<string | null>(null);
   const [arquivoXmlUrl, setArquivoXmlUrl] = useState<string | null>(null);
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingXml, setUploadingXml] = useState(false);
+  const [uploadingComprovante, setUploadingComprovante] = useState(false);
+  const [contaPaga, setContaPaga] = useState(false);
   const [pendingVencimentoUnico, setPendingVencimentoUnico] = useState<string | null>(null);
+  const [pendingXmlItems, setPendingXmlItems] = useState<InvoiceItemValues[] | null>(null);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   function applyParsedXml(text: string) {
@@ -79,7 +84,7 @@ export function InvoiceForm({
       if (supplierInput) supplierInput.value = parsed.fornecedorNome;
     }
     if (parsed.items.length > 0) {
-      setItems(parsed.items);
+      setPendingXmlItems(parsed.items);
     }
     if (parsed.duplicatas.length >= 2) {
       setGerarContaPagar(true);
@@ -93,9 +98,11 @@ export function InvoiceForm({
       parsed.duplicatas.length > 0
         ? ` e ${parsed.duplicatas.length} boleto${parsed.duplicatas.length === 1 ? "" : "s"} da fatura`
         : "";
-    toast.success(
-      `XML lido: ${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} importado${parsed.items.length === 1 ? "" : "s"}${parcelasMsg}.`,
-    );
+    const itensMsg =
+      parsed.items.length > 0
+        ? `${parsed.items.length} ite${parsed.items.length === 1 ? "m" : "ns"} pra revisar`
+        : "nenhum item";
+    toast.success(`XML lido: ${itensMsg}${parcelasMsg}.`);
   }
 
   async function handleXmlImport(file: File) {
@@ -142,7 +149,7 @@ export function InvoiceForm({
 
   async function handleFileChange(
     file: File | undefined,
-    kind: "pdf" | "xml",
+    kind: "pdf" | "xml" | "comprovante",
     workId: string,
   ) {
     if (!file) return;
@@ -150,8 +157,8 @@ export function InvoiceForm({
       void handleXmlImport(file);
     }
     if (!workId) return;
-    const setUploading = kind === "pdf" ? setUploadingPdf : setUploadingXml;
-    const setUrl = kind === "pdf" ? setArquivoUrl : setArquivoXmlUrl;
+    const setUploading = kind === "pdf" ? setUploadingPdf : kind === "xml" ? setUploadingXml : setUploadingComprovante;
+    const setUrl = kind === "pdf" ? setArquivoUrl : kind === "xml" ? setArquivoXmlUrl : setComprovanteUrl;
     setUploading(true);
     try {
       const key = await uploadFileToR2(file, "notas-fiscais", workId, draftId);
@@ -165,11 +172,13 @@ export function InvoiceForm({
   }
 
   return (
+    <>
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="itemsJson" value={JSON.stringify(items)} readOnly />
       <input type="hidden" name="parcelasJson" value={JSON.stringify(parcelas)} readOnly />
       <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
       <input type="hidden" name="arquivoXmlUrl" value={arquivoXmlUrl ?? ""} readOnly />
+      <input type="hidden" name="comprovanteUrl" value={comprovanteUrl ?? ""} readOnly />
       <input type="hidden" name="radarId" value={radarId ?? ""} readOnly />
 
       <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
@@ -339,6 +348,37 @@ export function InvoiceForm({
               </div>
             </div>
 
+            {!parcelar ? (
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    name="contaPaga"
+                    checked={contaPaga}
+                    onChange={(e) => setContaPaga(e.target.checked)}
+                    className="size-4"
+                  />
+                  Já foi paga (à vista)
+                </label>
+                {contaPaga ? (
+                  <div className="flex flex-col gap-2 sm:max-w-sm">
+                    <Label htmlFor="comprovante">Comprovante de pagamento (opcional)</Label>
+                    <Input
+                      id="comprovante"
+                      type="file"
+                      disabled={uploadingComprovante}
+                      onChange={(e) => {
+                        const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
+                        void handleFileChange(e.target.files?.[0], "comprovante", workSelect?.value ?? "");
+                      }}
+                    />
+                    {uploadingComprovante ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
+                    {comprovanteUrl ? <p className="text-xs text-success">Comprovante anexado.</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
@@ -370,5 +410,16 @@ export function InvoiceForm({
         </Button>
       </div>
     </form>
+    <XmlItemsReviewDialog
+      open={pendingXmlItems !== null}
+      items={pendingXmlItems ?? []}
+      materials={materials}
+      onCancel={() => setPendingXmlItems(null)}
+      onConfirm={(resolved) => {
+        setItems(resolved);
+        setPendingXmlItems(null);
+      }}
+    />
+    </>
   );
 }

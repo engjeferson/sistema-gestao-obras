@@ -27,6 +27,7 @@ export async function createInvoiceWithFinancialEntry(
   createdById: string,
   arquivoUrl: string | null,
   arquivoXmlUrl: string | null,
+  comprovanteUrl: string | null,
 ) {
   const supplierId = await findOrCreateSupplierId(data.supplierNome);
   const valorTotal = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
@@ -170,7 +171,9 @@ export async function createInvoiceWithFinancialEntry(
         valor: valorTotal,
         dataEmissao: new Date(data.dataEmissao),
         dataVencimento: new Date(data.dataVencimento),
-        status: "PENDENTE",
+        dataPagamento: data.contaPaga ? new Date(data.dataVencimento) : null,
+        status: data.contaPaga ? "PAGO" : "PENDENTE",
+        comprovanteUrl: comprovanteUrl || null,
         invoiceId: invoice.id,
         createdById,
       },
