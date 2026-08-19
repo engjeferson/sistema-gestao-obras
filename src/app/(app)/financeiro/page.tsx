@@ -47,25 +47,29 @@ export default async function FinanceiroPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
-          <p className="text-muted-foreground">Contas a pagar, pagas e receitas de todas as obras.</p>
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-4 border-b bg-background px-4 pt-4 pb-4 md:-mx-6 md:-mt-6 md:px-6 md:pt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
+            <p className="text-muted-foreground">Contas a pagar, pagas e receitas de todas as obras.</p>
+          </div>
+          {canEdit ? (
+            <Button render={<Link href="/financeiro/nova" />} nativeButton={false}>
+              <Plus /> Novo lançamento
+            </Button>
+          ) : null}
         </div>
-        {canEdit ? (
-          <Button render={<Link href="/financeiro/nova" />} nativeButton={false}>
-            <Plus /> Novo lançamento
-          </Button>
-        ) : null}
+
+        <FinanceiroTabsNav />
+
+        <TransactionFilters categorias={categorias} />
       </div>
-
-      <FinanceiroTabsNav />
-
-      <TransactionFilters categorias={categorias} />
 
       <TransactionsTable transactions={result.items} canEdit={canEdit} />
 
-      <div className="flex flex-wrap gap-6 rounded-lg border bg-muted/30 p-4">
+      <PaginationControls page={result.page} totalPages={result.totalPages} />
+
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-wrap gap-6 border-t bg-background px-4 py-4 md:-mx-6 md:-mb-6 md:px-6">
         <div>
           <p className="text-xs text-muted-foreground">Total a pagar</p>
           <p className="text-lg font-heading font-semibold">{formatCurrencyBRL(summary.totalAPagar)}</p>
@@ -81,8 +85,6 @@ export default async function FinanceiroPage({
           </p>
         </div>
       </div>
-
-      <PaginationControls page={result.page} totalPages={result.totalPages} />
     </div>
   );
 }
