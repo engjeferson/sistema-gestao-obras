@@ -30,10 +30,22 @@ export default async function ObraFinanceiroPage({
   }
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
 
-  const cards: { icon: typeof FileSignature; label: string; value: string; tone?: "success" | "destructive" }[] = [
+  const cards: { icon: typeof FileSignature; label: string; value: string; tone?: "success" | "destructive"; href?: string }[] = [
     { icon: FileSignature, label: "Contrato", value: formatCurrencyBRL(summary.contrato) },
-    { icon: ArrowDownCircle, label: "Gasto até agora", value: formatCurrencyBRL(summary.gasto), tone: "destructive" },
-    { icon: ArrowUpCircle, label: "Recebido", value: formatCurrencyBRL(summary.recebido), tone: "success" },
+    {
+      icon: ArrowDownCircle,
+      label: "Gasto até agora",
+      value: formatCurrencyBRL(summary.gasto),
+      tone: "destructive",
+      href: `/financeiro?workId=${id}&tipo=PAGAR`,
+    },
+    {
+      icon: ArrowUpCircle,
+      label: "Recebido",
+      value: formatCurrencyBRL(summary.recebido),
+      tone: "success",
+      href: `/financeiro?workId=${id}&tipo=RECEBER&status=PAGO`,
+    },
     {
       icon: PiggyBank,
       label: "Saldo",

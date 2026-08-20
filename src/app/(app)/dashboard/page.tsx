@@ -31,11 +31,23 @@ export default async function DashboardPage() {
     { icon: TrendingUp, label: "Margem média projetada", value: `${company.margemMediaProjetada.toFixed(1)}%` },
   ];
 
-  const financeiroKpis: { icon: typeof Building2; label: string; value: string; tone?: "success" | "destructive" | "warning" }[] = [
+  const financeiroKpis: { icon: typeof Building2; label: string; value: string; tone?: "success" | "destructive" | "warning"; href?: string }[] = [
     { icon: Calculator, label: "Custo total orçado", value: formatCurrencyBRL(company.custoTotalOrcado) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(company.custoRealizado) },
-    { icon: ArrowDownCircle, label: "Contas a pagar", value: formatCurrencyBRL(data.totalAPagar), tone: "destructive" },
-    { icon: ArrowUpCircle, label: "Contas a receber", value: formatCurrencyBRL(data.contasAReceber), tone: "success" },
+    {
+      icon: ArrowDownCircle,
+      label: "Contas a pagar",
+      value: formatCurrencyBRL(data.totalAPagar),
+      tone: "destructive",
+      href: "/financeiro?tipo=PAGAR&status=EM_ABERTO",
+    },
+    {
+      icon: ArrowUpCircle,
+      label: "Contas a receber",
+      value: formatCurrencyBRL(data.contasAReceber),
+      tone: "success",
+      href: "/financeiro?tipo=RECEBER&status=EM_ABERTO",
+    },
     {
       icon: PiggyBank,
       label: "Saldo financeiro",

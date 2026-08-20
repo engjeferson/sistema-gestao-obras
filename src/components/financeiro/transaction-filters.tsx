@@ -32,6 +32,7 @@ export function TransactionFilters({
         onChange={(e) => setParam("status", e.target.value)}
       >
         <option value="">Todos os status</option>
+        <option value="EM_ABERTO">Em aberto (pendente + vencido)</option>
         {Object.entries(TRANSACTION_STATUS_LABELS).map(([value, label]) => (
           <option key={value} value={value}>
             {label}

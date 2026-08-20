@@ -14,7 +14,7 @@ export type TransactionFilters = {
   workId?: string;
   tipo?: TransactionType;
   categoriaId?: string;
-  status?: TransactionStatus;
+  status?: TransactionStatus | "EM_ABERTO";
   favorecido?: string;
   supplierId?: string;
   dataInicio?: string;
@@ -62,7 +62,10 @@ function buildTransactionWhere(filters?: TransactionFilters) {
     workId: filters?.workId,
     tipo: filters?.tipo,
     categoriaId: filters?.categoriaId,
-    status: filters?.status,
+    status:
+      filters?.status === "EM_ABERTO"
+        ? { in: ["PENDENTE", "VENCIDO"] as TransactionStatus[] }
+        : filters?.status,
     supplierId: filters?.supplierId,
     favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
     dataVencimento: {

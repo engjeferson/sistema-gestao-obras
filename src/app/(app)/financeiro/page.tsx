@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
+import { getWork } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
@@ -14,6 +15,7 @@ export default async function FinanceiroPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    workId?: string;
     status?: string;
     tipo?: string;
     categoriaId?: string;
@@ -28,7 +30,8 @@ export default async function FinanceiroPage({
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
   const filters = {
-    status: params.status as TransactionStatus | undefined,
+    workId: params.workId || undefined,
+    status: params.status as TransactionStatus | "EM_ABERTO" | undefined,
     tipo: params.tipo as TransactionType | undefined,
     categoriaId: params.categoriaId || undefined,
     favorecido: params.favorecido || undefined,
@@ -37,11 +40,12 @@ export default async function FinanceiroPage({
     dataPagamentoInicio: params.dataPagamentoInicio || undefined,
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
-  const [session, result, categorias, summary] = await Promise.all([
+  const [session, result, categorias, summary, work] = await Promise.all([
     auth(),
     listTransactions(filters, page),
     listFinancialCategories(),
     getTransactionsSummary(filters),
+    filters.workId ? getWork(filters.workId) : Promise.resolve(null),
   ]);
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
 
@@ -63,6 +67,21 @@ export default async function FinanceiroPage({
         <FinanceiroTabsNav />
 
         <TransactionFilters categorias={categorias} />
+
+        {work ? (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Filtrando pela obra:</span>
+            <span className="font-medium">
+              {work.codigo} — {work.nome}
+            </span>
+            <Link
+              href={{ pathname: "/financeiro", query: { ...params, workId: undefined, page: undefined } }}
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" /> remover
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-4 p-4 md:p-6">
