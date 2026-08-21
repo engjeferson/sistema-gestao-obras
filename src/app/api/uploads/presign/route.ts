@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { buildKey, presignPut } from "@/lib/r2";
 
-const ALLOWED_CATEGORIES = ["rdo-fotos", "notas-fiscais", "contratos", "medicoes", "company", "obra-render"] as const;
+const ALLOWED_CATEGORIES = [
+  "rdo-fotos",
+  "notas-fiscais",
+  "contratos",
+  "medicoes",
+  "aditivos",
+  "company",
+  "obra-render",
+] as const;
 type UploadCategory = (typeof ALLOWED_CATEGORIES)[number];
 
 export async function POST(request: Request) {

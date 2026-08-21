@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteContractAddendum } from "@/server/actions/contratos";
@@ -15,6 +15,7 @@ type AddendumRow = {
   descricao: string | null;
   valor: number;
   observacoes: string | null;
+  arquivoUrl: string | null;
 };
 
 function DeleteButton({ addendumId, workId, contractId }: { addendumId: string; workId: string; contractId: string }) {
@@ -80,6 +81,7 @@ export function ContractAddendumsTable({
             <TableHead>Descrição</TableHead>
             <TableHead>Observações</TableHead>
             <TableHead>Valor</TableHead>
+            <TableHead>Anexo</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -90,6 +92,27 @@ export function ContractAddendumsTable({
               <TableCell>{addendum.descricao ?? "—"}</TableCell>
               <TableCell className="max-w-[280px] truncate">{addendum.observacoes ?? "—"}</TableCell>
               <TableCell className="font-medium text-success">+{formatCurrencyBRL(addendum.valor)}</TableCell>
+              <TableCell>
+                {addendum.arquivoUrl ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Ver anexo"
+                    render={
+                      <a
+                        href={`/api/files?key=${encodeURIComponent(addendum.arquivoUrl)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    }
+                    nativeButton={false}
+                  >
+                    <Paperclip className="size-4" />
+                  </Button>
+                ) : (
+                  "—"
+                )}
+              </TableCell>
               <TableCell className="text-right">
                 <DeleteButton addendumId={addendum.id} workId={workId} contractId={contractId} />
               </TableCell>

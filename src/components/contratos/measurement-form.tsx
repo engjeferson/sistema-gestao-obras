@@ -11,6 +11,23 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { PAYMENT_METHOD_LABELS } from "@/lib/status-labels";
 
+type MeasurementFormDefaultValues = {
+  data?: Date | string;
+  dataVencimento?: Date | string;
+  valor?: number;
+  categoriaId?: string;
+  bankAccountId?: string | null;
+  descricao?: string | null;
+  observacoes?: string | null;
+  arquivoUrl?: string | null;
+};
+
+function toDateInputValue(date: Date | string | undefined | null) {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toISOString().slice(0, 10);
+}
+
 export function MeasurementForm({
   action,
   workId,
@@ -19,6 +36,8 @@ export function MeasurementForm({
   bankAccounts,
   proximoNumero,
   direcao,
+  defaultValues,
+  submitLabel = "Lançar medição",
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   workId: string;
@@ -27,10 +46,13 @@ export function MeasurementForm({
   bankAccounts: { id: string; nome: string }[];
   proximoNumero: number;
   direcao: "PAGAR" | "RECEBER";
+  defaultValues?: MeasurementFormDefaultValues;
+  submitLabel?: string;
 }) {
+  const isEdit = Boolean(defaultValues);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [confirmar, setConfirmar] = useState(false);
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null);
+  const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
@@ -54,24 +76,36 @@ export function MeasurementForm({
       <input type="hidden" name="contractId" value={contractId} />
       <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
 
-      <p className="text-sm text-muted-foreground">Medição #{proximoNumero}</p>
+      {!isEdit ? <p className="text-sm text-muted-foreground">Medição #{proximoNumero}</p> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="data">Data da medição</Label>
-          <Input id="data" name="data" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
+          <Input
+            id="data"
+            name="data"
+            type="date"
+            defaultValue={toDateInputValue(defaultValues?.data) || new Date().toISOString().slice(0, 10)}
+            required
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="dataVencimento">Data de vencimento</Label>
-          <Input id="dataVencimento" name="dataVencimento" type="date" required />
+          <Input
+            id="dataVencimento"
+            name="dataVencimento"
+            type="date"
+            defaultValue={toDateInputValue(defaultValues?.dataVencimento)}
+            required
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valor">Valor (R$)</Label>
-          <CurrencyInput id="valor" name="valor" required />
+          <CurrencyInput id="valor" name="valor" defaultValue={defaultValues?.valor} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="categoriaId">Categoria</Label>
-          <NativeSelect id="categoriaId" name="categoriaId" defaultValue="" required>
+          <NativeSelect id="categoriaId" name="categoriaId" defaultValue={defaultValues?.categoriaId ?? ""} required>
             <option value="" disabled>
               Selecione a categoria
             </option>
@@ -84,7 +118,7 @@ export function MeasurementForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="bankAccountId">Conta bancária</Label>
-          <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue="">
+          <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue={defaultValues?.bankAccountId ?? ""}>
             <option value="">—</option>
             {bankAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -95,7 +129,12 @@ export function MeasurementForm({
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="descricao">Descrição</Label>
-          <Input id="descricao" name="descricao" placeholder="Ex: Etapa 2 concluída" />
+          <Input
+            id="descricao"
+            name="descricao"
+            placeholder="Ex: Etapa 2 concluída"
+            defaultValue={defaultValues?.descricao ?? ""}
+          />
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="comprovante">Comprovante (opcional)</Label>
@@ -110,41 +149,43 @@ export function MeasurementForm({
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacoes">Observações</Label>
-          <Textarea id="observacoes" name="observacoes" />
+          <Textarea id="observacoes" name="observacoes" defaultValue={defaultValues?.observacoes ?? ""} />
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border p-4">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            name="confirmar"
-            checked={confirmar}
-            onChange={(e) => setConfirmar(e.target.checked)}
-            className="size-4"
-          />
-          {direcao === "PAGAR" ? "Confirmar pagamento agora" : "Confirmar recebimento agora"}
-        </label>
-        {confirmar ? (
-          <div className="flex flex-col gap-2 sm:max-w-xs">
-            <Label htmlFor="formaPagamento">Forma de pagamento</Label>
-            <NativeSelect id="formaPagamento" name="formaPagamento" defaultValue="">
-              <option value="">—</option>
-              {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-        ) : null}
-      </div>
+      {!isEdit ? (
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              name="confirmar"
+              checked={confirmar}
+              onChange={(e) => setConfirmar(e.target.checked)}
+              className="size-4"
+            />
+            {direcao === "PAGAR" ? "Confirmar pagamento agora" : "Confirmar recebimento agora"}
+          </label>
+          {confirmar ? (
+            <div className="flex flex-col gap-2 sm:max-w-xs">
+              <Label htmlFor="formaPagamento">Forma de pagamento</Label>
+              <NativeSelect id="formaPagamento" name="formaPagamento" defaultValue="">
+                <option value="">—</option>
+                {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
       <div>
         <Button type="submit" disabled={isPending || uploading}>
-          {isPending ? "Salvando..." : "Lançar medição"}
+          {isPending ? "Salvando..." : submitLabel}
         </Button>
       </div>
     </form>

@@ -13,7 +13,14 @@ export const r2Client = new S3Client({
   },
 });
 
-type UploadCategory = "rdo-fotos" | "notas-fiscais" | "contratos" | "medicoes" | "company" | "obra-render";
+type UploadCategory =
+  | "rdo-fotos"
+  | "notas-fiscais"
+  | "contratos"
+  | "medicoes"
+  | "aditivos"
+  | "company"
+  | "obra-render";
 
 export function buildKey(category: UploadCategory, workId: string | null, entityId: string, filename: string) {
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");

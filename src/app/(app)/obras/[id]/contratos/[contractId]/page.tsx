@@ -49,6 +49,7 @@ export default async function ContractDetailPage({
     descricao: a.descricao,
     valor: Number(a.valor),
     observacoes: a.observacoes,
+    arquivoUrl: a.arquivoUrl,
   }));
 
   const proximoNumero = (contract.measurements[0]?.numero ?? 0) + 1;

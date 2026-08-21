@@ -172,6 +172,67 @@ export async function createMeasurement(_prevState: string | undefined, formData
   redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
 }
 
+export async function getMeasurement(measurementId: string) {
+  return prisma.contractMeasurement.findUnique({
+    where: { id: measurementId },
+    include: { financialTransaction: true, contract: true },
+  });
+}
+
+export async function updateMeasurement(
+  measurementId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const parsed = parseMeasurementForm(formData);
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+  const data = parsed.data;
+
+  const measurement = await prisma.contractMeasurement.findUnique({
+    where: { id: measurementId },
+    include: { financialTransaction: true },
+  });
+  if (!measurement) {
+    return "Medição não encontrada.";
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.contractMeasurement.update({
+      where: { id: measurementId },
+      data: {
+        data: new Date(data.data),
+        descricao: data.descricao || null,
+        valor: data.valor,
+        observacoes: data.observacoes || null,
+        arquivoUrl: data.arquivoUrl || null,
+      },
+    });
+
+    if (measurement.financialTransaction) {
+      await tx.financialTransaction.update({
+        where: { id: measurement.financialTransaction.id },
+        data: {
+          categoriaId: data.categoriaId,
+          bankAccountId: data.bankAccountId || null,
+          valor: data.valor,
+          dataEmissao: new Date(data.data),
+          dataVencimento: new Date(data.dataVencimento),
+        },
+      });
+    }
+  });
+
+  revalidatePath(`/obras/${data.workId}/contratos`);
+  revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
+  revalidatePath(`/obras/${data.workId}/financeiro`);
+  redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
+}
+
 export async function deleteMeasurement(measurementId: string, workId: string, contractId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
@@ -205,6 +266,7 @@ function parseContractAddendumForm(formData: FormData) {
     valor: formData.get("valor"),
     descricao: formData.get("descricao") ?? undefined,
     observacoes: formData.get("observacoes") ?? undefined,
+    arquivoUrl: formData.get("arquivoUrl") ?? undefined,
   });
 }
 
@@ -225,6 +287,7 @@ export async function createContractAddendum(_prevState: string | undefined, for
       descricao: data.descricao || null,
       valor: data.valor,
       observacoes: data.observacoes || null,
+      arquivoUrl: data.arquivoUrl || null,
     },
   });
 

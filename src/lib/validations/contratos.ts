@@ -50,6 +50,7 @@ export const contractAddendumFormSchema = z.object({
   valor: z.coerce.number().positive("Informe um valor maior que zero."),
   descricao: z.string().trim().optional(),
   observacoes: z.string().trim().optional(),
+  arquivoUrl: z.string().optional(),
 });
 
 export type ContractAddendumFormValues = z.infer<typeof contractAddendumFormSchema>;

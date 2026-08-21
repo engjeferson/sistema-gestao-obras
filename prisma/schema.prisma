@@ -468,6 +468,7 @@ model ContractAddendum {
   descricao   String?
   valor       Decimal  @db.Decimal(14, 2)
   observacoes String?
+  arquivoUrl  String?
   createdAt   DateTime @default(now())
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)

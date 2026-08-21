@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Paperclip, CheckCircle2 } from "lucide-react";
+import { Trash2, Paperclip, CheckCircle2, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -155,6 +156,17 @@ export function MeasurementsTable({
                   {measurement.status && measurement.status !== "PAGO" && measurement.financialTransactionId ? (
                     <FinalizeButton transactionId={measurement.financialTransactionId} workId={workId} />
                   ) : null}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Editar"
+                    render={
+                      <Link href={`/obras/${workId}/contratos/${contractId}/medicoes/${measurement.id}/editar`} />
+                    }
+                    nativeButton={false}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
                   <DeleteButton measurementId={measurement.id} workId={workId} contractId={contractId} />
                 </div>
               </TableCell>
