@@ -410,6 +410,80 @@ export async function markAsPago(transactionId: string, workId: string | null, f
   }
 }
 
+export async function partialPayTransaction(
+  transactionId: string,
+  workId: string | null,
+  input: { valorPago: number; formaPagamento?: PaymentMethod; dataPagamento: string; novoVencimento?: string },
+) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+
+  const original = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
+  if (!original) {
+    throw new Error("Lançamento não encontrado.");
+  }
+  if (original.status === "PAGO") {
+    throw new Error("Esta conta já está paga.");
+  }
+
+  const valorTotal = Number(original.valor);
+  if (!(input.valorPago > 0) || input.valorPago >= valorTotal) {
+    throw new Error("O valor pago deve ser maior que zero e menor que o valor total da conta.");
+  }
+  const valorResidual = Math.round((valorTotal - input.valorPago) * 100) / 100;
+  const grupoId = original.parcelaGrupoId ?? randomUUID();
+
+  await prisma.$transaction([
+    prisma.financialTransaction.update({
+      where: { id: transactionId },
+      data: {
+        valor: input.valorPago,
+        status: "PAGO",
+        dataPagamento: new Date(input.dataPagamento),
+        formaPagamento: input.formaPagamento,
+        descricao: `${original.descricao} (parcela 1/2 — pago)`,
+        parcelaGrupoId: grupoId,
+        parcelaNumero: 1,
+        parcelaTotal: 2,
+      },
+    }),
+    prisma.financialTransaction.create({
+      data: {
+        workId: original.workId,
+        tipo: original.tipo,
+        descricao: `${original.descricao} (parcela 2/2 — saldo residual)`,
+        categoriaId: original.categoriaId,
+        favorecidoNome: original.favorecidoNome,
+        supplierId: original.supplierId,
+        clientId: original.clientId,
+        bankAccountId: original.bankAccountId,
+        stageId: original.stageId,
+        taskId: original.taskId,
+        valor: valorResidual,
+        dataEmissao: original.dataEmissao,
+        dataVencimento: input.novoVencimento ? new Date(input.novoVencimento) : original.dataVencimento,
+        dataPagamento: null,
+        formaPagamento: null,
+        status: "PENDENTE",
+        observacao: original.observacao,
+        invoiceId: original.invoiceId,
+        parcelaGrupoId: grupoId,
+        parcelaNumero: 2,
+        parcelaTotal: 2,
+        createdById: session.user.id,
+      },
+    }),
+  ]);
+
+  revalidatePath("/financeiro");
+  if (workId) {
+    revalidatePath(`/obras/${workId}/financeiro`);
+  }
+  if (original.invoiceId) {
+    revalidatePath(`/notas-fiscais/${original.invoiceId}`);
+  }
+}
+
 export async function deleteTransaction(transactionId: string, workId: string | null) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);

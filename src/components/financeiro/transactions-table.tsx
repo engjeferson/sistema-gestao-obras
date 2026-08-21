@@ -100,7 +100,13 @@ export function TransactionsTable({
               </TableCell>
               <TableCell>
                 {canEdit ? (
-                  <TransactionRowActions transactionId={t.id} workId={t.workId} status={t.effectiveStatus} />
+                  <TransactionRowActions
+                    transactionId={t.id}
+                    workId={t.workId}
+                    status={t.effectiveStatus}
+                    valor={Number(t.valor)}
+                    dataVencimento={t.dataVencimento.toISOString().slice(0, 10)}
+                  />
                 ) : null}
               </TableCell>
             </TableRow>

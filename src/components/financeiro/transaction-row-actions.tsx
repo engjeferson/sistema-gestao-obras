@@ -3,21 +3,27 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, CheckCircle2 } from "lucide-react";
+import { Trash2, CheckCircle2, SplitSquareHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { markAsPago, deleteTransaction } from "@/server/actions/financeiro";
+import { PartialPaymentDialog } from "@/components/financeiro/partial-payment-dialog";
 
 export function TransactionRowActions({
   transactionId,
   workId,
   status,
+  valor,
+  dataVencimento,
 }: {
   transactionId: string;
   workId: string | null;
   status: string;
+  valor: number;
+  dataVencimento: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [partialPaymentOpen, setPartialPaymentOpen] = useState(false);
   const router = useRouter();
 
   function handleMarkAsPago() {
@@ -53,9 +59,20 @@ export function TransactionRowActions({
   return (
     <div className="flex items-center justify-end gap-1">
       {status !== "PAGO" ? (
-        <Button variant="ghost" size="icon" title="Marcar como pago" disabled={isPending} onClick={handleMarkAsPago}>
-          <CheckCircle2 className="size-4" />
-        </Button>
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Pagamento parcial"
+            disabled={isPending}
+            onClick={() => setPartialPaymentOpen(true)}
+          >
+            <SplitSquareHorizontal className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Marcar como pago" disabled={isPending} onClick={handleMarkAsPago}>
+            <CheckCircle2 className="size-4" />
+          </Button>
+        </>
       ) : null}
       <Button
         variant="ghost"
@@ -67,6 +84,15 @@ export function TransactionRowActions({
       >
         <Trash2 className="size-4" />
       </Button>
+
+      <PartialPaymentDialog
+        open={partialPaymentOpen}
+        onOpenChange={setPartialPaymentOpen}
+        transactionId={transactionId}
+        workId={workId}
+        valorTotal={valor}
+        vencimentoAtual={dataVencimento}
+      />
     </div>
   );
 }
