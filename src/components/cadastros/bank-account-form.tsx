@@ -13,6 +13,7 @@ const TIPO_LABELS: Record<string, string> = {
   CORRENTE: "Conta corrente",
   POUPANCA: "Poupança",
   CAIXA: "Caixa (dinheiro)",
+  CARTAO_CREDITO: "Cartão de crédito",
   OUTRA: "Outra",
 };
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const bankAccountTypeValues = ["CORRENTE", "POUPANCA", "CAIXA", "OUTRA"] as const;
+export const bankAccountTypeValues = ["CORRENTE", "POUPANCA", "CAIXA", "CARTAO_CREDITO", "OUTRA"] as const;
 
 export const bankAccountFormSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome da conta."),
