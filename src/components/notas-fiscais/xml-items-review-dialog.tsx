@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { findSimilarMaterial } from "@/lib/text";
 import { UNIT_LABELS } from "@/lib/status-labels";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
@@ -31,7 +30,12 @@ export function XmlItemsReviewDialog({
     if (!open) return;
     setOverrides(
       Object.fromEntries(
-        items.map((item, index) => [index, findSimilarMaterial(item.material, materials)?.nome ?? ""]),
+        items.map((item, index) => {
+          const exact = materials.find(
+            (material) => material.nome.trim().toLowerCase() === item.material.trim().toLowerCase(),
+          );
+          return [index, exact?.nome ?? ""];
+        }),
       ),
     );
     setUnidades(Object.fromEntries(items.map((item, index) => [index, item.unidade])));
