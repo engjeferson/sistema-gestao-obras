@@ -24,6 +24,7 @@ import { formatCurrencyBRL } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
 import type { ObraDashboardRow } from "@/server/actions/obras";
 import type { WorkStatus } from "@/generated/prisma/enums";
+import type { FinancePermissions } from "@/lib/finance-permissions";
 
 const ACTIVE_STATUSES: WorkStatus[] = ["PLANEJAMENTO", "EM_ANDAMENTO"];
 
@@ -34,6 +35,7 @@ export function ObrasDashboard({
   totalCount,
   kpis,
   clients,
+  financePermissions,
 }: {
   works: ObraDashboardRow[];
   totalCount: number;
@@ -46,6 +48,7 @@ export function ObrasDashboard({
     hojeDateStr: string;
   };
   clients: { id: string; nome: string }[];
+  financePermissions: FinancePermissions;
 }) {
   const [statusTab, setStatusTab] = useState<StatusTab>("ativas");
   const [search, setSearch] = useState("");
@@ -67,40 +70,50 @@ export function ObrasDashboard({
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard icon={Building2} label="Obras" value={`${filtered.length}/${totalCount}`} />
-        <KpiCard
-          icon={Wallet}
-          label="Despesas do dia"
-          value={formatCurrencyBRL(kpis.despesasDoDia)}
-          tone="destructive"
-          href={`/financeiro?tipo=PAGAR&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
-        />
-        <KpiCard
-          icon={PiggyBank}
-          label="Receitas do dia"
-          value={formatCurrencyBRL(kpis.receitasDoDia)}
-          tone="success"
-          href={`/financeiro?tipo=RECEBER&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
-        />
-        <KpiCard
-          icon={ArrowDownCircle}
-          label="Despesas em aberto"
-          value={formatCurrencyBRL(kpis.despesasEmAberto)}
-          tone="destructive"
-          href="/financeiro?tipo=PAGAR&status=PENDENTE"
-        />
-        <KpiCard
-          icon={ArrowUpCircle}
-          label="Receitas em aberto"
-          value={formatCurrencyBRL(kpis.receitasEmAberto)}
-          tone="success"
-          href="/financeiro?tipo=RECEBER&status=PENDENTE"
-        />
-        <KpiCard
-          icon={kpis.saudeFinanceiraGlobal >= 0 ? TrendingUp : TrendingDown}
-          label="Saúde financeira"
-          value={formatCurrencyBRL(kpis.saudeFinanceiraGlobal)}
-          tone={kpis.saudeFinanceiraGlobal >= 0 ? "success" : "destructive"}
-        />
+        {financePermissions.verSaidas ? (
+          <KpiCard
+            icon={Wallet}
+            label="Despesas do dia"
+            value={formatCurrencyBRL(kpis.despesasDoDia)}
+            tone="destructive"
+            href={`/financeiro?tipo=PAGAR&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
+          />
+        ) : null}
+        {financePermissions.verEntradas ? (
+          <KpiCard
+            icon={PiggyBank}
+            label="Receitas do dia"
+            value={formatCurrencyBRL(kpis.receitasDoDia)}
+            tone="success"
+            href={`/financeiro?tipo=RECEBER&status=PAGO&dataPagamentoInicio=${kpis.hojeDateStr}&dataPagamentoFim=${kpis.hojeDateStr}`}
+          />
+        ) : null}
+        {financePermissions.verSaidas ? (
+          <KpiCard
+            icon={ArrowDownCircle}
+            label="Despesas em aberto"
+            value={formatCurrencyBRL(kpis.despesasEmAberto)}
+            tone="destructive"
+            href="/financeiro?tipo=PAGAR&status=PENDENTE"
+          />
+        ) : null}
+        {financePermissions.verEntradas ? (
+          <KpiCard
+            icon={ArrowUpCircle}
+            label="Receitas em aberto"
+            value={formatCurrencyBRL(kpis.receitasEmAberto)}
+            tone="success"
+            href="/financeiro?tipo=RECEBER&status=PENDENTE"
+          />
+        ) : null}
+        {financePermissions.verSaudeFinanceira ? (
+          <KpiCard
+            icon={kpis.saudeFinanceiraGlobal >= 0 ? TrendingUp : TrendingDown}
+            label="Saúde financeira"
+            value={formatCurrencyBRL(kpis.saudeFinanceiraGlobal)}
+            tone={kpis.saudeFinanceiraGlobal >= 0 ? "success" : "destructive"}
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

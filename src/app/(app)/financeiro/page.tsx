@@ -3,6 +3,8 @@ import { Plus, X } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
 import { getWork } from "@/server/actions/obras";
+import { getCurrentFinancePermissions } from "@/server/actions/permissions";
+import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
@@ -29,7 +31,7 @@ export default async function FinanceiroPage({
 }) {
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
-  const filters = {
+  const requestedFilters = {
     workId: params.workId || undefined,
     status: params.status as TransactionStatus | "EM_ABERTO" | undefined,
     tipo: params.tipo as TransactionType | undefined,
@@ -40,14 +42,38 @@ export default async function FinanceiroPage({
     dataPagamentoInicio: params.dataPagamentoInicio || undefined,
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
-  const [session, result, categorias, summary, work] = await Promise.all([
+
+  const [session, perms, allCategorias] = await Promise.all([
     auth(),
-    listTransactions(filters, page),
+    getCurrentFinancePermissions(),
     listFinancialCategories(),
+  ]);
+  const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
+  const hasAccess = perms.verEntradas || perms.verSaidas;
+  const filters = restrictTransactionFilters(requestedFilters, perms);
+  const categorias = perms.categoriasPermitidasIds
+    ? allCategorias.filter((c) => perms.categoriasPermitidasIds!.includes(c.id))
+    : allCategorias;
+
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Financeiro</h1>
+          <p className="text-muted-foreground">Contas a pagar, pagas e receitas de todas as obras.</p>
+        </div>
+        <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          Você não tem permissão para ver lançamentos financeiros.
+        </p>
+      </div>
+    );
+  }
+
+  const [result, summary, work] = await Promise.all([
+    listTransactions(filters, page),
     getTransactionsSummary(filters),
     filters.workId ? getWork(filters.workId) : Promise.resolve(null),
   ]);
-  const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
 
   return (
     <div className="flex flex-col">

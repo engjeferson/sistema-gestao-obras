@@ -20,6 +20,7 @@ import { getWorkCostSummary, getWorkAlerts } from "@/server/actions/orcamento";
 import { listOverdueTasks, listUpcomingTasks } from "@/server/actions/planejamento";
 import { listUpcomingBills } from "@/server/actions/financeiro";
 import { listInvoices } from "@/server/actions/notas-fiscais";
+import { getCurrentFinancePermissions } from "@/server/actions/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertsList } from "@/components/dashboard/alerts-list";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -33,15 +34,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export default async function VisaoGeralPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [overview, summary, alerts, atrasadas, proximasAtividades, contasAVencer, notasFiscais] = await Promise.all([
-    getWorkOverview(id),
-    getWorkCostSummary(id),
-    getWorkAlerts(id),
-    listOverdueTasks(id),
-    listUpcomingTasks(id),
-    listUpcomingBills(id),
-    listInvoices(id, 1),
-  ]);
+  const [overview, summary, alerts, atrasadas, proximasAtividades, contasAVencer, notasFiscais, perms] =
+    await Promise.all([
+      getWorkOverview(id),
+      getWorkCostSummary(id),
+      getWorkAlerts(id),
+      listOverdueTasks(id),
+      listUpcomingTasks(id),
+      listUpcomingBills(id),
+      listInvoices(id, 1),
+      getCurrentFinancePermissions(),
+    ]);
   if (!overview || !summary) {
     notFound();
   }
@@ -66,14 +69,20 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
   const custoKpis: { icon: typeof Calculator; label: string; value: string; tone?: "destructive" | "success" }[] = [
     { icon: Calculator, label: "Custo orçado", value: formatCurrencyBRL(summary.orcado) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(summary.realizado) },
-    { icon: ArrowDownCircle, label: "Contas a pagar", value: formatCurrencyBRL(summary.aPagar), tone: "destructive" },
+    ...(perms.verSaidas
+      ? [{ icon: ArrowDownCircle, label: "Contas a pagar", value: formatCurrencyBRL(summary.aPagar), tone: "destructive" as const }]
+      : []),
     { icon: Layers, label: "Custo comprometido", value: formatCurrencyBRL(summary.comprometido) },
-    {
-      icon: PiggyBank,
-      label: "Saldo do orçamento",
-      value: formatCurrencyBRL(summary.saldoOrcamento),
-      tone: summary.saldoOrcamento < 0 ? "destructive" : "success",
-    },
+    ...(perms.verSaldo
+      ? [
+          {
+            icon: PiggyBank,
+            label: "Saldo do orçamento",
+            value: formatCurrencyBRL(summary.saldoOrcamento),
+            tone: (summary.saldoOrcamento < 0 ? "destructive" : "success") as "destructive" | "success",
+          },
+        ]
+      : []),
   ];
 
   const avancoKpis = [
@@ -186,26 +195,28 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Contas a vencer (7 dias)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col divide-y">
-            {contasAVencer.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma conta a vencer nos próximos 7 dias.</p>
-            ) : (
-              contasAVencer.map((conta) => (
-                <div key={conta.id} className="flex items-center justify-between py-2 text-sm first:pt-0 last:pb-0">
-                  <p className="min-w-0 truncate font-medium">{conta.descricao}</p>
-                  <div className="shrink-0 text-right">
-                    <p>{formatCurrencyBRL(Number(conta.valor))}</p>
-                    <p className="text-muted-foreground">{formatDateBR(conta.dataVencimento)}</p>
+        {perms.verSaidas ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Contas a vencer (7 dias)</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col divide-y">
+              {contasAVencer.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma conta a vencer nos próximos 7 dias.</p>
+              ) : (
+                contasAVencer.map((conta) => (
+                  <div key={conta.id} className="flex items-center justify-between py-2 text-sm first:pt-0 last:pb-0">
+                    <p className="min-w-0 truncate font-medium">{conta.descricao}</p>
+                    <div className="shrink-0 text-right">
+                      <p>{formatCurrencyBRL(Number(conta.valor))}</p>
+                      <p className="text-muted-foreground">{formatDateBR(conta.dataVencimento)}</p>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>

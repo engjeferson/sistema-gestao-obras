@@ -12,6 +12,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { getDashboardData, getCompanyOverview, getGlobalAlerts } from "@/server/actions/dashboard";
+import { getCurrentFinancePermissions } from "@/server/actions/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertsList } from "@/components/dashboard/alerts-list";
 import { WorksOverviewTable } from "@/components/dashboard/works-overview-table";
@@ -23,7 +24,12 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default async function DashboardPage() {
-  const [data, company, alerts] = await Promise.all([getDashboardData(), getCompanyOverview(), getGlobalAlerts()]);
+  const [data, company, alerts, perms] = await Promise.all([
+    getDashboardData(),
+    getCompanyOverview(),
+    getGlobalAlerts(),
+    getCurrentFinancePermissions(),
+  ]);
 
   const obraKpis = [
     { icon: Building2, label: "Obras em andamento", value: data.obrasEmAndamento.toString() },
@@ -31,29 +37,43 @@ export default async function DashboardPage() {
     { icon: TrendingUp, label: "Margem média projetada", value: `${company.margemMediaProjetada.toFixed(1)}%` },
   ];
 
+  const saldoFinanceiroTone: "success" | "destructive" = data.saldoFinanceiro < 0 ? "destructive" : "success";
+
   const financeiroKpis: { icon: typeof Building2; label: string; value: string; tone?: "success" | "destructive" | "warning"; href?: string }[] = [
     { icon: Calculator, label: "Custo total orçado", value: formatCurrencyBRL(company.custoTotalOrcado) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(company.custoRealizado) },
-    {
-      icon: ArrowDownCircle,
-      label: "Contas a pagar",
-      value: formatCurrencyBRL(data.totalAPagar),
-      tone: "destructive",
-      href: "/financeiro?tipo=PAGAR&status=EM_ABERTO",
-    },
-    {
-      icon: ArrowUpCircle,
-      label: "Contas a receber",
-      value: formatCurrencyBRL(data.contasAReceber),
-      tone: "success",
-      href: "/financeiro?tipo=RECEBER&status=EM_ABERTO",
-    },
-    {
-      icon: PiggyBank,
-      label: "Saldo financeiro",
-      value: formatCurrencyBRL(data.saldoFinanceiro),
-      tone: data.saldoFinanceiro < 0 ? "destructive" : "success",
-    },
+    ...(perms.verSaidas
+      ? [
+          {
+            icon: ArrowDownCircle,
+            label: "Contas a pagar",
+            value: formatCurrencyBRL(data.totalAPagar),
+            tone: "destructive" as const,
+            href: "/financeiro?tipo=PAGAR&status=EM_ABERTO",
+          },
+        ]
+      : []),
+    ...(perms.verEntradas
+      ? [
+          {
+            icon: ArrowUpCircle,
+            label: "Contas a receber",
+            value: formatCurrencyBRL(data.contasAReceber),
+            tone: "success" as const,
+            href: "/financeiro?tipo=RECEBER&status=EM_ABERTO",
+          },
+        ]
+      : []),
+    ...(perms.verSaudeFinanceira
+      ? [
+          {
+            icon: PiggyBank,
+            label: "Saldo financeiro",
+            value: formatCurrencyBRL(data.saldoFinanceiro),
+            tone: saldoFinanceiroTone,
+          },
+        ]
+      : []),
   ];
 
   return (

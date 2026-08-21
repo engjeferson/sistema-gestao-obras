@@ -122,6 +122,7 @@ model User {
   passwordHash String
   role         Role
   active       Boolean  @default(true)
+  financePermissions Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

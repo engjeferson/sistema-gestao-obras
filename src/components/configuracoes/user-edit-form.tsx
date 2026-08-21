@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { FinancePermissionsFields } from "@/components/configuracoes/finance-permissions-fields";
+import type { FinancePermissions } from "@/lib/finance-permissions";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR: "Administrador",
@@ -16,9 +18,13 @@ const ROLE_LABELS: Record<string, string> = {
 export function UserEditForm({
   action,
   defaultValues,
+  categorias,
+  financePermissions,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues: { name: string; email: string; role: string };
+  categorias: { id: string; nome: string }[];
+  financePermissions: FinancePermissions;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
@@ -54,6 +60,7 @@ export function UserEditForm({
           </NativeSelect>
         </div>
       </div>
+      <FinancePermissionsFields categorias={categorias} defaultValues={financePermissions} />
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       <div>
         <Button type="submit" disabled={isPending}>

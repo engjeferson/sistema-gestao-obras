@@ -8,6 +8,27 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { userFormSchema, userEditFormSchema } from "@/lib/validations/usuarios";
 
+function parseFinancePermissionFields(formData: FormData) {
+  return {
+    verEntradas: formData.get("verEntradas") === "on",
+    verSaidas: formData.get("verSaidas") === "on",
+    verSaldo: formData.get("verSaldo") === "on",
+    verSaudeFinanceira: formData.get("verSaudeFinanceira") === "on",
+    todasCategorias: formData.get("todasCategorias") === "on",
+    categoriasPermitidasIds: formData.getAll("categoriasPermitidasIds").map(String),
+  };
+}
+
+function buildFinancePermissions(data: ReturnType<typeof parseFinancePermissionFields>) {
+  return {
+    verEntradas: data.verEntradas,
+    verSaidas: data.verSaidas,
+    verSaldo: data.verSaldo,
+    verSaudeFinanceira: data.verSaudeFinanceira,
+    categoriasPermitidasIds: data.todasCategorias ? null : data.categoriasPermitidasIds,
+  };
+}
+
 export async function listUsers() {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
@@ -24,11 +45,13 @@ export async function createUser(_prevState: string | undefined, formData: FormD
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
 
+  const permissionFields = parseFinancePermissionFields(formData);
   const parsed = userFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
     role: formData.get("role"),
+    ...permissionFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -42,7 +65,13 @@ export async function createUser(_prevState: string | undefined, formData: FormD
 
   const passwordHash = await bcrypt.hash(data.password, 10);
   await prisma.user.create({
-    data: { name: data.name, email: data.email, passwordHash, role: data.role },
+    data: {
+      name: data.name,
+      email: data.email,
+      passwordHash,
+      role: data.role,
+      financePermissions: buildFinancePermissions(permissionFields),
+    },
   });
 
   revalidatePath("/configuracoes/usuarios");
@@ -53,11 +82,13 @@ export async function updateUser(userId: string, _prevState: string | undefined,
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
 
+  const permissionFields = parseFinancePermissionFields(formData);
   const parsed = userEditFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password") || undefined,
     role: formData.get("role"),
+    ...permissionFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -75,6 +106,7 @@ export async function updateUser(userId: string, _prevState: string | undefined,
       name: data.name,
       email: data.email,
       role: data.role,
+      financePermissions: buildFinancePermissions(permissionFields),
       ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
     },
   });

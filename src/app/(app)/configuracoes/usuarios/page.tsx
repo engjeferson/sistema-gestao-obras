@@ -1,9 +1,10 @@
 import { listUsers } from "@/server/actions/usuarios";
+import { listAllFinancialCategories } from "@/server/actions/financeiro";
 import { UserForm } from "@/components/configuracoes/user-form";
 import { UsersTable } from "@/components/configuracoes/users-table";
 
 export default async function UsuariosPage() {
-  const users = await listUsers();
+  const [users, categorias] = await Promise.all([listUsers(), listAllFinancialCategories()]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -11,7 +12,7 @@ export default async function UsuariosPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
         <p className="text-muted-foreground">Crie e gerencie os usuários que acessam o sistema.</p>
       </div>
-      <UserForm />
+      <UserForm categorias={categorias} />
       <UsersTable users={users} />
     </div>
   );
