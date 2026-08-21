@@ -8,7 +8,7 @@ import { GripVertical, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EditableName } from "@/components/planejamento/editable-name";
+import { EditableName } from "@/components/ui/editable-name";
 import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
 import { PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 import {

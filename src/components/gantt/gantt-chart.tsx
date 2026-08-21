@@ -8,7 +8,7 @@ import { ChevronDown, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut } from
 import { Button } from "@/components/ui/button";
 import { updatePlanningTaskDates, updateStageName, updateTaskName, type PredecessorChip } from "@/server/actions/planejamento";
 import { PredecessorsCell } from "@/components/planejamento/predecessors-cell";
-import { EditableName } from "@/components/planejamento/editable-name";
+import { EditableName } from "@/components/ui/editable-name";
 import type { PlainStage, PlainTask } from "@/components/planejamento/stage-list";
 import { PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 

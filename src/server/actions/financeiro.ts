@@ -14,6 +14,7 @@ export type TransactionFilters = {
   workId?: string;
   tipo?: TransactionType;
   categoriaId?: string;
+  categoriaIdIn?: string[];
   status?: TransactionStatus | "EM_ABERTO";
   favorecido?: string;
   supplierId?: string;
@@ -61,7 +62,7 @@ function buildTransactionWhere(filters?: TransactionFilters) {
   return {
     workId: filters?.workId,
     tipo: filters?.tipo,
-    categoriaId: filters?.categoriaId,
+    categoriaId: filters?.categoriaIdIn ? { in: filters.categoriaIdIn } : filters?.categoriaId,
     status:
       filters?.status === "EM_ABERTO"
         ? { in: ["PENDENTE", "VENCIDO"] as TransactionStatus[] }
@@ -206,6 +207,24 @@ export async function createFinancialCategory(_prevState: string | undefined, fo
   await prisma.financialCategory.create({ data: { nome } });
   revalidatePath("/configuracoes/categorias");
   return undefined;
+}
+
+export async function updateFinancialCategory(categoryId: string, nome: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR"]);
+
+  const trimmed = nome.trim();
+  if (!trimmed) {
+    throw new Error("Informe o nome da categoria.");
+  }
+
+  const existing = await prisma.financialCategory.findUnique({ where: { nome: trimmed } });
+  if (existing && existing.id !== categoryId) {
+    throw new Error("Já existe uma categoria com esse nome.");
+  }
+
+  await prisma.financialCategory.update({ where: { id: categoryId }, data: { nome: trimmed } });
+  revalidatePath("/configuracoes/categorias");
 }
 
 export async function toggleFinancialCategoryActive(categoryId: string, ativo: boolean) {

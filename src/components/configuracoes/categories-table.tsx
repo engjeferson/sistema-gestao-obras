@@ -2,10 +2,12 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EditableName } from "@/components/ui/editable-name";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toggleFinancialCategoryActive } from "@/server/actions/financeiro";
+import { toggleFinancialCategoryActive, updateFinancialCategory } from "@/server/actions/financeiro";
 
 type CategoryRow = { id: string; nome: string; ativo: boolean };
 
@@ -31,6 +33,14 @@ function ToggleButton({ category }: { category: CategoryRow }) {
 }
 
 export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
+  const router = useRouter();
+
+  function handleRename(category: CategoryRow, nome: string) {
+    updateFinancialCategory(category.id, nome)
+      .then(() => router.refresh())
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível renomear."));
+  }
+
   return (
     <div className="rounded-lg border">
       <Table>
@@ -44,7 +54,13 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
         <TableBody>
           {categories.map((category) => (
             <TableRow key={category.id}>
-              <TableCell className="font-medium">{category.nome}</TableCell>
+              <TableCell className="font-medium">
+                <EditableName
+                  value={category.nome}
+                  className="text-sm"
+                  onCommit={(nome) => handleRename(category, nome)}
+                />
+              </TableCell>
               <TableCell>
                 <Badge variant={category.ativo ? "success" : "secondary"}>
                   {category.ativo ? "Ativa" : "Inativa"}

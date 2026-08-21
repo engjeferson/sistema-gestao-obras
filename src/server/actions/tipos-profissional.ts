@@ -34,6 +34,24 @@ export async function createProfessionalType(_prevState: string | undefined, for
   return undefined;
 }
 
+export async function updateProfessionalType(typeId: string, nome: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR"]);
+
+  const trimmed = nome.trim();
+  if (!trimmed) {
+    throw new Error("Informe o nome do tipo.");
+  }
+
+  const existing = await prisma.professionalType.findUnique({ where: { nome: trimmed } });
+  if (existing && existing.id !== typeId) {
+    throw new Error("Já existe um tipo com esse nome.");
+  }
+
+  await prisma.professionalType.update({ where: { id: typeId }, data: { nome: trimmed } });
+  revalidatePath("/configuracoes/tipos-profissional");
+}
+
 export async function toggleProfessionalTypeActive(typeId: string, ativo: boolean) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
