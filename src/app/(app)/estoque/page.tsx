@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Plus, Wallet, Package } from "lucide-react";
-import { getStockBalances, listStockMovements } from "@/server/actions/estoque";
+import { getStockBalances } from "@/server/actions/estoque";
 import { listWorks } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { StockLocationFilter } from "@/components/estoque/stock-location-filter";
 import { StockBalanceSearch } from "@/components/estoque/stock-balance-search";
-import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
+import { EstoqueTabsNav } from "@/components/estoque/estoque-tabs-nav";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 
 export default async function EstoquePage({
@@ -17,17 +17,8 @@ export default async function EstoquePage({
   const { local } = await searchParams;
   const workId = local || undefined;
 
-  const [works, balances, movements] = await Promise.all([
-    listWorks(),
-    getStockBalances(workId),
-    listStockMovements({ workId: workId ?? null }),
-  ]);
+  const [works, balances] = await Promise.all([listWorks(), getStockBalances(workId)]);
   const worksOptions = works.map((work) => ({ id: work.id, nome: work.nome, codigo: work.codigo }));
-  const movementsOptions = movements.map((m) => ({
-    ...m,
-    quantidade: Number(m.quantidade),
-    valorUnitario: m.valorUnitario !== null ? Number(m.valorUnitario) : null,
-  }));
   const valorTotalEstoque = balances.reduce((sum, b) => sum + b.valorTotal, 0);
 
   return (
@@ -55,6 +46,8 @@ export default async function EstoquePage({
         </div>
       </div>
 
+      <EstoqueTabsNav />
+
       <StockLocationFilter works={worksOptions} selected={workId ?? ""} />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -65,11 +58,6 @@ export default async function EstoquePage({
       <div className="flex flex-col gap-2">
         <h2 className="font-medium">Saldo atual</h2>
         <StockBalanceSearch balances={balances} />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <h2 className="font-medium">Últimas movimentações</h2>
-        <StockMovementsTable movements={movementsOptions} />
       </div>
     </div>
   );

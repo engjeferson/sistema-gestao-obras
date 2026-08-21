@@ -63,12 +63,25 @@ export async function getStockBalances(workId?: string | null) {
     .sort((a, b) => a.materialNome.localeCompare(b.materialNome));
 }
 
-export async function listStockMovements(filters?: { workId?: string | null; materialId?: string }) {
+export async function listStockMovements(filters?: {
+  workId?: string | null;
+  materialId?: string;
+  tipo?: "ENTRADA" | "SAIDA" | "TRANSFERENCIA";
+  supplierId?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}) {
   const local = normalizeWorkId(filters?.workId);
   return prisma.stockMovement.findMany({
     where: {
       materialId: filters?.materialId,
+      tipo: filters?.tipo,
       OR: filters?.workId !== undefined ? [{ origemWorkId: local }, { destinoWorkId: local }] : undefined,
+      invoiceItem: filters?.supplierId ? { invoice: { supplierId: filters.supplierId } } : undefined,
+      data: {
+        gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,
+        lte: filters?.dataFim ? new Date(filters.dataFim) : undefined,
+      },
     },
     include: { material: true, origemWork: true, destinoWork: true, stage: true, createdBy: true },
     orderBy: { data: "desc" },
