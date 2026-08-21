@@ -293,7 +293,7 @@ export async function createTransaction(_prevState: string | undefined, formData
       Array.from({ length: n }, (_, i) =>
         prisma.financialTransaction.create({
           data: {
-            workId: data.workId,
+            workId: data.workId || null,
             tipo: data.tipo,
             descricao: `${data.descricao} (parcela ${i + 1}/${n})`,
             categoriaId: data.categoriaId,
@@ -321,7 +321,7 @@ export async function createTransaction(_prevState: string | undefined, formData
   } else {
     await prisma.financialTransaction.create({
       data: {
-        workId: data.workId,
+        workId: data.workId || null,
         tipo: data.tipo,
         descricao: data.descricao,
         categoriaId: data.categoriaId,
@@ -344,7 +344,9 @@ export async function createTransaction(_prevState: string | undefined, formData
   }
 
   revalidatePath("/financeiro");
-  revalidatePath(`/obras/${data.workId}/financeiro`);
+  if (data.workId) {
+    revalidatePath(`/obras/${data.workId}/financeiro`);
+  }
   redirect("/financeiro");
 }
 
@@ -366,7 +368,7 @@ export async function updateTransaction(
   await prisma.financialTransaction.update({
     where: { id: transactionId },
     data: {
-      workId: data.workId,
+      workId: data.workId || null,
       tipo: data.tipo,
       descricao: data.descricao,
       categoriaId: data.categoriaId,
@@ -387,7 +389,9 @@ export async function updateTransaction(
   });
 
   revalidatePath("/financeiro");
-  revalidatePath(`/obras/${data.workId}/financeiro`);
+  if (data.workId) {
+    revalidatePath(`/obras/${data.workId}/financeiro`);
+  }
   redirect("/financeiro");
 }
 

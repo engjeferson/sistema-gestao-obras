@@ -13,7 +13,7 @@ export const paymentMethodValues = [
 ] as const;
 
 export const transactionFormSchema = z.object({
-  workId: z.string().min(1, "Selecione a obra."),
+  workId: z.string().optional().or(z.literal("").transform(() => undefined)),
   tipo: z.enum(transactionTypeValues),
   descricao: z.string().trim().min(1, "Informe a descrição."),
   categoriaId: z.string().min(1, "Selecione a categoria."),

@@ -81,17 +81,18 @@ export function TransactionForm({
               setSelectedWorkId(e.target.value);
               setSelectedStageId("");
             }}
-            required
           >
-            <option value="" disabled>
-              Selecione a obra
-            </option>
+            <option value="">Despesa geral da empresa (sem obra)</option>
             {works.map((work) => (
               <option key={work.id} value={work.id}>
                 {work.codigo} — {work.nome}
               </option>
             ))}
           </NativeSelect>
+          <p className="text-xs text-muted-foreground">
+            Use "Despesa geral da empresa" para custos que não são de uma obra específica — água, luz, internet,
+            escritório etc.
+          </p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="stageId">Etapa</Label>
