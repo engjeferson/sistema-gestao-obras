@@ -42,3 +42,14 @@ export const measurementFormSchema = z.object({
 });
 
 export type MeasurementFormValues = z.infer<typeof measurementFormSchema>;
+
+export const contractAddendumFormSchema = z.object({
+  contractId: z.string().min(1),
+  workId: z.string().min(1),
+  data: z.string().min(1, "Informe a data."),
+  valor: z.coerce.number().positive("Informe um valor maior que zero."),
+  descricao: z.string().trim().optional(),
+  observacoes: z.string().trim().optional(),
+});
+
+export type ContractAddendumFormValues = z.infer<typeof contractAddendumFormSchema>;

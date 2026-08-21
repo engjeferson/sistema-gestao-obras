@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, Paperclip } from "lucide-react";
+import { Trash2, Paperclip, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteMeasurement } from "@/server/actions/contratos";
+import { markAsPago } from "@/server/actions/financeiro";
 import { TRANSACTION_STATUS_BADGE, TRANSACTION_STATUS_LABELS, formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
 
 type MeasurementRow = {
@@ -17,9 +18,33 @@ type MeasurementRow = {
   descricao: string | null;
   valor: number;
   status: string | null;
+  financialTransactionId: string | null;
   dataVencimento: Date | null;
   arquivoUrl: string | null;
 };
+
+function FinalizeButton({ transactionId, workId }: { transactionId: string; workId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleClick() {
+    startTransition(async () => {
+      try {
+        await markAsPago(transactionId, workId);
+        toast.success("Pagamento finalizado.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível finalizar o pagamento.");
+      }
+    });
+  }
+
+  return (
+    <Button variant="ghost" size="icon" title="Finalizar pagamento" disabled={isPending} onClick={handleClick}>
+      <CheckCircle2 className="size-4" />
+    </Button>
+  );
+}
 
 function DeleteButton({ measurementId, workId, contractId }: { measurementId: string; workId: string; contractId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -126,7 +151,12 @@ export function MeasurementsTable({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <DeleteButton measurementId={measurement.id} workId={workId} contractId={contractId} />
+                <div className="flex justify-end">
+                  {measurement.status && measurement.status !== "PAGO" && measurement.financialTransactionId ? (
+                    <FinalizeButton transactionId={measurement.financialTransactionId} workId={workId} />
+                  ) : null}
+                  <DeleteButton measurementId={measurement.id} workId={workId} contractId={contractId} />
+                </div>
               </TableCell>
             </TableRow>
           ))}

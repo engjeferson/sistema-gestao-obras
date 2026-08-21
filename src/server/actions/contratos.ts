@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
-import { contractFormSchema, measurementFormSchema } from "@/lib/validations/contratos";
+import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
 
 function parseContractForm(formData: FormData) {
   return contractFormSchema.safeParse({
@@ -25,7 +25,7 @@ export async function listContracts(workId: string) {
   const contracts = await prisma.contract.findMany({
     where: { workId },
     orderBy: { data: "desc" },
-    include: { measurements: { include: { financialTransaction: true } } },
+    include: { measurements: { include: { financialTransaction: true } }, addendums: true },
   });
 
   return contracts.map((contract) => {
@@ -33,11 +33,12 @@ export async function listContracts(workId: string) {
       const paid = m.financialTransaction?.status === "PAGO" ? Number(m.financialTransaction.valor) : 0;
       return sum + paid;
     }, 0);
-    const valorTotal = contract.valor !== null ? Number(contract.valor) : null;
+    const valorAditivos = contract.addendums.reduce((sum, a) => sum + Number(a.valor), 0);
+    const valorTotal = contract.valor !== null ? Number(contract.valor) + valorAditivos : null;
     const saldo = valorTotal !== null ? valorTotal - valorPago : null;
     const percentual = valorTotal !== null && valorTotal > 0 ? (valorPago / valorTotal) * 100 : 0;
 
-    return { ...contract, valorPago, saldo, percentual };
+    return { ...contract, valor: valorTotal, valorPago, saldo, percentual };
   });
 }
 
@@ -46,6 +47,7 @@ export async function getContract(contractId: string) {
     where: { id: contractId },
     include: {
       measurements: { include: { financialTransaction: true }, orderBy: { numero: "desc" } },
+      addendums: { orderBy: { data: "desc" } },
     },
   });
 }
@@ -193,4 +195,50 @@ export async function deleteMeasurement(measurementId: string, workId: string, c
   revalidatePath(`/obras/${workId}/contratos`);
   revalidatePath(`/obras/${workId}/contratos/${contractId}`);
   revalidatePath(`/obras/${workId}/financeiro`);
+}
+
+function parseContractAddendumForm(formData: FormData) {
+  return contractAddendumFormSchema.safeParse({
+    contractId: formData.get("contractId"),
+    workId: formData.get("workId"),
+    data: formData.get("data"),
+    valor: formData.get("valor"),
+    descricao: formData.get("descricao") ?? undefined,
+    observacoes: formData.get("observacoes") ?? undefined,
+  });
+}
+
+export async function createContractAddendum(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const parsed = parseContractAddendumForm(formData);
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+  const data = parsed.data;
+
+  await prisma.contractAddendum.create({
+    data: {
+      contractId: data.contractId,
+      data: new Date(data.data),
+      descricao: data.descricao || null,
+      valor: data.valor,
+      observacoes: data.observacoes || null,
+    },
+  });
+
+  revalidatePath(`/obras/${data.workId}/contratos`);
+  revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
+  return undefined;
+}
+
+export async function deleteContractAddendum(addendumId: string, workId: string, contractId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR"]);
+
+  await prisma.contractAddendum.delete({ where: { id: addendumId } });
+
+  revalidatePath(`/obras/${workId}/contratos`);
+  revalidatePath(`/obras/${workId}/contratos/${contractId}`);
 }

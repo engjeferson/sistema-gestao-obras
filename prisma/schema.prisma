@@ -456,8 +456,23 @@ model Contract {
 
   work         Work                   @relation(fields: [workId], references: [id], onDelete: Cascade)
   measurements ContractMeasurement[]
+  addendums    ContractAddendum[]
 
   @@index([workId])
+}
+
+model ContractAddendum {
+  id          String   @id @default(cuid())
+  contractId  String
+  data        DateTime @db.Date
+  descricao   String?
+  valor       Decimal  @db.Decimal(14, 2)
+  observacoes String?
+  createdAt   DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
 }
 
 model ContractMeasurement {
