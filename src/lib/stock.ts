@@ -1,15 +1,3 @@
-export function hasAnyStockMovementFilter(filters?: {
-  materialId?: string;
-  tipo?: string;
-  supplierId?: string;
-  dataInicio?: string;
-  dataFim?: string;
-}) {
-  return Boolean(
-    filters?.materialId || filters?.tipo || filters?.supplierId || filters?.dataInicio || filters?.dataFim,
-  );
-}
-
 export type StockMovementForBalance = {
   tipo: "ENTRADA" | "SAIDA" | "TRANSFERENCIA";
   origemWorkId: string | null;
