@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
+import { PeriodoFilter } from "@/components/ui/periodo-filter";
 import { TRANSACTION_STATUS_LABELS } from "@/lib/status-labels";
 
 export function TransactionFilters({
@@ -57,23 +58,7 @@ export function TransactionFilters({
         defaultValue={searchParams.get("favorecido") ?? ""}
         onBlur={(e) => setParam("favorecido", e.target.value)}
       />
-      <div className="flex items-center gap-2">
-        <Input
-          type="date"
-          className="w-auto"
-          aria-label="Vencimento de"
-          defaultValue={searchParams.get("dataInicio") ?? ""}
-          onChange={(e) => setParam("dataInicio", e.target.value)}
-        />
-        <span className="text-sm text-muted-foreground">até</span>
-        <Input
-          type="date"
-          className="w-auto"
-          aria-label="Vencimento até"
-          defaultValue={searchParams.get("dataFim") ?? ""}
-          onChange={(e) => setParam("dataFim", e.target.value)}
-        />
-      </div>
+      <PeriodoFilter inicioLabel="Vencimento de" fimLabel="Vencimento até" />
     </div>
   );
 }
