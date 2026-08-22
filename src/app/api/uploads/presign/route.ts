@@ -8,6 +8,7 @@ const ALLOWED_CATEGORIES = [
   "contratos",
   "medicoes",
   "aditivos",
+  "comprovantes",
   "company",
   "obra-render",
 ] as const;

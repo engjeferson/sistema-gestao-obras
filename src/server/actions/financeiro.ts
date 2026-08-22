@@ -417,7 +417,13 @@ export async function markAsPago(transactionId: string, workId: string | null, f
 export async function partialPayTransaction(
   transactionId: string,
   workId: string | null,
-  input: { valorPago: number; formaPagamento?: PaymentMethod; dataPagamento: string; novoVencimento?: string },
+  input: {
+    valorPago: number;
+    formaPagamento?: PaymentMethod;
+    dataPagamento: string;
+    novoVencimento?: string;
+    comprovanteUrl?: string;
+  },
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
@@ -445,6 +451,7 @@ export async function partialPayTransaction(
         status: "PAGO",
         dataPagamento: new Date(input.dataPagamento),
         formaPagamento: input.formaPagamento,
+        comprovanteUrl: input.comprovanteUrl || null,
         descricao: `${original.descricao} (parcela 1/2 — pago)`,
         parcelaGrupoId: grupoId,
         parcelaNumero: 1,

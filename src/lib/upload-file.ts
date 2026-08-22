@@ -4,6 +4,7 @@ export type UploadCategory =
   | "contratos"
   | "medicoes"
   | "aditivos"
+  | "comprovantes"
   | "company"
   | "obra-render";
 

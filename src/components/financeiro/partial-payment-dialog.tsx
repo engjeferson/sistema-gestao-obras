@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { partialPayTransaction } from "@/server/actions/financeiro";
+import { uploadFileToR2 } from "@/lib/upload-file";
 import { PAYMENT_METHOD_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 import type { PaymentMethod } from "@/generated/prisma/enums";
 
@@ -38,8 +39,25 @@ export function PartialPaymentDialog({
   const [formaPagamento, setFormaPagamento] = useState("");
   const [dataPagamento, setDataPagamento] = useState(todayStr());
   const [novoVencimento, setNovoVencimento] = useState("");
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   const valorResidual = valorPago && valorPago > 0 && valorPago < valorTotal ? valorTotal - valorPago : null;
+
+  async function handleFileChange(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const key = await uploadFileToR2(file, "comprovantes", workId, draftId);
+      setComprovanteUrl(key);
+      toast.success("Comprovante enviado.");
+    } catch {
+      toast.error("Não foi possível enviar o arquivo. Verifique a configuração de armazenamento.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function handleConfirm() {
     if (!valorPago || valorPago <= 0 || valorPago >= valorTotal) {
@@ -53,6 +71,7 @@ export function PartialPaymentDialog({
           formaPagamento: (formaPagamento as PaymentMethod) || undefined,
           dataPagamento,
           novoVencimento: novoVencimento || undefined,
+          comprovanteUrl: comprovanteUrl || undefined,
         });
         toast.success("Pagamento parcial registrado.");
         onOpenChange(false);
@@ -103,6 +122,18 @@ export function PartialPaymentDialog({
           </div>
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="comprovante">Comprovante ou anexo (opcional)</Label>
+            <Input
+              id="comprovante"
+              type="file"
+              disabled={uploading}
+              onChange={(e) => void handleFileChange(e.target.files?.[0])}
+            />
+            {uploading ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
+            {comprovanteUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="novoVencimento">Novo vencimento do saldo residual (opcional)</Label>
             <Input
               id="novoVencimento"
@@ -127,7 +158,7 @@ export function PartialPaymentDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleConfirm} disabled={isPending}>
+          <Button type="button" onClick={handleConfirm} disabled={isPending || uploading}>
             {isPending ? "Salvando..." : "Confirmar pagamento parcial"}
           </Button>
         </DialogFooter>
