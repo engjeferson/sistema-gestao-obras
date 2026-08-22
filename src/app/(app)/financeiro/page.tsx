@@ -3,6 +3,8 @@ import { Plus, X } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
 import { getWork } from "@/server/actions/obras";
+import { listSuppliers } from "@/server/actions/fornecedores";
+import { listClients } from "@/server/actions/clientes";
 import { getCurrentFinancePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
@@ -42,10 +44,12 @@ export default async function FinanceiroPage({
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
 
-  const [session, perms, allCategorias] = await Promise.all([
+  const [session, perms, allCategorias, suppliers, clients] = await Promise.all([
     auth(),
     getCurrentFinancePermissions(),
     listFinancialCategories(),
+    listSuppliers(),
+    listClients(),
   ]);
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
   const hasAccess = perms.verEntradas || perms.verSaidas;
@@ -53,6 +57,9 @@ export default async function FinanceiroPage({
   const categorias = perms.categoriasPermitidasIds
     ? allCategorias.filter((c) => perms.categoriasPermitidasIds!.includes(c.id))
     : allCategorias;
+  const favorecidos = Array.from(new Set([...suppliers, ...clients].map((f) => f.nome))).sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
+  );
 
   if (!hasAccess) {
     return (
@@ -89,7 +96,7 @@ export default async function FinanceiroPage({
           ) : null}
         </div>
 
-        <TransactionFilters categorias={categorias} />
+        <TransactionFilters categorias={categorias} favorecidos={favorecidos} />
 
         {work ? (
           <div className="flex items-center gap-2 text-sm">
