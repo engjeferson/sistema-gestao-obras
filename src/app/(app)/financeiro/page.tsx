@@ -8,7 +8,6 @@ import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
-import { FinanceiroTabsNav } from "@/components/financeiro/financeiro-tabs-nav";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
@@ -90,8 +89,6 @@ export default async function FinanceiroPage({
           ) : null}
         </div>
 
-        <FinanceiroTabsNav />
-
         <TransactionFilters categorias={categorias} />
 
         {work ? (
@@ -111,7 +108,7 @@ export default async function FinanceiroPage({
       </div>
 
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        <TransactionsTable transactions={result.items} canEdit={canEdit} />
+        <TransactionsTable transactions={result.items} canEdit={canEdit} selectable />
 
         <PaginationControls page={result.page} totalPages={result.totalPages} />
       </div>

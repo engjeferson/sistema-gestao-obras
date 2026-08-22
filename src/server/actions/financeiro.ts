@@ -146,18 +146,6 @@ export async function getTransactionsSummary(filters?: TransactionFilters) {
   };
 }
 
-export async function listOpenTransactionsForBatchPayment(filters: TransactionFilters) {
-  await healOverdueTransactions(filters);
-
-  const transactions = await prisma.financialTransaction.findMany({
-    where: { ...buildTransactionWhere(filters), status: { in: ["PENDENTE", "VENCIDO"] } },
-    include: { work: true, categoria: true },
-    orderBy: { dataVencimento: "asc" },
-  });
-
-  return transactions.map((t) => ({ ...t, effectiveStatus: t.status as TransactionStatus }));
-}
-
 export async function batchMarkAsPago(transactionIds: string[], formaPagamento?: PaymentMethod) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
@@ -174,7 +162,6 @@ export async function batchMarkAsPago(transactionIds: string[], formaPagamento?:
   });
 
   revalidatePath("/financeiro");
-  revalidatePath("/financeiro/pagamento-em-lote");
   for (const workId of new Set(transactions.map((t) => t.workId).filter((id): id is string => !!id))) {
     revalidatePath(`/obras/${workId}/financeiro`);
   }

@@ -1,14 +1,24 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionRowActions } from "@/components/financeiro/transaction-row-actions";
+import { batchMarkAsPago } from "@/server/actions/financeiro";
 import {
   TRANSACTION_STATUS_BADGE,
   TRANSACTION_STATUS_LABELS,
   TRANSACTION_TYPE_LABELS,
+  PAYMENT_METHOD_LABELS,
   formatCurrencyBRL,
   formatDateBR,
 } from "@/lib/status-labels";
+import type { PaymentMethod } from "@/generated/prisma/enums";
 
 type TransactionRow = {
   id: string;
@@ -27,11 +37,71 @@ export function TransactionsTable({
   transactions,
   showObraColumn = true,
   canEdit = true,
+  selectable = false,
 }: {
   transactions: TransactionRow[];
   showObraColumn?: boolean;
   canEdit?: boolean;
+  selectable?: boolean;
 }) {
+  const router = useRouter();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [formaPagamento, setFormaPagamento] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const showSelection = selectable && canEdit;
+  const eligibleIds = useMemo(
+    () => transactions.filter((t) => t.effectiveStatus !== "PAGO").map((t) => t.id),
+    [transactions],
+  );
+  const totalSelecionado = useMemo(
+    () => transactions.filter((t) => selected.has(t.id)).reduce((sum, t) => sum + Number(t.valor), 0),
+    [transactions, selected],
+  );
+
+  useEffect(() => {
+    setSelected((prev) => {
+      const currentIds = new Set(transactions.map((t) => t.id));
+      const next = new Set(Array.from(prev).filter((id) => currentIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [transactions]);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) =>
+      eligibleIds.length > 0 && eligibleIds.every((id) => prev.has(id)) ? new Set() : new Set(eligibleIds),
+    );
+  }
+
+  function handleConfirm() {
+    const ids = Array.from(selected);
+    const confirmed = window.confirm(
+      `Marcar ${ids.length} conta(s) como pagas, totalizando ${formatCurrencyBRL(totalSelecionado)}?`,
+    );
+    if (!confirmed) return;
+
+    startTransition(async () => {
+      try {
+        await batchMarkAsPago(ids, (formaPagamento as PaymentMethod) || undefined);
+        toast.success("Contas marcadas como pagas.");
+        setSelected(new Set());
+        setFormaPagamento("");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível confirmar o pagamento.");
+      }
+    });
+  }
+
   if (transactions.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -41,78 +111,119 @@ export function TransactionsTable({
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Descrição</TableHead>
-            {showObraColumn ? <TableHead>Obra</TableHead> : null}
-            <TableHead>Tipo</TableHead>
-            <TableHead>Categoria</TableHead>
-            <TableHead>Favorecido</TableHead>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Valor</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.map((t) => (
-            <TableRow key={t.id}>
-              <TableCell>
-                {canEdit ? (
-                  <Link
-                    href={`/financeiro/${t.id}/editar`}
-                    title={t.descricao}
-                    className="block max-w-[220px] truncate font-medium hover:underline"
-                  >
-                    {t.descricao}
-                  </Link>
-                ) : (
-                  <span title={t.descricao} className="block max-w-[220px] truncate font-medium">
-                    {t.descricao}
-                  </span>
-                )}
-              </TableCell>
-              {showObraColumn ? (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {showSelection ? (
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    checked={eligibleIds.length > 0 && eligibleIds.every((id) => selected.has(id))}
+                    onChange={toggleAll}
+                    disabled={eligibleIds.length === 0}
+                  />
+                </TableHead>
+              ) : null}
+              <TableHead>Descrição</TableHead>
+              {showObraColumn ? <TableHead>Obra</TableHead> : null}
+              <TableHead>Tipo</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead>Favorecido</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead>Valor</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {transactions.map((t) => (
+              <TableRow key={t.id}>
+                {showSelection ? (
+                  <TableCell>
+                    {t.effectiveStatus !== "PAGO" ? (
+                      <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
+                    ) : null}
+                  </TableCell>
+                ) : null}
                 <TableCell>
-                  {t.work ? (
-                    <Link href={`/obras/${t.workId}`} className="hover:underline">
-                      {t.work.codigo}
+                  {canEdit ? (
+                    <Link
+                      href={`/financeiro/${t.id}/editar`}
+                      title={t.descricao}
+                      className="block max-w-[220px] truncate font-medium hover:underline"
+                    >
+                      {t.descricao}
                     </Link>
                   ) : (
-                    "Despesa geral"
+                    <span title={t.descricao} className="block max-w-[220px] truncate font-medium">
+                      {t.descricao}
+                    </span>
                   )}
                 </TableCell>
-              ) : null}
-              <TableCell>{TRANSACTION_TYPE_LABELS[t.tipo]}</TableCell>
-              <TableCell>{t.categoria.nome}</TableCell>
-              <TableCell>{t.favorecidoNome}</TableCell>
-              <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
-              <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
-              <TableCell>
-                <Badge
-                  variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}
-                  className={t.effectiveStatus === "VENCIDO" ? "animate-pulse-subtle" : undefined}
-                >
-                  {TRANSACTION_STATUS_LABELS[t.effectiveStatus]}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {canEdit ? (
-                  <TransactionRowActions
-                    transactionId={t.id}
-                    workId={t.workId}
-                    status={t.effectiveStatus}
-                    valor={Number(t.valor)}
-                    dataVencimento={t.dataVencimento.toISOString().slice(0, 10)}
-                  />
+                {showObraColumn ? (
+                  <TableCell>
+                    {t.work ? (
+                      <Link href={`/obras/${t.workId}`} className="hover:underline">
+                        {t.work.codigo}
+                      </Link>
+                    ) : (
+                      "Despesa geral"
+                    )}
+                  </TableCell>
                 ) : null}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                <TableCell>{TRANSACTION_TYPE_LABELS[t.tipo]}</TableCell>
+                <TableCell>{t.categoria.nome}</TableCell>
+                <TableCell>{t.favorecidoNome}</TableCell>
+                <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
+                <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}
+                    className={t.effectiveStatus === "VENCIDO" ? "animate-pulse-subtle" : undefined}
+                  >
+                    {TRANSACTION_STATUS_LABELS[t.effectiveStatus]}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {canEdit ? (
+                    <TransactionRowActions
+                      transactionId={t.id}
+                      workId={t.workId}
+                      status={t.effectiveStatus}
+                      valor={Number(t.valor)}
+                      dataVencimento={t.dataVencimento.toISOString().slice(0, 10)}
+                    />
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {showSelection && selected.size > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-muted/30 p-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Selecionado ({selected.size})</p>
+            <p className="text-lg font-heading font-semibold text-primary">{formatCurrencyBRL(totalSelecionado)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <NativeSelect className="w-auto" value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)}>
+              <option value="">Forma de pagamento (opcional)</option>
+              {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+            <Button disabled={isPending} onClick={handleConfirm}>
+              Confirmar pagamento
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
