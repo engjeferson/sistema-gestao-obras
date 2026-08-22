@@ -167,11 +167,18 @@ export async function getIncomingNFeXml(
         resumo,
       };
     }
-    if (retorno.cStat !== "138" || retorno.docs.length === 0) {
-      return { error: `SEFAZ não retornou o documento completo (${retorno.cStat}: ${retorno.xMotivo}).`, resumo };
+    const doc = retorno.docs[0];
+    const documentoCompleto = doc && (doc.schema.startsWith("procNFe") || doc.schema.startsWith("nfeProc"));
+    if (retorno.cStat !== "138" || !documentoCompleto) {
+      return {
+        error: documentoCompleto === false && doc
+          ? "A SEFAZ ainda só disponibilizou o resumo desta nota, sem os itens. Tente novamente mais tarde."
+          : `SEFAZ não retornou o documento completo (${retorno.cStat}: ${retorno.xMotivo}).`,
+        resumo,
+      };
     }
 
-    const xml = retorno.docs[0].xml;
+    const xml = doc.xml;
     await prisma.incomingNFe.update({ where: { id }, data: { xmlCompleto: xml } });
     return { xml, resumo };
   } catch (error) {
