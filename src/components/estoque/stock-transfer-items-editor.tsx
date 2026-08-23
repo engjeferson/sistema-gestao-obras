@@ -3,7 +3,7 @@
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Combobox } from "@/components/ui/combobox";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { StockTransferItemValues } from "@/lib/validations/estoque";
 
@@ -32,6 +32,16 @@ export function StockTransferItemsEditor({
     onChange(items.filter((_, i) => i !== index));
   }
 
+  const materiaisComSaldo = materials.filter((m) => (saldosOrigem[m.id]?.saldo ?? 0) > 0);
+
+  function optionsFor(currentMaterialId: string) {
+    if (currentMaterialId && !materiaisComSaldo.some((m) => m.id === currentMaterialId)) {
+      const atual = materials.find((m) => m.id === currentMaterialId);
+      if (atual) return [atual, ...materiaisComSaldo];
+    }
+    return materiaisComSaldo;
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto rounded-lg border">
@@ -52,20 +62,14 @@ export function StockTransferItemsEditor({
               return (
                 <tr key={index} className="border-t">
                   <td className="p-2">
-                    <NativeSelect
+                    <Combobox
                       value={item.materialId}
-                      onChange={(e) => updateItem(index, { materialId: e.target.value })}
-                      required
-                    >
-                      <option value="" disabled>
-                        Selecione o material
-                      </option>
-                      {materials.map((material) => (
-                        <option key={material.id} value={material.id}>
-                          {material.nome}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                      onChange={(materialId) => updateItem(index, { materialId })}
+                      options={optionsFor(item.materialId).map((m) => ({ value: m.id, label: m.nome }))}
+                      placeholder="Buscar material..."
+                      emptyMessage="Nenhum material com saldo nesta origem."
+                      className="min-w-[16rem]"
+                    />
                   </td>
                   <td className={`p-2 whitespace-nowrap ${excedeSaldo ? "text-destructive" : "text-muted-foreground"}`}>
                     {item.materialId ? info.saldo : "—"}

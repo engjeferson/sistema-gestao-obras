@@ -10,7 +10,13 @@ const TIPO_OPTIONS: { value: string; label: string }[] = [
   { value: "TRANSFERENCIA", label: "Transferência" },
 ];
 
-export function StockMovementsFilters({ suppliers }: { suppliers: { id: string; nome: string }[] }) {
+export function StockMovementsFilters({
+  suppliers,
+  stages,
+}: {
+  suppliers: { id: string; nome: string }[];
+  stages: { id: string; label: string }[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -49,6 +55,18 @@ export function StockMovementsFilters({ suppliers }: { suppliers: { id: string; 
         {suppliers.map((supplier) => (
           <option key={supplier.id} value={supplier.id}>
             {supplier.nome}
+          </option>
+        ))}
+      </NativeSelect>
+      <NativeSelect
+        className="w-auto"
+        defaultValue={searchParams.get("stageId") ?? ""}
+        onChange={(e) => setParam("stageId", e.target.value)}
+      >
+        <option value="">Todas as etapas</option>
+        {stages.map((stage) => (
+          <option key={stage.id} value={stage.id}>
+            {stage.label}
           </option>
         ))}
       </NativeSelect>

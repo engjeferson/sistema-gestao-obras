@@ -66,6 +66,7 @@ export async function getStockBalances(workId?: string | null) {
 export async function listStockMovements(filters?: {
   workId?: string | null;
   materialId?: string;
+  stageId?: string;
   tipo?: "ENTRADA" | "SAIDA" | "TRANSFERENCIA";
   supplierId?: string;
   dataInicio?: string;
@@ -75,6 +76,7 @@ export async function listStockMovements(filters?: {
   return prisma.stockMovement.findMany({
     where: {
       materialId: filters?.materialId,
+      stageId: filters?.stageId,
       tipo: filters?.tipo,
       OR: filters?.workId !== undefined ? [{ origemWorkId: local }, { destinoWorkId: local }] : undefined,
       invoiceItem: filters?.supplierId ? { invoice: { supplierId: filters.supplierId } } : undefined,
