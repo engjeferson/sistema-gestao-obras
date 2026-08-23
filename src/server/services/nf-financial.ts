@@ -10,15 +10,11 @@ async function findOrCreateSupplierId(nome: string) {
   return created.id;
 }
 
-async function findOrCreateMaterialId(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  nome: string,
-  unidadePadrao: InvoiceFormValues["items"][number]["unidade"],
-) {
+async function findOrCreateMaterialId(nome: string, unidadePadrao: InvoiceFormValues["items"][number]["unidade"]) {
   const trimmed = nome.trim();
-  const existing = await tx.material.findUnique({ where: { nome: trimmed } });
+  const existing = await prisma.material.findUnique({ where: { nome: trimmed } });
   if (existing) return existing.id;
-  const created = await tx.material.create({ data: { nome: trimmed, unidadePadrao } });
+  const created = await prisma.material.create({ data: { nome: trimmed, unidadePadrao } });
   return created.id;
 }
 
@@ -33,6 +29,14 @@ export async function createInvoiceWithFinancialEntry(
   const valorTotal = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
   const stageId = data.workId ? data.stageId || null : null;
   const taskId = data.workId ? data.taskId || null : null;
+
+  // Resolve materiais antes da transação: cada lookup/criação é uma
+  // ida-e-volta ao Neon (driver HTTP), e fazer isso dentro da transação
+  // interativa estourava o timeout padrão de 5s em notas com vários itens.
+  const materialIds: string[] = [];
+  for (const item of data.items) {
+    materialIds.push(await findOrCreateMaterialId(item.material, item.unidade));
+  }
 
   return prisma.$transaction(async (tx) => {
     const invoice = await tx.invoice.create({
@@ -52,8 +56,8 @@ export async function createInvoiceWithFinancialEntry(
       },
     });
 
-    for (const item of data.items) {
-      const materialId = await findOrCreateMaterialId(tx, item.material, item.unidade);
+    for (const [index, item] of data.items.entries()) {
+      const materialId = materialIds[index];
       const invoiceItem = await tx.invoiceItem.create({
         data: {
           invoiceId: invoice.id,
@@ -179,5 +183,5 @@ export async function createInvoiceWithFinancialEntry(
       },
     });
     return { invoice, transactions: [transaction] };
-  });
+  }, { timeout: 20000 });
 }
