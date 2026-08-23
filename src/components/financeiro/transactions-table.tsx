@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,6 +60,7 @@ export function TransactionsTable({
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [materiaisDe, setMateriaisDe] = useState<TransactionRow | null>(null);
+  const [confirmBatchOpen, setConfirmBatchOpen] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -95,19 +97,15 @@ export function TransactionsTable({
     );
   }
 
-  function handleConfirm() {
+  function executeBatchPayment() {
     const ids = Array.from(selected);
-    const confirmed = window.confirm(
-      `Marcar ${ids.length} conta(s) como pagas, totalizando ${formatCurrencyBRL(totalSelecionado)}?`,
-    );
-    if (!confirmed) return;
-
     startTransition(async () => {
       try {
         await batchMarkAsPago(ids, (formaPagamento as PaymentMethod) || undefined);
         toast.success("Contas marcadas como pagas.");
         setSelected(new Set());
         setFormaPagamento("");
+        setConfirmBatchOpen(false);
         router.refresh();
       } catch {
         toast.error("Não foi possível confirmar o pagamento.");
@@ -275,12 +273,22 @@ export function TransactionsTable({
                 </option>
               ))}
             </NativeSelect>
-            <Button disabled={isPending} onClick={handleConfirm}>
+            <Button disabled={isPending} onClick={() => setConfirmBatchOpen(true)}>
               Confirmar pagamento
             </Button>
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmBatchOpen}
+        onOpenChange={setConfirmBatchOpen}
+        title="Confirmar pagamento em lote"
+        description={`Marcar ${selected.size} conta(s) como pagas, totalizando ${formatCurrencyBRL(totalSelecionado)}?`}
+        confirmLabel="Confirmar pagamento"
+        onConfirm={executeBatchPayment}
+        isPending={isPending}
+      />
     </div>
   );
 }
