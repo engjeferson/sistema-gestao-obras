@@ -9,23 +9,59 @@ import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefa
 
 const MAX_LOTES_POR_SYNC = 10;
 const SYNC_COOLDOWN_MINUTOS = 65;
+const MAX_COMPLETAR_POR_SYNC = 20;
+
+// Notas "Nova" só contam/aparecem quando o XML completo (com itens) já está
+// disponível — enquanto a SEFAZ só libera o resumo, ficam escondidas em vez
+// de aparecer prontas pra lançar sem os materiais.
+const FILTRO_PRONTAS_PARA_REVISAO = {
+  OR: [{ status: { not: "PENDENTE" as const } }, { xmlCompleto: { not: null } }],
+};
+
+/**
+ * Tenta buscar o XML completo (com itens) pras notas "Nova" que ainda só têm
+ * o resumo — a SEFAZ às vezes libera o documento completo depois de algum
+ * tempo, mesmo sem nenhuma ação nossa. Processa um lote limitado por
+ * chamada, e falhas isoladas não interrompem o resto.
+ */
+async function completarPendentes(cnpj: string, uf: string) {
+  const pendentes = await prisma.incomingNFe.findMany({
+    where: { status: "PENDENTE", xmlCompleto: null },
+    take: MAX_COMPLETAR_POR_SYNC,
+    select: { id: true, chaveAcesso: true },
+  });
+
+  for (const nota of pendentes) {
+    try {
+      const retorno = await buscarNFeCompletaPorChave({ cnpj, uf, chaveAcesso: nota.chaveAcesso });
+      const doc = retorno.docs[0];
+      const documentoCompleto = doc && (doc.schema.startsWith("procNFe") || doc.schema.startsWith("nfeProc"));
+      if (retorno.cStat === "138" && documentoCompleto) {
+        await prisma.incomingNFe.update({ where: { id: nota.id }, data: { xmlCompleto: doc.xml } });
+      }
+    } catch {
+      // Best-effort — segue pras próximas notas mesmo se uma falhar.
+    }
+  }
+}
 
 export async function listIncomingNFes(page = 1, pageSize = 20) {
   const [items, totalCount] = await Promise.all([
     prisma.incomingNFe.findMany({
+      where: FILTRO_PRONTAS_PARA_REVISAO,
       orderBy: { dataEmissao: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: { invoice: { include: { work: true } } },
     }),
-    prisma.incomingNFe.count(),
+    prisma.incomingNFe.count({ where: FILTRO_PRONTAS_PARA_REVISAO }),
   ]);
 
   return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)), page, pageSize };
 }
 
 export async function countPendingIncomingNFes() {
-  return prisma.incomingNFe.count({ where: { status: "PENDENTE" } });
+  return prisma.incomingNFe.count({ where: { status: "PENDENTE", xmlCompleto: { not: null } } });
 }
 
 type SyncResult =
@@ -122,6 +158,8 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
       message: error instanceof Error ? error.message : "Não foi possível consultar a SEFAZ.",
     };
   }
+
+  await completarPendentes(company.cnpj, company.uf);
 
   revalidatePath("/notas-fiscais/radar");
   return { status: "ok", novos };
