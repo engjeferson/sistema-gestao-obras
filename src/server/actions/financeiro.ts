@@ -112,7 +112,15 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
   const [transactions, totalCount] = await Promise.all([
     prisma.financialTransaction.findMany({
       where,
-      include: { work: true, categoria: true },
+      include: {
+        work: true,
+        categoria: true,
+        invoice: {
+          select: {
+            items: { select: { material: true, quantidade: true, unidade: true, valorUnitario: true, valorTotal: true } },
+          },
+        },
+      },
       orderBy: { dataVencimento: "asc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -120,7 +128,21 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
     prisma.financialTransaction.count({ where }),
   ]);
 
-  const items = transactions.map((t) => ({ ...t, effectiveStatus: t.status as TransactionStatus }));
+  const items = transactions.map((t) => ({
+    ...t,
+    effectiveStatus: t.status as TransactionStatus,
+    invoice: t.invoice
+      ? {
+          items: t.invoice.items.map((item) => ({
+            material: item.material,
+            quantidade: Number(item.quantidade),
+            unidade: item.unidade,
+            valorUnitario: Number(item.valorUnitario),
+            valorTotal: Number(item.valorTotal),
+          })),
+        }
+      : null,
+  }));
 
   return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), page };
 }

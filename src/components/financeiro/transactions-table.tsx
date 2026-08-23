@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TransactionRowActions } from "@/components/financeiro/transaction-row-actions";
@@ -15,10 +17,19 @@ import {
   TRANSACTION_STATUS_LABELS,
   TRANSACTION_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
+  UNIT_LABELS,
   formatCurrencyBRL,
   formatDateBR,
 } from "@/lib/status-labels";
 import type { PaymentMethod } from "@/generated/prisma/enums";
+
+type InvoiceItemRow = {
+  material: string;
+  quantidade: number;
+  unidade: string;
+  valorUnitario: number;
+  valorTotal: number;
+};
 
 type TransactionRow = {
   id: string;
@@ -31,6 +42,7 @@ type TransactionRow = {
   effectiveStatus: string;
   categoria: { nome: string };
   work: { nome: string; codigo: string } | null;
+  invoice: { items: InvoiceItemRow[] } | null;
 };
 
 export function TransactionsTable({
@@ -46,6 +58,7 @@ export function TransactionsTable({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [materiaisDe, setMateriaisDe] = useState<TransactionRow | null>(null);
   const [formaPagamento, setFormaPagamento] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -60,8 +73,8 @@ export function TransactionsTable({
   );
 
   useEffect(() => {
+    const currentIds = new Set(transactions.map((t) => t.id));
     setSelected((prev) => {
-      const currentIds = new Set(transactions.map((t) => t.id));
       const next = new Set(Array.from(prev).filter((id) => currentIds.has(id)));
       return next.size === prev.size ? prev : next;
     });
@@ -116,6 +129,7 @@ export function TransactionsTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               {showSelection ? (
                 <TableHead className="w-10">
                   <input
@@ -138,8 +152,22 @@ export function TransactionsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((t) => (
+            {transactions.map((t) => {
+              const items = t.invoice?.items ?? [];
+              return (
               <TableRow key={t.id}>
+                <TableCell>
+                  {items.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setMateriaisDe(t)}
+                      className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Ver materiais"
+                    >
+                      <Layers className="size-4" />
+                    </button>
+                  ) : null}
+                </TableCell>
                 {showSelection ? (
                   <TableCell>
                     {t.effectiveStatus !== "PAGO" ? (
@@ -198,10 +226,39 @@ export function TransactionsTable({
                   ) : null}
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={materiaisDe !== null} onOpenChange={(open) => !open && setMateriaisDe(null)}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Materiais — {materiaisDe?.descricao}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {(materiaisDe?.invoice?.items ?? []).map((item, index) => (
+                  <tr key={index} className="border-b border-border/50 last:border-0">
+                    <td className="py-1.5 pr-4 whitespace-nowrap">{item.material}</td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap text-muted-foreground">
+                      {item.quantidade} {UNIT_LABELS[item.unidade] ?? item.unidade}
+                    </td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap text-muted-foreground">
+                      {formatCurrencyBRL(item.valorUnitario)}/un
+                    </td>
+                    <td className="py-1.5 text-right font-medium whitespace-nowrap">
+                      {formatCurrencyBRL(item.valorTotal)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {showSelection && selected.size > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-muted/30 p-4">
