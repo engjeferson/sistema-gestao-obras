@@ -417,6 +417,7 @@ model StockMovement {
   origemWorkId   String?
   destinoWorkId  String?
   stageId        String?
+  taskId         String?
   quantidade     Decimal           @db.Decimal(12, 3)
   valorUnitario  Decimal?          @db.Decimal(14, 2)
   data           DateTime          @db.Date
@@ -430,6 +431,7 @@ model StockMovement {
   origemWork  Work?          @relation("StockMovementOrigem", fields: [origemWorkId], references: [id])
   destinoWork Work?          @relation("StockMovementDestino", fields: [destinoWorkId], references: [id])
   stage       PlanningStage? @relation(fields: [stageId], references: [id])
+  task        PlanningTask?  @relation(fields: [taskId], references: [id])
   invoiceItem InvoiceItem?   @relation(fields: [invoiceItemId], references: [id])
   createdBy   User           @relation(fields: [createdById], references: [id])
 
@@ -437,6 +439,7 @@ model StockMovement {
   @@index([origemWorkId])
   @@index([destinoWorkId])
   @@index([stageId])
+  @@index([taskId])
   @@index([transferGrupoId])
 }
 
@@ -538,6 +541,7 @@ model PlanningTask {
   budgetItems           BudgetItem[]
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
+  stockMovements        StockMovement[]
   predecessors          PlanningDependency[]    @relation("SuccessorLinks")
   successors            PlanningDependency[]    @relation("PredecessorLinks")
 

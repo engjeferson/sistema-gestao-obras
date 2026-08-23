@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createStockSaida } from "@/server/actions/estoque";
 
-type StageOption = { id: string; codigo: string | null; nome: string };
+type TaskOption = { id: string; codigo: string | null; nome: string };
+type StageOption = { id: string; codigo: string | null; nome: string; tasks: TaskOption[] };
 
 export function StockSaidaForm({
   materials,
@@ -26,8 +27,10 @@ export function StockSaidaForm({
   const [errorMessage, formAction, isPending] = useActionState(createStockSaida, undefined);
   const [origemWorkId, setOrigemWorkId] = useState(defaultWorkId ?? "");
   const [materialId, setMaterialId] = useState("");
+  const [stageId, setStageId] = useState("");
   const saldoAtual = balances[origemWorkId || "geral"]?.[materialId]?.saldo ?? 0;
   const stagesForWork = stagesByWork[origemWorkId] ?? [];
+  const tasksForStage = stagesForWork.find((s) => s.id === stageId)?.tasks ?? [];
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -73,12 +76,32 @@ export function StockSaidaForm({
         {origemWorkId ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="stageId">Etapa</Label>
-            <NativeSelect id="stageId" name="stageId" defaultValue="" key={origemWorkId}>
+            <NativeSelect
+              id="stageId"
+              name="stageId"
+              value={stageId}
+              onChange={(e) => setStageId(e.target.value)}
+              key={origemWorkId}
+            >
               <option value="">—</option>
               {stagesForWork.map((stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.codigo ? `${stage.codigo} — ` : ""}
                   {stage.nome}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        ) : null}
+        {stageId && tasksForStage.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="taskId">Atividade</Label>
+            <NativeSelect id="taskId" name="taskId" defaultValue="" key={stageId}>
+              <option value="">—</option>
+              {tasksForStage.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.codigo ? `${task.codigo} — ` : ""}
+                  {task.nome}
                 </option>
               ))}
             </NativeSelect>

@@ -203,6 +203,7 @@ export async function createStockEntrada(_prevState: string | undefined, formDat
     materialId: formData.get("materialId"),
     destinoWorkId: formData.get("destinoWorkId") ?? undefined,
     stageId: formData.get("stageId") ?? undefined,
+    taskId: formData.get("taskId") ?? undefined,
     quantidade: formData.get("quantidade"),
     valorUnitario: formData.get("valorUnitario") || undefined,
     data: formData.get("data"),
@@ -219,6 +220,7 @@ export async function createStockEntrada(_prevState: string | undefined, formDat
       tipo: "ENTRADA",
       destinoWorkId: data.destinoWorkId || null,
       stageId: data.destinoWorkId ? data.stageId || null : null,
+      taskId: data.destinoWorkId ? data.taskId || null : null,
       quantidade: data.quantidade,
       valorUnitario: data.valorUnitario ?? null,
       data: new Date(data.data),
@@ -239,6 +241,7 @@ export async function createStockSaida(_prevState: string | undefined, formData:
     materialId: formData.get("materialId"),
     origemWorkId: formData.get("origemWorkId") ?? undefined,
     stageId: formData.get("stageId") ?? undefined,
+    taskId: formData.get("taskId") ?? undefined,
     quantidade: formData.get("quantidade"),
     valorUnitario: formData.get("valorUnitario") || undefined,
     data: formData.get("data"),
@@ -261,6 +264,7 @@ export async function createStockSaida(_prevState: string | undefined, formData:
       tipo: "SAIDA",
       origemWorkId: origem,
       stageId: origem ? data.stageId || null : null,
+      taskId: origem ? data.taskId || null : null,
       quantidade: data.quantidade,
       valorUnitario: data.valorUnitario ?? null,
       data: new Date(data.data),
@@ -288,6 +292,7 @@ export async function createStockTransferencia(_prevState: string | undefined, f
     origemWorkId: formData.get("origemWorkId") ?? undefined,
     destinoWorkId: formData.get("destinoWorkId") ?? undefined,
     stageId: formData.get("stageId") ?? undefined,
+    taskId: formData.get("taskId") ?? undefined,
     data: formData.get("data"),
     motivo: formData.get("motivo") ?? undefined,
     itens: itensParsed,
@@ -299,6 +304,7 @@ export async function createStockTransferencia(_prevState: string | undefined, f
   const origem = data.origemWorkId || null;
   const destino = data.destinoWorkId || null;
   const stageId = destino ? data.stageId || null : null;
+  const taskId = destino ? data.taskId || null : null;
 
   const custosMedios = new Map<string, number>();
   for (const item of data.itens) {
@@ -319,6 +325,7 @@ export async function createStockTransferencia(_prevState: string | undefined, f
           origemWorkId: origem,
           destinoWorkId: destino,
           stageId,
+          taskId,
           quantidade: item.quantidade,
           // Mantém o mesmo custo já registrado na origem — não se cria valor na transferência.
           valorUnitario: custosMedios.get(item.materialId) ?? null,
@@ -333,4 +340,139 @@ export async function createStockTransferencia(_prevState: string | undefined, f
 
   revalidatePath("/estoque");
   redirect("/estoque");
+}
+
+export type AppropriationMaterial = {
+  materialId: string;
+  nome: string;
+  unidade: string | null;
+  categoria: string | null;
+  quantidade: number;
+  valor: number;
+};
+
+export type AppropriationNode = {
+  id: string;
+  tipo: "stage" | "task";
+  codigo: string | null;
+  nome: string;
+  ordem: number;
+  parentId: string | null;
+  valor: number;
+  materiaisDiretos: AppropriationMaterial[];
+  children: AppropriationNode[];
+};
+
+/**
+ * Árvore de apropriação de material por etapa/subetapa/atividade de uma obra.
+ * "Valor apropriado" é uma soma cumulativa (não um saldo líquido): toda
+ * movimentação com stageId/taskId preenchido representa material alocado
+ * àquele nó (entrada direto lá, saída de uso, ou transferência com destino
+ * lá) — nenhum dos 3 formulários usa esse campo pra representar remoção.
+ */
+export async function getStockAppropriationTree(workId: string): Promise<AppropriationNode[]> {
+  const [stages, movements] = await Promise.all([
+    prisma.planningStage.findMany({
+      where: { workId },
+      include: { tasks: { orderBy: { ordem: "asc" } } },
+      orderBy: { ordem: "asc" },
+    }),
+    prisma.stockMovement.findMany({
+      where: {
+        OR: [{ origemWorkId: workId }, { destinoWorkId: workId }],
+        NOT: { stageId: null, taskId: null },
+      },
+      select: {
+        materialId: true,
+        stageId: true,
+        taskId: true,
+        quantidade: true,
+        valorUnitario: true,
+        material: { select: { nome: true, unidadePadrao: true, categoria: true } },
+      },
+    }),
+  ]);
+
+  type Mov = (typeof movements)[number];
+
+  function aggregateMateriais(movs: Mov[]): AppropriationMaterial[] {
+    const byMaterial = new Map<string, AppropriationMaterial>();
+    for (const m of movs) {
+      const existing = byMaterial.get(m.materialId) ?? {
+        materialId: m.materialId,
+        nome: m.material.nome,
+        unidade: m.material.unidadePadrao,
+        categoria: m.material.categoria,
+        quantidade: 0,
+        valor: 0,
+      };
+      existing.quantidade += Number(m.quantidade);
+      existing.valor += Number(m.quantidade) * Number(m.valorUnitario ?? 0);
+      byMaterial.set(m.materialId, existing);
+    }
+    return Array.from(byMaterial.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+
+  const movementsByStage = new Map<string, Mov[]>();
+  const movementsByTask = new Map<string, Mov[]>();
+  for (const m of movements) {
+    if (m.taskId) {
+      const list = movementsByTask.get(m.taskId) ?? [];
+      list.push(m);
+      movementsByTask.set(m.taskId, list);
+    } else if (m.stageId) {
+      const list = movementsByStage.get(m.stageId) ?? [];
+      list.push(m);
+      movementsByStage.set(m.stageId, list);
+    }
+  }
+
+  const nodeById = new Map<string, AppropriationNode>();
+  for (const stage of stages) {
+    const taskNodes: AppropriationNode[] = stage.tasks.map((task) => ({
+      id: task.id,
+      tipo: "task",
+      codigo: task.codigo,
+      nome: task.nome,
+      ordem: task.ordem,
+      parentId: stage.id,
+      valor: 0,
+      materiaisDiretos: aggregateMateriais(movementsByTask.get(task.id) ?? []),
+      children: [],
+    }));
+
+    nodeById.set(stage.id, {
+      id: stage.id,
+      tipo: "stage",
+      codigo: stage.codigo,
+      nome: stage.nome,
+      ordem: stage.ordem,
+      parentId: stage.parentId,
+      valor: 0,
+      materiaisDiretos: aggregateMateriais(movementsByStage.get(stage.id) ?? []),
+      children: taskNodes,
+    });
+  }
+
+  const roots: AppropriationNode[] = [];
+  for (const node of nodeById.values()) {
+    if (node.tipo === "stage" && node.parentId && nodeById.has(node.parentId)) {
+      nodeById.get(node.parentId)!.children.push(node);
+    } else if (node.tipo === "stage") {
+      roots.push(node);
+    }
+  }
+
+  function finalize(node: AppropriationNode): number {
+    node.children.sort((a, b) => a.ordem - b.ordem);
+    const ownValue = node.materiaisDiretos.reduce((sum, m) => sum + m.valor, 0);
+    const childrenValue = node.children.reduce((sum, child) => sum + finalize(child), 0);
+    node.valor = ownValue + childrenValue;
+    return node.valor;
+  }
+
+  roots.sort((a, b) => a.ordem - b.ordem);
+  for (const root of roots) finalize(root);
+
+  return roots;
 }

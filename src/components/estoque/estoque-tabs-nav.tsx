@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/estoque", label: "Saldo atual" },
   { href: "/estoque/movimentacoes", label: "Movimentações" },
+  { href: "/estoque/apropriacao", label: "Apropriação" },
 ];
 
 export function EstoqueTabsNav() {
