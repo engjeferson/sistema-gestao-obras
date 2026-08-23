@@ -1,4 +1,4 @@
-import { listIncomingNFes, countPendingIncomingNFes } from "@/server/actions/sefaz-radar";
+import { listIncomingNFes, countPendingIncomingNFes, autoSyncIncomingNFesIfDue } from "@/server/actions/sefaz-radar";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -11,6 +11,8 @@ export default async function RadarNFePage({
   const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
   const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
+
+  await autoSyncIncomingNFesIfDue();
 
   const [result, pendentes] = await Promise.all([
     listIncomingNFes(page, pageSize),

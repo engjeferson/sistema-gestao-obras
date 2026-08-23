@@ -8,6 +8,7 @@ import { buscarLoteDistribuicao, buscarNFeCompletaPorChave } from "@/lib/sefaz/d
 import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefaz/parse-res-nfe";
 
 const MAX_LOTES_POR_SYNC = 10;
+const SYNC_COOLDOWN_MINUTOS = 65;
 
 export async function listIncomingNFes(page = 1, pageSize = 20) {
   const [items, totalCount] = await Promise.all([
@@ -27,19 +28,38 @@ export async function countPendingIncomingNFes() {
   return prisma.incomingNFe.count({ where: { status: "PENDENTE" } });
 }
 
+type SyncResult =
+  | { status: "ok"; novos: number }
+  | { status: "skipped"; minutosRestantes: number }
+  | { status: "error"; message: string };
+
 /**
  * Busca lotes novos na SEFAZ a partir do último NSU processado, até esgotar
  * (ultNSU === maxNSU) ou atingir o limite de lotes por chamada — Distribuição
  * DFe devolve no máximo ~50 documentos por lote.
+ *
+ * Respeita um cooldown local (SYNC_COOLDOWN_MINUTOS) espelhando a janela de
+ * 1h que a própria SEFAZ aplica por CNPJ quando não há documentos novos
+ * (erro 656 — "Consumo Indevido"). Isso protege tanto o botão manual quanto
+ * a sincronização automática de disparar consultas em excesso.
  */
-export async function syncIncomingNFes(): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-
+async function runIncomingNFeSync(): Promise<SyncResult> {
   const company = await prisma.companySettings.findFirst();
   if (!company?.cnpj || !company?.uf) {
-    return "Cadastre o CNPJ e a UF da empresa em Configurações antes de sincronizar.";
+    return { status: "error", message: "Cadastre o CNPJ e a UF da empresa em Configurações antes de sincronizar." };
   }
+
+  if (company.sefazUltimaTentativaEm) {
+    const minutosDesdeUltima = (Date.now() - company.sefazUltimaTentativaEm.getTime()) / 60000;
+    if (minutosDesdeUltima < SYNC_COOLDOWN_MINUTOS) {
+      return { status: "skipped", minutosRestantes: Math.ceil(SYNC_COOLDOWN_MINUTOS - minutosDesdeUltima) };
+    }
+  }
+
+  await prisma.companySettings.update({
+    where: { id: company.id },
+    data: { sefazUltimaTentativaEm: new Date() },
+  });
 
   let ultNsu = company.sefazUltimoNsu ?? "0";
   let novos = 0;
@@ -49,7 +69,7 @@ export async function syncIncomingNFes(): Promise<string | undefined> {
       const retorno = await buscarLoteDistribuicao({ cnpj: company.cnpj, uf: company.uf, ultNsu });
 
       if (retorno.cStat !== "138" && retorno.cStat !== "137") {
-        return `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}`;
+        return { status: "error", message: `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}` };
       }
 
       for (const doc of retorno.docs) {
@@ -97,11 +117,37 @@ export async function syncIncomingNFes(): Promise<string | undefined> {
       ultNsu = newUltNsu;
     }
   } catch (error) {
-    return error instanceof Error ? error.message : "Não foi possível consultar a SEFAZ.";
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "Não foi possível consultar a SEFAZ.",
+    };
   }
 
   revalidatePath("/notas-fiscais/radar");
-  return novos > 0 ? undefined : "Nenhuma nota nova encontrada.";
+  return { status: "ok", novos };
+}
+
+export async function syncIncomingNFes(): Promise<string | undefined> {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+
+  const result = await runIncomingNFeSync();
+  if (result.status === "error") return result.message;
+  if (result.status === "skipped") {
+    return `Sincronizado recentemente — tente novamente em ${result.minutosRestantes} min.`;
+  }
+  return result.novos > 0 ? undefined : "Nenhuma nota nova encontrada.";
+}
+
+/**
+ * Disparada automaticamente ao abrir a tela do Radar, para que a lista
+ * fique em dia sem depender de clique manual. Silenciosa: erros e o
+ * cooldown local são apenas ignorados, já que é uma tentativa de fundo.
+ */
+export async function autoSyncIncomingNFesIfDue(): Promise<void> {
+  const session = await auth();
+  if (!session?.user) return;
+  await runIncomingNFeSync();
 }
 
 export async function ignoreIncomingNFe(id: string) {
