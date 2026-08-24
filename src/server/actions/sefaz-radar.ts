@@ -46,16 +46,45 @@ async function completarPendentes(cnpj: string, uf: string) {
   }
 }
 
-export async function listIncomingNFes(page = 1, pageSize = 20) {
+export type IncomingNFeFiltros = {
+  status?: "PENDENTE" | "LANCADA" | "IGNORADA";
+  dataInicio?: string;
+  dataFim?: string;
+  oeVinculada?: "sim" | "nao";
+  nfeCompleta?: "sim" | "nao";
+};
+
+function buildIncomingNFeWhere(filtros: IncomingNFeFiltros) {
+  const AND: Record<string, unknown>[] = [FILTRO_PRONTAS_PARA_REVISAO];
+
+  if (filtros.status) AND.push({ status: filtros.status });
+  if (filtros.dataInicio || filtros.dataFim) {
+    AND.push({
+      dataEmissao: {
+        ...(filtros.dataInicio ? { gte: new Date(filtros.dataInicio) } : {}),
+        ...(filtros.dataFim ? { lte: new Date(filtros.dataFim) } : {}),
+      },
+    });
+  }
+  if (filtros.oeVinculada === "sim") AND.push({ invoiceId: { not: null } });
+  if (filtros.oeVinculada === "nao") AND.push({ invoiceId: null });
+  if (filtros.nfeCompleta === "sim") AND.push({ xmlCompleto: { not: null } });
+  if (filtros.nfeCompleta === "nao") AND.push({ xmlCompleto: null });
+
+  return { AND };
+}
+
+export async function listIncomingNFes(page = 1, pageSize = 20, filtros: IncomingNFeFiltros = {}) {
+  const where = buildIncomingNFeWhere(filtros);
   const [items, totalCount] = await Promise.all([
     prisma.incomingNFe.findMany({
-      where: FILTRO_PRONTAS_PARA_REVISAO,
+      where,
       orderBy: { dataEmissao: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: { invoice: { include: { work: true } } },
     }),
-    prisma.incomingNFe.count({ where: FILTRO_PRONTAS_PARA_REVISAO }),
+    prisma.incomingNFe.count({ where }),
   ]);
 
   return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)), page, pageSize };
@@ -283,11 +312,12 @@ export type NotaAguardandoManifestacao = {
   dataEmissao: Date | null;
   manifestadoEm: Date | null;
   manifestacaoErro: string | null;
+  manifestacaoTipo: string | null;
 };
 
 /**
  * Notas "Nova" ainda em resumo — escondidas da lista principal do Radar até
- * o XML completo chegar. Mostradas à parte pra permitir manifestar ciência
+ * o XML completo chegar. Mostradas à parte pra permitir manifestar
  * manualmente, o que costuma liberar o XML completo junto à SEFAZ.
  */
 export async function listNotasAguardandoManifestacao(): Promise<NotaAguardandoManifestacao[]> {
@@ -303,16 +333,25 @@ export async function listNotasAguardandoManifestacao(): Promise<NotaAguardandoM
       dataEmissao: true,
       manifestadoEm: true,
       manifestacaoErro: true,
+      manifestacaoTipo: true,
     },
   });
 }
 
+type TipoEventoManifestacao = (typeof TIPO_EVENTO_MANIFESTACAO)[keyof typeof TIPO_EVENTO_MANIFESTACAO];
+
 /**
- * Envia Ciência da Operação pra uma nota específica. Guarda o resultado
- * (sucesso ou erro cru retornado pela SEFAZ) em `manifestacaoErro` pra ficar
- * visível na tela — diferente de um toast, que some sozinho.
+ * Envia um evento de Manifestação do Destinatário (Ciência, Confirmação,
+ * Desconhecimento ou Operação não Realizada) pra uma nota específica. Guarda
+ * o resultado (sucesso ou erro cru retornado pela SEFAZ) em
+ * `manifestacaoErro` pra ficar visível na tela — diferente de um toast, que
+ * some sozinho.
  */
-export async function manifestarCienciaIncomingNFe(id: string): Promise<{ ok: boolean; message: string }> {
+export async function manifestarIncomingNFe(
+  id: string,
+  tpEvento: TipoEventoManifestacao,
+  observacao?: string,
+): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
@@ -328,7 +367,8 @@ export async function manifestarCienciaIncomingNFe(id: string): Promise<{ ok: bo
     const resultado = await enviarManifestacao({
       chaveAcesso: incoming.chaveAcesso,
       cnpjDestinatario: company.cnpj,
-      tpEvento: TIPO_EVENTO_MANIFESTACAO.CIENCIA_OPERACAO,
+      tpEvento,
+      xJust: observacao,
     });
 
     const message = `SEFAZ ${resultado.cStat}: ${resultado.xMotivo}`;
@@ -336,7 +376,9 @@ export async function manifestarCienciaIncomingNFe(id: string): Promise<{ ok: bo
 
     await prisma.incomingNFe.update({
       where: { id },
-      data: sucesso ? { manifestadoEm: new Date(), manifestacaoErro: null } : { manifestacaoErro: message },
+      data: sucesso
+        ? { manifestadoEm: new Date(), manifestacaoErro: null, manifestacaoTipo: tpEvento }
+        : { manifestacaoErro: message },
     });
     revalidatePath("/notas-fiscais/radar");
     return { ok: sucesso, message };

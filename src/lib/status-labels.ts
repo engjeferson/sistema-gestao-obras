@@ -61,6 +61,13 @@ export const PLANNING_STATUS_BADGE: Record<string, "secondary" | "success" | "wa
 
 export const FINANCIAL_CATEGORY_PLACEHOLDER = "Selecione uma categoria";
 
+export const MANIFESTACAO_TIPO_LABELS: Record<string, string> = {
+  "210200": "Confirmação da Operação",
+  "210210": "Ciência da Operação",
+  "210220": "Desconhecimento da Operação",
+  "210240": "Operação não Realizada",
+};
+
 export const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR: "Administrador",
   ENGENHEIRO: "Engenheiro",

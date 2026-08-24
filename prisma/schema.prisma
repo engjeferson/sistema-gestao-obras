@@ -168,6 +168,7 @@ model IncomingNFe {
   xmlCompleto  String?           @db.Text
   manifestadoEm DateTime?
   manifestacaoErro String?       @db.Text
+  manifestacaoTipo String?
   invoiceId    String?           @unique
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt

@@ -3,27 +3,48 @@ import {
   countPendingIncomingNFes,
   autoSyncIncomingNFesIfDue,
   listNotasAguardandoManifestacao,
+  type IncomingNFeFiltros,
 } from "@/server/actions/sefaz-radar";
+import { getCompanySettings } from "@/server/actions/empresa";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
 import { PendingManifestacaoList } from "@/components/notas-fiscais/pending-manifestacao-list";
+import { RadarFilters } from "@/components/notas-fiscais/radar-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 
 export default async function RadarNFePage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    pageSize?: string;
+    status?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    oeVinculada?: string;
+    nfeCompleta?: string;
+  }>;
 }) {
-  const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
+  const { page: pageParam, pageSize: pageSizeParam, status, dataInicio, dataFim, oeVinculada, nfeCompleta } =
+    await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
   const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
 
+  const filtros: IncomingNFeFiltros = {
+    status: status === "PENDENTE" || status === "LANCADA" || status === "IGNORADA" ? status : undefined,
+    dataInicio,
+    dataFim,
+    oeVinculada: oeVinculada === "sim" || oeVinculada === "nao" ? oeVinculada : undefined,
+    nfeCompleta: nfeCompleta === "sim" || nfeCompleta === "nao" ? nfeCompleta : undefined,
+  };
+
   await autoSyncIncomingNFesIfDue();
 
-  const [result, pendentes, aguardandoManifestacao] = await Promise.all([
-    listIncomingNFes(page, pageSize),
+  const [result, pendentes, aguardandoManifestacao, company] = await Promise.all([
+    listIncomingNFes(page, pageSize, filtros),
     countPendingIncomingNFes(),
     listNotasAguardandoManifestacao(),
+    getCompanySettings(),
   ]);
 
   const itemsOptions = result.items.map((item) => ({
@@ -60,7 +81,8 @@ export default async function RadarNFePage({
 
       <div className="p-4 md:p-6">
         <PendingManifestacaoList items={aguardandoManifestacao} />
-        <IncomingNFeTable items={itemsOptions} />
+        <RadarFilters />
+        <IncomingNFeTable items={itemsOptions} companyCnpj={company?.cnpj ?? null} />
       </div>
 
       <div className="sticky bottom-0 z-10 border-t bg-background p-4 md:p-6">

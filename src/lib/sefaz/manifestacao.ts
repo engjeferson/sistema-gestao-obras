@@ -1,18 +1,14 @@
 import { loadSefazCertPem } from "@/lib/sefaz/cert";
 import { signInfEvento } from "@/lib/sefaz/xml-sign";
 import { callRecepcaoEvento } from "@/lib/sefaz/soap-client";
+import { TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao-tipos";
+
+export { TIPO_EVENTO_MANIFESTACAO };
 
 // cOrgao=91 é o "Ambiente Nacional" — confirmado (documentação SEFAZ +
 // exemplos ACBr) como o valor correto pro webservice nacional de eventos,
 // independente da UF do destinatário.
 const C_ORGAO_AMBIENTE_NACIONAL = "91";
-
-export const TIPO_EVENTO_MANIFESTACAO = {
-  CONFIRMACAO_OPERACAO: "210200",
-  CIENCIA_OPERACAO: "210210",
-  DESCONHECIMENTO_OPERACAO: "210220",
-  OPERACAO_NAO_REALIZADA: "210240",
-} as const;
 
 const DESC_EVENTO: Record<string, string> = {
   "210200": "Confirmacao da Operacao",
@@ -33,6 +29,10 @@ function ambienteTpAmb() {
 function tag(xml: string, name: string): string | null {
   const match = xml.match(new RegExp(`<${name}[^>]*>([^<]*)</${name}>`));
   return match ? match[1] : null;
+}
+
+function escapeXml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function dhEventoAgora(): string {
@@ -61,6 +61,10 @@ export async function enviarManifestacao(params: {
   cnpjDestinatario: string;
   tpEvento: (typeof TIPO_EVENTO_MANIFESTACAO)[keyof typeof TIPO_EVENTO_MANIFESTACAO];
   nSeqEvento?: number;
+  // Exigido pela SEFAZ só quando tpEvento === OPERACAO_NAO_REALIZADA
+  // (justificativa, mín. 15 caracteres) — ignorado nos outros tipos, já
+  // que o schema de detEvento não aceita texto livre neles.
+  xJust?: string;
 }): Promise<ManifestacaoResultado> {
   const cnpj = params.cnpjDestinatario.replace(/\D/g, "");
   const nSeqEvento = params.nSeqEvento ?? 1;
@@ -68,8 +72,12 @@ export async function enviarManifestacao(params: {
   const id = `ID${params.tpEvento}${params.chaveAcesso}${nSeqEventoPad}`;
   const idLote = String(Date.now());
   const descEvento = DESC_EVENTO[params.tpEvento];
+  const xJustTag =
+    params.tpEvento === TIPO_EVENTO_MANIFESTACAO.OPERACAO_NAO_REALIZADA && params.xJust
+      ? `<xJust>${escapeXml(params.xJust)}</xJust>`
+      : "";
 
-  const infEvento = `<infEvento Id="${id}"><cOrgao>${C_ORGAO_AMBIENTE_NACIONAL}</cOrgao><tpAmb>${ambienteTpAmb()}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${params.chaveAcesso}</chNFe><dhEvento>${dhEventoAgora()}</dhEvento><tpEvento>${params.tpEvento}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>${descEvento}</descEvento></detEvento></infEvento>`;
+  const infEvento = `<infEvento Id="${id}"><cOrgao>${C_ORGAO_AMBIENTE_NACIONAL}</cOrgao><tpAmb>${ambienteTpAmb()}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${params.chaveAcesso}</chNFe><dhEvento>${dhEventoAgora()}</dhEvento><tpEvento>${params.tpEvento}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>${descEvento}</descEvento>${xJustTag}</detEvento></infEvento>`;
 
   const evento = `<evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">${infEvento}</evento>`;
   const eventoAssinado = signInfEvento(evento, id, loadSefazCertPem());
