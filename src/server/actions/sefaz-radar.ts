@@ -378,13 +378,13 @@ export async function manifestarIncomingNFe(
       where: { id },
       data: sucesso
         ? { manifestadoEm: new Date(), manifestacaoErro: null, manifestacaoTipo: tpEvento }
-        : { manifestacaoErro: message },
+        : { manifestacaoErro: message, manifestacaoTipo: tpEvento },
     });
     revalidatePath("/notas-fiscais/radar");
     return { ok: sucesso, message };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida ao manifestar.";
-    await prisma.incomingNFe.update({ where: { id }, data: { manifestacaoErro: message } });
+    await prisma.incomingNFe.update({ where: { id }, data: { manifestacaoErro: message, manifestacaoTipo: tpEvento } });
     revalidatePath("/notas-fiscais/radar");
     return { ok: false, message };
   }
