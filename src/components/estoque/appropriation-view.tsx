@@ -1,39 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Wallet } from "lucide-react";
+import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AppropriationFilters, type AppropriationViewMode } from "@/components/estoque/appropriation-filters";
 import { AppropriationTree } from "@/components/estoque/appropriation-tree";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { AppropriationNode } from "@/server/actions/estoque";
 
-export function AppropriationView({
-  nodes,
-  materials,
-  categorias,
-}: {
-  nodes: AppropriationNode[];
-  materials: { id: string; nome: string }[];
-  categorias: string[];
-}) {
+function collectMateriais(nodes: AppropriationNode[]): { id: string; nome: string }[] {
+  const byId = new Map<string, string>();
+  function walk(list: AppropriationNode[]) {
+    for (const node of list) {
+      for (const m of node.materiaisDiretos) byId.set(m.materialId, m.nome);
+      walk(node.children);
+    }
+  }
+  walk(nodes);
+  return Array.from(byId.entries())
+    .map(([id, nome]) => ({ id, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+export function AppropriationView({ nodes }: { nodes: AppropriationNode[] }) {
   const [search, setSearch] = useState("");
   const [materialId, setMaterialId] = useState("");
-  const [categoria, setCategoria] = useState("");
   const [viewMode, setViewMode] = useState<AppropriationViewMode>("arvore");
+
+  const materials = useMemo(() => collectMateriais(nodes), [nodes]);
+  const valorTotal = useMemo(() => nodes.reduce((sum, node) => sum + node.valor, 0), [nodes]);
 
   return (
     <div className="flex flex-col gap-4">
+      <KpiCard icon={Wallet} label="Valor total apropriado nesta obra" value={formatCurrencyBRL(valorTotal)} />
       <AppropriationFilters
         materials={materials}
-        categorias={categorias}
         search={search}
         onSearchChange={setSearch}
         materialId={materialId}
         onMaterialChange={setMaterialId}
-        categoria={categoria}
-        onCategoriaChange={setCategoria}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       />
-      <AppropriationTree nodes={nodes} search={search} materialId={materialId} categoria={categoria} viewMode={viewMode} />
+      <AppropriationTree nodes={nodes} search={search} materialId={materialId} viewMode={viewMode} />
     </div>
   );
 }

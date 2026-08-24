@@ -7,14 +7,12 @@ import { formatCurrencyBRL, UNIT_LABELS } from "@/lib/status-labels";
 import type { AppropriationMaterial, AppropriationNode } from "@/server/actions/estoque";
 import type { AppropriationViewMode } from "@/components/estoque/appropriation-filters";
 
-function filterByResource(nodes: AppropriationNode[], materialId: string, categoria: string): AppropriationNode[] {
-  if (!materialId && !categoria) return nodes;
+function filterByResource(nodes: AppropriationNode[], materialId: string): AppropriationNode[] {
+  if (!materialId) return nodes;
   const result: AppropriationNode[] = [];
   for (const node of nodes) {
-    const materiaisDiretos = node.materiaisDiretos.filter(
-      (m) => (!materialId || m.materialId === materialId) && (!categoria || m.categoria === categoria),
-    );
-    const children = filterByResource(node.children, materialId, categoria);
+    const materiaisDiretos = node.materiaisDiretos.filter((m) => m.materialId === materialId);
+    const children = filterByResource(node.children, materialId);
     if (materiaisDiretos.length === 0 && children.length === 0) continue;
     const valor = materiaisDiretos.reduce((s, m) => s + m.valor, 0) + children.reduce((s, c) => s + c.valor, 0);
     result.push({ ...node, materiaisDiretos, children, valor });
@@ -74,18 +72,16 @@ export function AppropriationTree({
   nodes,
   search,
   materialId,
-  categoria,
   viewMode,
 }: {
   nodes: AppropriationNode[];
   search: string;
   materialId: string;
-  categoria: string;
   viewMode: AppropriationViewMode;
 }) {
   const filtered = useMemo(
-    () => filterBySearch(filterByResource(nodes, materialId, categoria), search),
-    [nodes, materialId, categoria, search],
+    () => filterBySearch(filterByResource(nodes, materialId), search),
+    [nodes, materialId, search],
   );
   const materiais = useMemo(() => flattenMateriais(filtered), [filtered]);
   const tasks = useMemo(() => flattenTasks(filtered), [filtered]);
@@ -101,7 +97,7 @@ export function AppropriationTree({
   if (viewMode === "recursos") return <MaterialsFlatTable materiais={materiais} />;
   if (viewMode === "atividades") return <TasksFlatList tasks={tasks} />;
 
-  const autoOpen = Boolean(search.trim() || materialId || categoria);
+  const autoOpen = Boolean(search.trim() || materialId);
   return (
     <div className="rounded-lg border p-2">
       <TreeNodes nodes={filtered} depth={0} defaultOpen={autoOpen} />

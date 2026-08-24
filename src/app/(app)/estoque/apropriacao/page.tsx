@@ -1,5 +1,4 @@
 import { listWorks } from "@/server/actions/obras";
-import { listActiveMaterials } from "@/server/actions/materiais";
 import { getStockAppropriationTree } from "@/server/actions/estoque";
 import { EstoqueTabsNav } from "@/components/estoque/estoque-tabs-nav";
 import { AppropriationObraSelect } from "@/components/estoque/appropriation-obra-select";
@@ -11,11 +10,8 @@ export default async function EstoqueApropriacaoPage({
   searchParams: Promise<{ workId?: string }>;
 }) {
   const { workId } = await searchParams;
-  const [works, materials] = await Promise.all([listWorks(), listActiveMaterials()]);
+  const works = await listWorks();
   const nodes = workId ? await getStockAppropriationTree(workId) : [];
-  const categorias = Array.from(new Set(materials.map((m) => m.categoria).filter((c): c is string => Boolean(c)))).sort(
-    (a, b) => a.localeCompare(b, "pt-BR"),
-  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -32,11 +28,7 @@ export default async function EstoqueApropriacaoPage({
       />
 
       {workId ? (
-        <AppropriationView
-          nodes={nodes}
-          materials={materials.map((m) => ({ id: m.id, nome: m.nome }))}
-          categorias={categorias}
-        />
+        <AppropriationView nodes={nodes} />
       ) : (
         <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           Selecione uma obra pra ver a apropriação de material.

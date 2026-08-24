@@ -1,6 +1,5 @@
 "use client";
 
-import { NativeSelect } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
@@ -15,24 +14,18 @@ const VIEW_MODE_OPTIONS: { value: AppropriationViewMode; label: string }[] = [
 
 export function AppropriationFilters({
   materials,
-  categorias,
   search,
   onSearchChange,
   materialId,
   onMaterialChange,
-  categoria,
-  onCategoriaChange,
   viewMode,
   onViewModeChange,
 }: {
   materials: { id: string; nome: string }[];
-  categorias: string[];
   search: string;
   onSearchChange: (value: string) => void;
   materialId: string;
   onMaterialChange: (value: string) => void;
-  categoria: string;
-  onCategoriaChange: (value: string) => void;
   viewMode: AppropriationViewMode;
   onViewModeChange: (mode: AppropriationViewMode) => void;
 }) {
@@ -56,17 +49,6 @@ export function AppropriationFilters({
           placeholder="Selecione um recurso"
           className="w-56"
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Filtrar por grupo</label>
-        <NativeSelect className="w-auto" value={categoria} onChange={(e) => onCategoriaChange(e.target.value)}>
-          <option value="">Todos os grupos</option>
-          {categorias.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </NativeSelect>
       </div>
       <div className="flex items-center gap-1 rounded-full bg-muted p-1">
         {VIEW_MODE_OPTIONS.map((option) => (
