@@ -4,18 +4,12 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { EyeOff, Undo2, FileText, ExternalLink, Eye, Copy } from "lucide-react";
+import { EyeOff, Undo2, FileText, ExternalLink, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ignoreIncomingNFe, restoreIncomingNFe } from "@/server/actions/sefaz-radar";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
-
-function handleCopyChave(chaveAcesso: string) {
-  navigator.clipboard.writeText(chaveAcesso).then(() => {
-    toast.success("Chave copiada.");
-  });
-}
 
 type IncomingNFeRow = {
   id: string;
@@ -106,7 +100,7 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
   );
 }
 
-export function IncomingNFeTable({ items, companyCnpj }: { items: IncomingNFeRow[]; companyCnpj: string | null }) {
+export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
   if (items.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -122,12 +116,9 @@ export function IncomingNFeTable({ items, companyCnpj }: { items: IncomingNFeRow
           <TableRow>
             <TableHead>Status</TableHead>
             <TableHead>Emitente</TableHead>
-            <TableHead>CNPJ</TableHead>
-            <TableHead>Meu CNPJ</TableHead>
             <TableHead>NF / Série</TableHead>
             <TableHead>Data</TableHead>
             <TableHead>Valor</TableHead>
-            <TableHead>Chave NFe</TableHead>
             <TableHead>OE</TableHead>
             <TableHead>PDF</TableHead>
             <TableHead className="text-right">Ações</TableHead>
@@ -140,23 +131,11 @@ export function IncomingNFeTable({ items, companyCnpj }: { items: IncomingNFeRow
                 <Badge variant={STATUS_BADGE[row.status]}>{STATUS_LABELS[row.status]}</Badge>
               </TableCell>
               <TableCell className="font-medium">{row.emitenteNome ?? "—"}</TableCell>
-              <TableCell>{row.emitenteCnpj ?? "—"}</TableCell>
-              <TableCell className="text-muted-foreground">{companyCnpj ?? "—"}</TableCell>
               <TableCell>
                 {row.numero ?? "—"} / {row.serie ?? "—"}
               </TableCell>
               <TableCell>{row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"}</TableCell>
               <TableCell>{row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1">
-                  <span className="max-w-32 truncate font-mono text-xs" title={row.chaveAcesso}>
-                    {row.chaveAcesso}
-                  </span>
-                  <Button variant="ghost" size="icon-sm" onClick={() => handleCopyChave(row.chaveAcesso)} title="Copiar chave">
-                    <Copy className="size-3.5" />
-                  </Button>
-                </div>
-              </TableCell>
               <TableCell className="text-muted-foreground">
                 {row.invoiceLink ? (row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL) : "—"}
               </TableCell>

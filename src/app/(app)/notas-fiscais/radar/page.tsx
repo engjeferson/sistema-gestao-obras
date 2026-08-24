@@ -5,7 +5,6 @@ import {
   listNotasAguardandoManifestacao,
   type IncomingNFeFiltros,
 } from "@/server/actions/sefaz-radar";
-import { getCompanySettings } from "@/server/actions/empresa";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
 import { PendingManifestacaoList } from "@/components/notas-fiscais/pending-manifestacao-list";
@@ -40,11 +39,10 @@ export default async function RadarNFePage({
 
   await autoSyncIncomingNFesIfDue();
 
-  const [result, pendentes, aguardandoManifestacao, company] = await Promise.all([
+  const [result, pendentes, aguardandoManifestacao] = await Promise.all([
     listIncomingNFes(page, pageSize, filtros),
     countPendingIncomingNFes(),
     listNotasAguardandoManifestacao(),
-    getCompanySettings(),
   ]);
 
   const itemsOptions = result.items.map((item) => ({
@@ -82,7 +80,7 @@ export default async function RadarNFePage({
       <div className="p-4 md:p-6">
         <PendingManifestacaoList items={aguardandoManifestacao} />
         <RadarFilters />
-        <IncomingNFeTable items={itemsOptions} companyCnpj={company?.cnpj ?? null} />
+        <IncomingNFeTable items={itemsOptions} />
       </div>
 
       <div className="sticky bottom-0 z-10 border-t bg-background p-4 md:p-6">
