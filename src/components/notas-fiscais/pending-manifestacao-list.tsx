@@ -1,113 +1,41 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { manifestarIncomingNFe, type NotaAguardandoManifestacao } from "@/server/actions/sefaz-radar";
 import { TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao-tipos";
-import { formatDateBR, MANIFESTACAO_TIPO_LABELS } from "@/lib/status-labels";
+import { formatDateBR } from "@/lib/status-labels";
 
-const OBSERVACAO_MAX = 255;
-
-function ManifestacaoDialog({
-  row,
-  open,
-  onOpenChange,
-}: {
-  row: NotaAguardandoManifestacao;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [tpEvento, setTpEvento] = useState<string>("");
-  const [observacao, setObservacao] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-
-  function handleConcluir() {
-    if (!tpEvento) return;
-    startTransition(async () => {
-      const resultado = await manifestarIncomingNFe(
-        row.id,
-        tpEvento as (typeof TIPO_EVENTO_MANIFESTACAO)[keyof typeof TIPO_EVENTO_MANIFESTACAO],
-        observacao || undefined,
-      );
-      if (resultado.ok) {
-        toast.success(resultado.message);
-      } else {
-        toast.error(resultado.message);
-      }
-      onOpenChange(false);
-      router.refresh();
-    });
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setTpEvento("");
-          setObservacao("");
-        }
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Alterar status de manifestação</DialogTitle>
-          <DialogDescription>Selecione o novo status e, se necessário, adicione uma observação.</DialogDescription>
-        </DialogHeader>
-
-        <p className="text-sm text-muted-foreground">
-          Última manifestação: {row.manifestacaoTipo ? MANIFESTACAO_TIPO_LABELS[row.manifestacaoTipo] : "Nenhuma"}
-        </p>
-
-        <div className="flex flex-col gap-2">
-          <Label>Novo Status *</Label>
-          <NativeSelect value={tpEvento} onChange={(e) => setTpEvento(e.target.value)}>
-            <option value="">Selecione o novo status</option>
-            {Object.values(TIPO_EVENTO_MANIFESTACAO).map((codigo) => (
-              <option key={codigo} value={codigo}>
-                {MANIFESTACAO_TIPO_LABELS[codigo]}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label>Observação</Label>
-          <Textarea
-            placeholder="Descreva informações complementares para o novo status"
-            maxLength={OBSERVACAO_MAX}
-            value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-          />
-          <p className="text-right text-xs text-muted-foreground">
-            {observacao.length} / {OBSERVACAO_MAX}
-          </p>
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={handleConcluir} disabled={!tpEvento || isPending}>
-            {isPending ? "Enviando..." : "Concluir"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+// Estado exibido na lista, derivado dos campos já existentes em IncomingNFe
+// (nenhum status novo persistido — evita duplicar estrutura):
+// - manifestadoEm setado           -> "Aguardando XML" (ciência registrada, esperando a SEFAZ liberar o XML completo)
+// - manifestacaoErro setado (sem manifestadoEm) -> "Erro na manifestação"
+// - nenhum dos dois                -> "Aguardando manifestação"
+function situacao(row: NotaAguardandoManifestacao): "aguardando_xml" | "erro" | "localizada" {
+  if (row.manifestadoEm) return "aguardando_xml";
+  if (row.manifestacaoErro) return "erro";
+  return "localizada";
 }
 
 function Row({ row }: { row: NotaAguardandoManifestacao }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const estado = situacao(row);
+
+  function handleDarCiencia() {
+    startTransition(async () => {
+      const resultado = await manifestarIncomingNFe(row.id, TIPO_EVENTO_MANIFESTACAO.CIENCIA_OPERACAO);
+      if (resultado.ok) {
+        toast.success("Ciência registrada. Aguardando XML completo da SEFAZ.");
+      } else {
+        toast.error(resultado.message);
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2 border-b p-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
@@ -117,12 +45,16 @@ function Row({ row }: { row: NotaAguardandoManifestacao }) {
           NF {row.numero ?? "—"}/{row.serie ?? "—"} · {row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"} · chave{" "}
           {row.chaveAcesso}
         </p>
+        {estado === "erro" ? <p className="mt-1 text-xs text-destructive">Erro na manifestação — tente novamente.</p> : null}
       </div>
-      <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)} className="shrink-0">
-        <BadgeCheck />
-        Manifestar
-      </Button>
-      <ManifestacaoDialog row={row} open={dialogOpen} onOpenChange={setDialogOpen} />
+      {estado === "aguardando_xml" ? (
+        <span className="shrink-0 text-xs font-medium text-muted-foreground">Aguardando XML</span>
+      ) : (
+        <Button size="sm" variant="outline" disabled={isPending} onClick={handleDarCiencia} className="shrink-0">
+          <BadgeCheck />
+          {isPending ? "Enviando..." : estado === "erro" ? "Tentar novamente" : "Dar Ciência"}
+        </Button>
+      )}
     </div>
   );
 }
@@ -133,10 +65,10 @@ export function PendingManifestacaoList({ items }: { items: NotaAguardandoManife
   return (
     <div className="mb-4 rounded-lg border">
       <div className="border-b bg-muted/30 p-3">
-        <p className="text-sm font-medium">Aguardando liberação da SEFAZ ({items.length})</p>
+        <p className="text-sm font-medium">Aguardando manifestação ({items.length})</p>
         <p className="text-xs text-muted-foreground">
-          Notas que a SEFAZ ainda só liberou como resumo, sem os itens. Manifestar sinaliza o status da operação pra
-          SEFAZ — normalmente libera o XML completo em seguida.
+          Notas que a SEFAZ ainda só liberou como resumo, sem os itens. Dar ciência sinaliza que você está ciente da
+          operação — a SEFAZ costuma liberar o XML completo entre 30min e 1h depois.
         </p>
       </div>
       <div>

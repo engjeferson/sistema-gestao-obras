@@ -26,9 +26,10 @@ function extractSoapFaultReason(xml: string): string | null {
 function postSoap12(pathname: string, soapAction: string, body: string): Promise<string> {
   const { pfx, passphrase } = loadSefazCert();
   const buffer = Buffer.from(body, "utf-8");
+  const hostname = getAmbienteHost();
 
   const options: https.RequestOptions = {
-    hostname: getAmbienteHost(),
+    hostname,
     path: pathname,
     method: "POST",
     pfx,
@@ -39,12 +40,15 @@ function postSoap12(pathname: string, soapAction: string, body: string): Promise
     },
   };
 
+  console.log(`[soap-client] POST https://${hostname}${pathname} (ambiente=${process.env.SEFAZ_AMBIENTE === "2" ? "homologação" : "produção"})`);
+
   return new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk) => chunks.push(chunk));
       res.on("end", () => {
         const responseBody = Buffer.concat(chunks).toString("utf-8");
+        console.log(`[soap-client] HTTP ${res.statusCode} de https://${hostname}${pathname}`);
         if (res.statusCode && res.statusCode >= 400) {
           const reason = extractSoapFaultReason(responseBody);
           reject(new Error(reason ? `SEFAZ (${res.statusCode}): ${reason}` : `SEFAZ respondeu ${res.statusCode}: ${responseBody.slice(0, 200)}`));

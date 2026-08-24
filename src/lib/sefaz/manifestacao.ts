@@ -80,11 +80,28 @@ export async function enviarManifestacao(params: {
   const infEvento = `<infEvento Id="${id}"><cOrgao>${C_ORGAO_AMBIENTE_NACIONAL}</cOrgao><tpAmb>${ambienteTpAmb()}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${params.chaveAcesso}</chNFe><dhEvento>${dhEventoAgora()}</dhEvento><tpEvento>${params.tpEvento}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>${descEvento}</descEvento>${xJustTag}</detEvento></infEvento>`;
 
   const evento = `<evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">${infEvento}</evento>`;
+
+  console.log(`[manifestacao] chave=${params.chaveAcesso} tpEvento=${params.tpEvento} ambiente=${ambienteTpAmb()} evento (antes de assinar):`, evento);
+
   const eventoAssinado = signInfEvento(evento, id, loadSefazCertPem());
+
+  console.log(`[manifestacao] chave=${params.chaveAcesso} evento assinado:`, eventoAssinado);
 
   const envEvento = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>${idLote}</idLote>${eventoAssinado}</envEvento>`;
 
-  const soapResponse = await callRecepcaoEvento(envEvento);
+  let soapResponse: string;
+  try {
+    soapResponse = await callRecepcaoEvento(envEvento);
+  } catch (error) {
+    console.error(`[manifestacao] chave=${params.chaveAcesso} falha na chamada SOAP:`, error);
+    throw error;
+  }
+
+  console.log(`[manifestacao] chave=${params.chaveAcesso} resposta SOAP crua:`, soapResponse);
+
+  const loteMatch = soapResponse.match(/<retEnvEvento[^>]*>([\s\S]*?)<retEvento/);
+  const cStatLote = loteMatch ? tag(loteMatch[1], "cStat") : null;
+  const xMotivoLote = loteMatch ? tag(loteMatch[1], "xMotivo") : null;
 
   const retEventoMatch = soapResponse.match(/<retEvento[^>]*>([\s\S]*?)<\/retEvento>/);
   const infEventoRetorno = retEventoMatch ? retEventoMatch[1] : soapResponse;
@@ -92,6 +109,10 @@ export async function enviarManifestacao(params: {
   const cStat = tag(infEventoRetorno, "cStat") ?? "";
   const xMotivo = tag(infEventoRetorno, "xMotivo") ?? "Sem retorno da SEFAZ.";
   const nProt = tag(infEventoRetorno, "nProt");
+
+  console.log(
+    `[manifestacao] chave=${params.chaveAcesso} cStat(lote)=${cStatLote} xMotivo(lote)=${xMotivoLote} cStat(evento)=${cStat} xMotivo(evento)=${xMotivo} nProt=${nProt}`,
+  );
 
   if (cStat === "135" || cStat === "136") {
     return { status: "registrado", cStat, xMotivo, nProt };
