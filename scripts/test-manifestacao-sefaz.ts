@@ -143,6 +143,26 @@ const VARIANTES: Variante[] = [
     bare: true,
     cOrgao: "43",
   },
+  {
+    label: "AN — BARE + cOrgao=91 — SOAP 1.2",
+    hostname: "www1.nfe.fazenda.gov.br",
+    path: "/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx",
+    operacao: "nfeRecepcaoEventoNF",
+    soapAction: "http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF",
+    soapVersao: "1.2",
+    bare: true,
+    cOrgao: "91",
+  },
+  {
+    label: "AN — BARE + cOrgao=91 — SOAP 1.1",
+    hostname: "www1.nfe.fazenda.gov.br",
+    path: "/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx",
+    operacao: "nfeRecepcaoEventoNF",
+    soapAction: "http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEventoNF",
+    soapVersao: "1.1",
+    bare: true,
+    cOrgao: "91",
+  },
 ];
 
 function tag(xml: string, name: string): string | null {

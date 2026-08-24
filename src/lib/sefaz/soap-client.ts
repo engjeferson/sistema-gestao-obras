@@ -87,16 +87,18 @@ export function callDistDFeInt(distDFeIntXml: string): Promise<string> {
  * (XML-DSig) pro webservice nacional NFeRecepcaoEvento4. Diferente do
  * NFeDistribuicaoDFe, o `envEvento` precisa vir assinado — a autenticação
  * por mTLS sozinha não basta pra um serviço que altera o histórico da NF-e.
- * Confirmado via WSDL ao vivo que este serviço NÃO usa nfeCabecMsg (SOAP
- * header) — só o corpo, igual ao NFeDistribuicaoDFe.
+ *
+ * O `nfeDadosMsg` vai DIRETO no Body ("bare"), sem envolver no nome da
+ * operação — confirmado por diagnóstico isolado (scripts/test-manifestacao-
+ * sefaz.ts) que o parser real da SEFAZ só lê o conteúdo (inclusive o
+ * `idLote`) nesse formato; com o wrapper (`<nfeRecepcaoEventoNF>...`) o
+ * servidor retornava erro genérico de servidor sem sequer processar o XML.
  */
 export function callRecepcaoEvento(envEventoXmlAssinado: string): Promise<string> {
   const envelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <nfeRecepcaoEventoNF xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">
-      <nfeDadosMsg>${envEventoXmlAssinado}</nfeDadosMsg>
-    </nfeRecepcaoEventoNF>
+    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${envEventoXmlAssinado}</nfeDadosMsg>
   </soap12:Body>
 </soap12:Envelope>`;
 
