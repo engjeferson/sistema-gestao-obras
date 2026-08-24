@@ -167,6 +167,7 @@ model IncomingNFe {
   status       IncomingNFeStatus @default(PENDENTE)
   xmlCompleto  String?           @db.Text
   manifestadoEm DateTime?
+  manifestacaoErro String?       @db.Text
   invoiceId    String?           @unique
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt

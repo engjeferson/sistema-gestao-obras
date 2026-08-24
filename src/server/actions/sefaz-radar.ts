@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { buscarLoteDistribuicao, buscarNFeCompletaPorChave } from "@/lib/sefaz/dist-dfe";
 import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefaz/parse-res-nfe";
+import { enviarManifestacao, TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao";
 
 const MAX_LOTES_POR_SYNC = 10;
 const SYNC_COOLDOWN_MINUTOS = 65;
@@ -270,6 +271,80 @@ export async function getIncomingNFeXml(
       error: error instanceof Error ? error.message : "Não foi possível buscar o XML completo.",
       resumo,
     };
+  }
+}
+
+export type NotaAguardandoManifestacao = {
+  id: string;
+  chaveAcesso: string;
+  emitenteNome: string | null;
+  numero: string | null;
+  serie: string | null;
+  dataEmissao: Date | null;
+  manifestadoEm: Date | null;
+  manifestacaoErro: string | null;
+};
+
+/**
+ * Notas "Nova" ainda em resumo — escondidas da lista principal do Radar até
+ * o XML completo chegar. Mostradas à parte pra permitir manifestar ciência
+ * manualmente, o que costuma liberar o XML completo junto à SEFAZ.
+ */
+export async function listNotasAguardandoManifestacao(): Promise<NotaAguardandoManifestacao[]> {
+  return prisma.incomingNFe.findMany({
+    where: { status: "PENDENTE", xmlCompleto: null },
+    orderBy: { dataEmissao: "desc" },
+    select: {
+      id: true,
+      chaveAcesso: true,
+      emitenteNome: true,
+      numero: true,
+      serie: true,
+      dataEmissao: true,
+      manifestadoEm: true,
+      manifestacaoErro: true,
+    },
+  });
+}
+
+/**
+ * Envia Ciência da Operação pra uma nota específica. Guarda o resultado
+ * (sucesso ou erro cru retornado pela SEFAZ) em `manifestacaoErro` pra ficar
+ * visível na tela — diferente de um toast, que some sozinho.
+ */
+export async function manifestarCienciaIncomingNFe(id: string): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+
+  const incoming = await prisma.incomingNFe.findUnique({ where: { id }, select: { chaveAcesso: true } });
+  if (!incoming) return { ok: false, message: "Nota não encontrada." };
+
+  const company = await prisma.companySettings.findFirst();
+  if (!company?.cnpj) {
+    return { ok: false, message: "Cadastre o CNPJ da empresa em Configurações antes de manifestar." };
+  }
+
+  try {
+    const resultado = await enviarManifestacao({
+      chaveAcesso: incoming.chaveAcesso,
+      cnpjDestinatario: company.cnpj,
+      tpEvento: TIPO_EVENTO_MANIFESTACAO.CIENCIA_OPERACAO,
+    });
+
+    const message = `SEFAZ ${resultado.cStat}: ${resultado.xMotivo}`;
+    const sucesso = resultado.status === "registrado" || resultado.status === "duplicado";
+
+    await prisma.incomingNFe.update({
+      where: { id },
+      data: sucesso ? { manifestadoEm: new Date(), manifestacaoErro: null } : { manifestacaoErro: message },
+    });
+    revalidatePath("/notas-fiscais/radar");
+    return { ok: sucesso, message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha desconhecida ao manifestar.";
+    await prisma.incomingNFe.update({ where: { id }, data: { manifestacaoErro: message } });
+    revalidatePath("/notas-fiscais/radar");
+    return { ok: false, message };
   }
 }
 
