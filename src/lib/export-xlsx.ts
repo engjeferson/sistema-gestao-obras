@@ -10,6 +10,9 @@ export async function buildXlsxBuffer(report: ReportTable): Promise<Buffer> {
   for (const row of report.rows) {
     sheet.addRow(row);
   }
+  if (report.total) {
+    sheet.addRow(report.total).font = { bold: true };
+  }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);

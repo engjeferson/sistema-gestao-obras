@@ -13,8 +13,10 @@ const styles = StyleSheet.create({
   table: { display: "flex", width: "100%" },
   tableRow: { flexDirection: "row", borderBottom: "1 solid #eee", paddingVertical: 4 },
   tableHeaderRow: { flexDirection: "row", borderBottom: "1 solid #333", paddingVertical: 4 },
+  tableTotalRow: { flexDirection: "row", borderTop: "1 solid #333", paddingVertical: 4 },
   tableCell: { flex: 1, paddingRight: 6 },
   tableHeaderCell: { flex: 1, paddingRight: 6, fontWeight: 700 },
+  tableTotalCell: { flex: 1, paddingRight: 6, fontWeight: 700 },
   footer: { position: "absolute", bottom: 24, left: 32, right: 32, fontSize: 8, color: "#999", textAlign: "center" },
 });
 
@@ -61,6 +63,15 @@ export function ReportPdfDocument({
               </View>
             ))
           )}
+          {report.total ? (
+            <View style={styles.tableTotalRow}>
+              {report.columns.map((column) => (
+                <Text key={column.key} style={styles.tableTotalCell}>
+                  {report.total?.[column.key] ?? ""}
+                </Text>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <Text style={styles.footer}>Gerado em {formatDateBR(new Date())} pelo Sistema de Gestão de Obras</Text>

@@ -16,7 +16,7 @@ import { REPORT_DEFINITIONS, type ReportTable } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const REPORT_FETCHERS: Record<string, (workId?: string) => Promise<ReportTable>> = {
   "orcamento-obra": getReportOrcamentoObra,
@@ -111,6 +111,17 @@ export default async function RelatorioPage({
                     </TableRow>
                   ))}
                 </TableBody>
+                {report.total ? (
+                  <TableFooter>
+                    <TableRow>
+                      {report.columns.map((column) => (
+                        <TableCell key={column.key} className="font-semibold">
+                          {report.total?.[column.key] ?? ""}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableFooter>
+                ) : null}
               </Table>
             </div>
           )}

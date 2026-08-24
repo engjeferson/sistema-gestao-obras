@@ -3,6 +3,7 @@ export type ReportTable = {
   subtitle?: string;
   columns: { key: string; label: string }[];
   rows: Record<string, string>[];
+  total?: Record<string, string>;
 };
 
 export const REPORT_DEFINITIONS = [

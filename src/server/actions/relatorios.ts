@@ -332,6 +332,8 @@ export async function getReportContasAPagarPorObra(workId?: string): Promise<Rep
     take: 200,
   });
 
+  const valorTotal = transactions.reduce((sum, t) => sum + Number(t.valor), 0);
+
   return {
     title: "Contas a pagar por obra",
     subtitle: workId ? undefined : "Todas as obras",
@@ -349,5 +351,6 @@ export async function getReportContasAPagarPorObra(workId?: string): Promise<Rep
       valor: formatCurrencyBRL(Number(t.valor)),
       status: TRANSACTION_STATUS_LABELS[t.status],
     })),
+    total: { descricao: "Total", valor: formatCurrencyBRL(valorTotal) },
   };
 }
