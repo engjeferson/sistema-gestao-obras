@@ -117,7 +117,6 @@ function Row({ row }: { row: NotaAguardandoManifestacao }) {
           NF {row.numero ?? "—"}/{row.serie ?? "—"} · {row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"} · chave{" "}
           {row.chaveAcesso}
         </p>
-        {row.manifestacaoErro ? <p className="mt-1 break-all text-xs text-destructive">{row.manifestacaoErro}</p> : null}
       </div>
       <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)} className="shrink-0">
         <BadgeCheck />
