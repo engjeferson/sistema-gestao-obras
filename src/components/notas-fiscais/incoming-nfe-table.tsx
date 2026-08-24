@@ -108,7 +108,7 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
     if (row.manifestadoEm) {
       return (
         <div className="flex justify-end items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Aguardando XML</span>
+          <Badge variant="warning">Aguardando XML</Badge>
           <Button variant="ghost" size="sm" disabled={isPending} onClick={handleIgnore} title="Ignorar">
             <EyeOff />
           </Button>
