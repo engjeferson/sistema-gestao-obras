@@ -21,7 +21,7 @@ import { budgetItemFormSchema } from "@/lib/validations/orcamento";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 
 export async function getBudgetVsActualByStage(workId: string) {
-  const [stages, budgetItems, transactions] = await Promise.all([
+  const [stages, budgetItems, transactions, categorias] = await Promise.all([
     prisma.planningStage.findMany({
       where: { workId },
       include: { tasks: { orderBy: { ordem: "asc" } } },
@@ -30,8 +30,9 @@ export async function getBudgetVsActualByStage(workId: string) {
     prisma.budgetItem.findMany({ where: { workId }, select: { taskId: true, valorTotalPrevisto: true } }),
     prisma.financialTransaction.findMany({
       where: { workId, tipo: "PAGAR" },
-      select: { valor: true, status: true, stageId: true, taskId: true },
+      select: { valor: true, status: true, stageId: true, taskId: true, categoriaId: true },
     }),
+    prisma.financialCategory.findMany({ where: { nome: { in: ["Mão de obra", "Material"] } }, select: { id: true, nome: true } }),
   ]);
 
   const orcadoByTask = new Map<string, number>();
@@ -39,10 +40,20 @@ export async function getBudgetVsActualByStage(workId: string) {
     orcadoByTask.set(item.taskId, (orcadoByTask.get(item.taskId) ?? 0) + Number(item.valorTotalPrevisto));
   }
 
+  const maoDeObraCategoriaId = categorias.find((c) => c.nome === "Mão de obra")?.id;
+  const materialCategoriaId = categorias.find((c) => c.nome === "Material")?.id;
+
   function sumTx(filter: (t: (typeof transactions)[number]) => boolean, statuses: string[]) {
     return transactions
       .filter((t) => filter(t) && statuses.includes(t.status))
       .reduce((sum, t) => sum + Number(t.valor), 0);
+  }
+
+  // Comprometido (qualquer status) por categoria — "quanto dessa categoria já
+  // está alocado" nessa etapa/atividade, seguindo a mesma ideia de "projetado".
+  function sumTxCategoria(filter: (t: (typeof transactions)[number]) => boolean, categoriaId: string | undefined) {
+    if (!categoriaId) return 0;
+    return sumTx((t) => filter(t) && t.categoriaId === categoriaId, ["PAGO", "PENDENTE", "VENCIDO"]);
   }
 
   return stages.map((stage) => {
@@ -52,6 +63,8 @@ export async function getBudgetVsActualByStage(workId: string) {
       const aPagar = sumTx((t) => t.taskId === task.id, ["PENDENTE", "VENCIDO"]);
       const projetado = computeProjetado({ realizado, aPagar });
       const saldo = computeSaldo({ orcado, projetado });
+      const maoDeObra = sumTxCategoria((t) => t.taskId === task.id, maoDeObraCategoriaId);
+      const material = sumTxCategoria((t) => t.taskId === task.id, materialCategoriaId);
       const avancoFisico = Number(task.percentualExecutado);
       const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
       const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
@@ -64,6 +77,8 @@ export async function getBudgetVsActualByStage(workId: string) {
         aPagar,
         projetado,
         saldo,
+        maoDeObra,
+        material,
         avancoFisico,
         avancoFinanceiro,
         diferenca,
@@ -76,6 +91,8 @@ export async function getBudgetVsActualByStage(workId: string) {
     const aPagar = sumTx((t) => t.stageId === stage.id, ["PENDENTE", "VENCIDO"]);
     const projetado = computeProjetado({ realizado, aPagar });
     const saldo = computeSaldo({ orcado, projetado });
+    const maoDeObra = sumTxCategoria((t) => t.stageId === stage.id, maoDeObraCategoriaId);
+    const material = sumTxCategoria((t) => t.stageId === stage.id, materialCategoriaId);
     const avancoFisico = tasks.length > 0 ? tasks.reduce((sum, t) => sum + t.avancoFisico, 0) / tasks.length : 0;
     const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
     const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
@@ -89,6 +106,8 @@ export async function getBudgetVsActualByStage(workId: string) {
       aPagar,
       projetado,
       saldo,
+      maoDeObra,
+      material,
       avancoFisico,
       avancoFinanceiro,
       diferenca,

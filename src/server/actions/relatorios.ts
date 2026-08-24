@@ -125,6 +125,9 @@ export async function getReportCustosPorEtapa(workId?: string): Promise<ReportTa
   if (!work) return { title: "Custos por etapa", columns: [], rows: [] };
 
   const stages = await getBudgetVsActualByStage(work.id);
+  const somar = (key: "orcado" | "realizado" | "aPagar" | "projetado" | "saldo" | "maoDeObra" | "material") =>
+    stages.reduce((sum, stage) => sum + stage[key], 0);
+
   return {
     title: "Custos por etapa",
     subtitle: `${work.codigo} — ${work.nome}`,
@@ -135,6 +138,8 @@ export async function getReportCustosPorEtapa(workId?: string): Promise<ReportTa
       { key: "aPagar", label: "A pagar" },
       { key: "projetado", label: "Projetado (comprometido)" },
       { key: "saldo", label: "Saldo" },
+      { key: "maoDeObra", label: "Mão de obra" },
+      { key: "material", label: "Material" },
     ],
     rows: stages.map((stage) => ({
       nome: `${stage.codigo ? `${stage.codigo} — ` : ""}${stage.nome}`,
@@ -143,7 +148,19 @@ export async function getReportCustosPorEtapa(workId?: string): Promise<ReportTa
       aPagar: formatCurrencyBRL(stage.aPagar),
       projetado: formatCurrencyBRL(stage.projetado),
       saldo: formatCurrencyBRL(stage.saldo),
+      maoDeObra: formatCurrencyBRL(stage.maoDeObra),
+      material: formatCurrencyBRL(stage.material),
     })),
+    total: {
+      nome: "Total",
+      orcado: formatCurrencyBRL(somar("orcado")),
+      realizado: formatCurrencyBRL(somar("realizado")),
+      aPagar: formatCurrencyBRL(somar("aPagar")),
+      projetado: formatCurrencyBRL(somar("projetado")),
+      saldo: formatCurrencyBRL(somar("saldo")),
+      maoDeObra: formatCurrencyBRL(somar("maoDeObra")),
+      material: formatCurrencyBRL(somar("material")),
+    },
   };
 }
 
