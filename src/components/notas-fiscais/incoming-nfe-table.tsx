@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { EyeOff, Undo2, FileText, ExternalLink, Eye } from "lucide-react";
+import { EyeOff, Undo2, FileText, ExternalLink, Eye, BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ignoreIncomingNFe, restoreIncomingNFe } from "@/server/actions/sefaz-radar";
+import { ignoreIncomingNFe, restoreIncomingNFe, manifestarIncomingNFe } from "@/server/actions/sefaz-radar";
+import { TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao-tipos";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
 
 type IncomingNFeRow = {
@@ -21,6 +22,9 @@ type IncomingNFeRow = {
   dataEmissao: Date | null;
   valorTotal: number | null;
   status: "PENDENTE" | "LANCADA" | "IGNORADA";
+  xmlCompleto: boolean;
+  manifestadoEm: Date | null;
+  manifestacaoErro: string | null;
   invoiceLink: { invoiceId: string; workId: string | null; workLabel: string | null } | null;
 };
 
@@ -57,6 +61,18 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
     });
   }
 
+  function handleDarCiencia() {
+    startTransition(async () => {
+      const resultado = await manifestarIncomingNFe(row.id, TIPO_EVENTO_MANIFESTACAO.CIENCIA_OPERACAO);
+      if (resultado.ok) {
+        toast.success("Ciência registrada. Aguardando XML completo da SEFAZ.");
+      } else {
+        toast.error(resultado.message);
+      }
+      router.refresh();
+    });
+  }
+
   if (row.status === "LANCADA") {
     if (!row.invoiceLink) {
       return <span className="text-xs text-muted-foreground">—</span>;
@@ -85,6 +101,29 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
       <Button variant="ghost" size="sm" disabled={isPending} onClick={handleRestore}>
         <Undo2 /> Restaurar
       </Button>
+    );
+  }
+
+  if (!row.xmlCompleto) {
+    if (row.manifestadoEm) {
+      return (
+        <div className="flex justify-end items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Aguardando XML</span>
+          <Button variant="ghost" size="sm" disabled={isPending} onClick={handleIgnore} title="Ignorar">
+            <EyeOff />
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" disabled={isPending} onClick={handleDarCiencia}>
+          <BadgeCheck /> {isPending ? "Enviando..." : row.manifestacaoErro ? "Tentar novamente" : "Dar Ciência"}
+        </Button>
+        <Button variant="ghost" size="sm" disabled={isPending} onClick={handleIgnore} title="Ignorar">
+          <EyeOff />
+        </Button>
+      </div>
     );
   }
 
@@ -130,7 +169,14 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
               <TableCell>
                 <Badge variant={STATUS_BADGE[row.status]}>{STATUS_LABELS[row.status]}</Badge>
               </TableCell>
-              <TableCell className="font-medium">{row.emitenteNome ?? "—"}</TableCell>
+              <TableCell className="font-medium">
+                {row.emitenteNome ?? "—"}
+                {!row.xmlCompleto && !row.manifestadoEm && row.manifestacaoErro ? (
+                  <p className="mt-0.5 max-w-56 truncate text-xs font-normal text-destructive" title={row.manifestacaoErro}>
+                    {row.manifestacaoErro}
+                  </p>
+                ) : null}
+              </TableCell>
               <TableCell>
                 {row.numero ?? "—"} / {row.serie ?? "—"}
               </TableCell>

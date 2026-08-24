@@ -12,13 +12,6 @@ const MAX_LOTES_POR_SYNC = 10;
 const SYNC_COOLDOWN_MINUTOS = 65;
 const MAX_COMPLETAR_POR_SYNC = 20;
 
-// Notas "Nova" só contam/aparecem quando o XML completo (com itens) já está
-// disponível — enquanto a SEFAZ só libera o resumo, ficam escondidas em vez
-// de aparecer prontas pra lançar sem os materiais.
-const FILTRO_PRONTAS_PARA_REVISAO = {
-  OR: [{ status: { not: "PENDENTE" as const } }, { xmlCompleto: { not: null } }],
-};
-
 /**
  * Tenta buscar o XML completo (com itens) pras notas "Nova" que ainda só têm
  * o resumo — a SEFAZ às vezes libera o documento completo depois de algum
@@ -55,7 +48,7 @@ export type IncomingNFeFiltros = {
 };
 
 function buildIncomingNFeWhere(filtros: IncomingNFeFiltros) {
-  const AND: Record<string, unknown>[] = [FILTRO_PRONTAS_PARA_REVISAO];
+  const AND: Record<string, unknown>[] = [];
 
   if (filtros.status) AND.push({ status: filtros.status });
   if (filtros.dataInicio || filtros.dataFim) {
@@ -301,41 +294,6 @@ export async function getIncomingNFeXml(
       resumo,
     };
   }
-}
-
-export type NotaAguardandoManifestacao = {
-  id: string;
-  chaveAcesso: string;
-  emitenteNome: string | null;
-  numero: string | null;
-  serie: string | null;
-  dataEmissao: Date | null;
-  manifestadoEm: Date | null;
-  manifestacaoErro: string | null;
-  manifestacaoTipo: string | null;
-};
-
-/**
- * Notas "Nova" ainda em resumo — escondidas da lista principal do Radar até
- * o XML completo chegar. Mostradas à parte pra permitir manifestar
- * manualmente, o que costuma liberar o XML completo junto à SEFAZ.
- */
-export async function listNotasAguardandoManifestacao(): Promise<NotaAguardandoManifestacao[]> {
-  return prisma.incomingNFe.findMany({
-    where: { status: "PENDENTE", xmlCompleto: null },
-    orderBy: { dataEmissao: "desc" },
-    select: {
-      id: true,
-      chaveAcesso: true,
-      emitenteNome: true,
-      numero: true,
-      serie: true,
-      dataEmissao: true,
-      manifestadoEm: true,
-      manifestacaoErro: true,
-      manifestacaoTipo: true,
-    },
-  });
 }
 
 type TipoEventoManifestacao = (typeof TIPO_EVENTO_MANIFESTACAO)[keyof typeof TIPO_EVENTO_MANIFESTACAO];

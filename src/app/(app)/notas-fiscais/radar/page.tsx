@@ -2,12 +2,10 @@ import {
   listIncomingNFes,
   countPendingIncomingNFes,
   autoSyncIncomingNFesIfDue,
-  listNotasAguardandoManifestacao,
   type IncomingNFeFiltros,
 } from "@/server/actions/sefaz-radar";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
-import { PendingManifestacaoList } from "@/components/notas-fiscais/pending-manifestacao-list";
 import { RadarFilters } from "@/components/notas-fiscais/radar-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 
@@ -39,10 +37,9 @@ export default async function RadarNFePage({
 
   await autoSyncIncomingNFesIfDue();
 
-  const [result, pendentes, aguardandoManifestacao] = await Promise.all([
+  const [result, pendentes] = await Promise.all([
     listIncomingNFes(page, pageSize, filtros),
     countPendingIncomingNFes(),
-    listNotasAguardandoManifestacao(),
   ]);
 
   const itemsOptions = result.items.map((item) => ({
@@ -55,6 +52,9 @@ export default async function RadarNFePage({
     dataEmissao: item.dataEmissao,
     valorTotal: item.valorTotal !== null ? Number(item.valorTotal) : null,
     status: item.status,
+    xmlCompleto: item.xmlCompleto !== null,
+    manifestadoEm: item.manifestadoEm,
+    manifestacaoErro: item.manifestacaoErro,
     invoiceLink: item.invoice
       ? {
           invoiceId: item.invoice.id,
@@ -78,7 +78,6 @@ export default async function RadarNFePage({
       </div>
 
       <div className="p-4 md:p-6">
-        <PendingManifestacaoList items={aguardandoManifestacao} />
         <RadarFilters />
         <IncomingNFeTable items={itemsOptions} />
       </div>
