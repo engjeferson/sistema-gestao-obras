@@ -13,6 +13,16 @@ function getAmbienteHost() {
   return process.env.SEFAZ_AMBIENTE === "2" ? ENDPOINTS.homologacao : ENDPOINTS.producao;
 }
 
+/**
+ * Extrai só o texto legível de um fault SOAP (soap:Text ou faultstring),
+ * em vez de propagar o envelope XML inteiro na mensagem de erro — o XML
+ * cru é ruído pro usuário final, o texto do fault já diz o que importa.
+ */
+function extractSoapFaultReason(xml: string): string | null {
+  const match = xml.match(/<(?:soap:Text|faultstring)[^>]*>([\s\S]*?)<\/(?:soap:Text|faultstring)>/);
+  return match ? match[1].trim() : null;
+}
+
 function postSoap12(pathname: string, soapAction: string, body: string): Promise<string> {
   const { pfx, passphrase } = loadSefazCert();
   const buffer = Buffer.from(body, "utf-8");
@@ -36,7 +46,8 @@ function postSoap12(pathname: string, soapAction: string, body: string): Promise
       res.on("end", () => {
         const responseBody = Buffer.concat(chunks).toString("utf-8");
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`SEFAZ respondeu ${res.statusCode}: ${responseBody.slice(0, 800)}`));
+          const reason = extractSoapFaultReason(responseBody);
+          reject(new Error(reason ? `SEFAZ (${res.statusCode}): ${reason}` : `SEFAZ respondeu ${res.statusCode}: ${responseBody.slice(0, 200)}`));
           return;
         }
         resolve(responseBody);
