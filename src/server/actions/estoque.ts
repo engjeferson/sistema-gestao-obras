@@ -359,19 +359,22 @@ export type AppropriationNode = {
   ordem: number;
   parentId: string | null;
   valor: number;
+  maoDeObra: number;
   materiaisDiretos: AppropriationMaterial[];
   children: AppropriationNode[];
 };
 
 /**
- * Árvore de apropriação de material por etapa/subetapa/atividade de uma obra.
- * "Valor apropriado" é uma soma cumulativa (não um saldo líquido): toda
- * movimentação com stageId/taskId preenchido representa material alocado
- * àquele nó (entrada direto lá, saída de uso, ou transferência com destino
- * lá) — nenhum dos 3 formulários usa esse campo pra representar remoção.
+ * Árvore de apropriação de material e mão de obra por etapa/subetapa/
+ * atividade de uma obra. Os valores são somas cumulativas (não um saldo
+ * líquido): toda movimentação/lançamento com stageId/taskId preenchido
+ * representa custo alocado àquele nó — material via StockMovement (entrada
+ * direto lá, saída de uso, ou transferência com destino lá), mão de obra via
+ * FinancialTransaction da categoria "Mão de obra" (qualquer status — reflete
+ * o total comprometido, não só o já pago).
  */
 export async function getStockAppropriationTree(workId: string): Promise<AppropriationNode[]> {
-  const [stages, movements] = await Promise.all([
+  const [stages, movements, maoDeObraCategoria] = await Promise.all([
     prisma.planningStage.findMany({
       where: { workId },
       include: { tasks: { orderBy: { ordem: "asc" } } },
@@ -391,7 +394,29 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
         material: { select: { nome: true, unidadePadrao: true, categoria: true } },
       },
     }),
+    prisma.financialCategory.findFirst({ where: { nome: "Mão de obra" }, select: { id: true } }),
   ]);
+
+  const maoDeObraTransactions = maoDeObraCategoria
+    ? await prisma.financialTransaction.findMany({
+        where: {
+          workId,
+          categoriaId: maoDeObraCategoria.id,
+          NOT: { stageId: null, taskId: null },
+        },
+        select: { valor: true, stageId: true, taskId: true },
+      })
+    : [];
+
+  const maoDeObraByStage = new Map<string, number>();
+  const maoDeObraByTask = new Map<string, number>();
+  for (const t of maoDeObraTransactions) {
+    if (t.taskId) {
+      maoDeObraByTask.set(t.taskId, (maoDeObraByTask.get(t.taskId) ?? 0) + Number(t.valor));
+    } else if (t.stageId) {
+      maoDeObraByStage.set(t.stageId, (maoDeObraByStage.get(t.stageId) ?? 0) + Number(t.valor));
+    }
+  }
 
   type Mov = (typeof movements)[number];
 
@@ -437,6 +462,7 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
       ordem: task.ordem,
       parentId: stage.id,
       valor: 0,
+      maoDeObra: maoDeObraByTask.get(task.id) ?? 0,
       materiaisDiretos: aggregateMateriais(movementsByTask.get(task.id) ?? []),
       children: [],
     }));
@@ -449,6 +475,7 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
       ordem: stage.ordem,
       parentId: stage.parentId,
       valor: 0,
+      maoDeObra: maoDeObraByStage.get(stage.id) ?? 0,
       materiaisDiretos: aggregateMateriais(movementsByStage.get(stage.id) ?? []),
       children: taskNodes,
     });
@@ -463,12 +490,13 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
     }
   }
 
-  function finalize(node: AppropriationNode): number {
+  function finalize(node: AppropriationNode): void {
     node.children.sort((a, b) => a.ordem - b.ordem);
     const ownValue = node.materiaisDiretos.reduce((sum, m) => sum + m.valor, 0);
-    const childrenValue = node.children.reduce((sum, child) => sum + finalize(child), 0);
-    node.valor = ownValue + childrenValue;
-    return node.valor;
+    const ownMaoDeObra = node.maoDeObra;
+    for (const child of node.children) finalize(child);
+    node.valor = ownValue + node.children.reduce((sum, child) => sum + child.valor, 0);
+    node.maoDeObra = ownMaoDeObra + node.children.reduce((sum, child) => sum + child.maoDeObra, 0);
   }
 
   roots.sort((a, b) => a.ordem - b.ordem);

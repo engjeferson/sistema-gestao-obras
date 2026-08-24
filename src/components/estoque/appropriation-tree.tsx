@@ -15,7 +15,8 @@ function filterByResource(nodes: AppropriationNode[], materialId: string): Appro
     const children = filterByResource(node.children, materialId);
     if (materiaisDiretos.length === 0 && children.length === 0) continue;
     const valor = materiaisDiretos.reduce((s, m) => s + m.valor, 0) + children.reduce((s, c) => s + c.valor, 0);
-    result.push({ ...node, materiaisDiretos, children, valor });
+    // Filtro é só de material — mão de obra some da visão pra não confundir.
+    result.push({ ...node, materiaisDiretos, children, valor, maoDeObra: 0 });
   }
   return result;
 }
@@ -142,7 +143,12 @@ function TreeNode({ node, depth, defaultOpen }: { node: AppropriationNode; depth
             {node.nome}
           </span>
         </span>
-        <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{formatCurrencyBRL(node.valor)}</span>
+        <span className="flex shrink-0 flex-col items-end text-sm tabular-nums text-muted-foreground">
+          <span>{formatCurrencyBRL(node.valor)}</span>
+          {node.maoDeObra > 0 ? (
+            <span className="text-xs text-muted-foreground/70">Mão de obra: {formatCurrencyBRL(node.maoDeObra)}</span>
+          ) : null}
+        </span>
       </button>
       {open ? (
         <div>
@@ -190,7 +196,12 @@ function TasksFlatList({ tasks }: { tasks: { node: AppropriationNode; path: stri
                 {node.nome}
               </p>
             </div>
-            <p className="shrink-0 text-sm font-medium tabular-nums">{formatCurrencyBRL(node.valor)}</p>
+            <div className="flex shrink-0 flex-col items-end">
+              <p className="text-sm font-medium tabular-nums">{formatCurrencyBRL(node.valor)}</p>
+              {node.maoDeObra > 0 ? (
+                <p className="text-xs text-muted-foreground">Mão de obra: {formatCurrencyBRL(node.maoDeObra)}</p>
+              ) : null}
+            </div>
           </div>
           {node.materiaisDiretos.length > 0 ? (
             <div className="mt-2 flex flex-col border-t pt-2">

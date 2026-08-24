@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Wallet } from "lucide-react";
+import { Wallet, HardHat } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AppropriationFilters, type AppropriationViewMode } from "@/components/estoque/appropriation-filters";
 import { AppropriationTree } from "@/components/estoque/appropriation-tree";
@@ -29,10 +29,14 @@ export function AppropriationView({ nodes }: { nodes: AppropriationNode[] }) {
 
   const materials = useMemo(() => collectMateriais(nodes), [nodes]);
   const valorTotal = useMemo(() => nodes.reduce((sum, node) => sum + node.valor, 0), [nodes]);
+  const maoDeObraTotal = useMemo(() => nodes.reduce((sum, node) => sum + node.maoDeObra, 0), [nodes]);
 
   return (
     <div className="flex flex-col gap-4">
-      <KpiCard icon={Wallet} label="Valor total apropriado nesta obra" value={formatCurrencyBRL(valorTotal)} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <KpiCard icon={Wallet} label="Valor total em material apropriado" value={formatCurrencyBRL(valorTotal)} />
+        <KpiCard icon={HardHat} label="Valor total em mão de obra" value={formatCurrencyBRL(maoDeObraTotal)} />
+      </div>
       <AppropriationFilters
         materials={materials}
         search={search}
