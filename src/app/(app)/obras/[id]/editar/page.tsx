@@ -1,12 +1,17 @@
 import { notFound } from "next/navigation";
 import { getWork, updateWork } from "@/server/actions/obras";
 import { listActiveProfessionals } from "@/server/actions/profissionais";
+import { listClients } from "@/server/actions/clientes";
 import { ObraForm } from "@/components/obras/obra-form";
 import { presignGet } from "@/lib/r2";
 
 export default async function EditarObraPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [work, professionals] = await Promise.all([getWork(id), listActiveProfessionals()]);
+  const [work, professionals, clients] = await Promise.all([
+    getWork(id),
+    listActiveProfessionals(),
+    listClients(),
+  ]);
   if (!work) {
     notFound();
   }
@@ -25,10 +30,10 @@ export default async function EditarObraPage({ params }: { params: Promise<{ id:
           ...work,
           valorContrato: Number(work.valorContrato),
           areaConstruida: work.areaConstruida !== null ? Number(work.areaConstruida) : null,
-          clienteNome: work.client?.nome,
         }}
         submitLabel="Salvar alterações"
         professionals={professionals}
+        clients={clients}
         renderPreviewUrl={renderPreviewUrl}
       />
     </div>

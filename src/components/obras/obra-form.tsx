@@ -1,12 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Combobox } from "@/components/ui/combobox";
 import { WorkRenderUploader } from "@/components/obras/work-render-uploader";
 import { WORK_STATUS_LABELS } from "@/lib/status-labels";
 import type { WorkModel } from "@/generated/prisma/models";
@@ -14,7 +16,6 @@ import type { WorkModel } from "@/generated/prisma/models";
 type ObraFormDefaultValues = Partial<Omit<WorkModel, "valorContrato" | "areaConstruida">> & {
   valorContrato?: number;
   areaConstruida?: number | null;
-  clienteNome?: string;
 };
 
 type ObraFormProps = {
@@ -22,6 +23,7 @@ type ObraFormProps = {
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
   professionals: { id: string; nome: string; tipo: { nome: string } }[];
+  clients: { id: string; nome: string }[];
   renderPreviewUrl?: string | null;
 };
 
@@ -40,11 +42,14 @@ export function ObraForm({
   defaultValues,
   submitLabel,
   professionals,
+  clients,
   renderPreviewUrl,
 }: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [clientId, setClientId] = useState(defaultValues?.clientId ?? "");
   const engenheiros = professionals.filter((p) => isEngenheiro(p.tipo.nome));
   const naoEngenheiros = professionals.filter((p) => !isEngenheiro(p.tipo.nome));
+  const clientOptions = clients.map((c) => ({ value: c.id, label: c.nome }));
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -53,13 +58,25 @@ export function ObraForm({
           <Label htmlFor="nome">Nome da obra</Label>
           <Input id="nome" name="nome" defaultValue={defaultValues?.nome} required />
         </div>
+        {defaultValues?.id ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="codigo">Código</Label>
+            <Input id="codigo" name="codigo" defaultValue={defaultValues?.codigo} required />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="codigo">Código</Label>
-          <Input id="codigo" name="codigo" defaultValue={defaultValues?.codigo} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="clienteNome">Cliente</Label>
-          <Input id="clienteNome" name="clienteNome" defaultValue={defaultValues?.clienteNome} />
+          <Label htmlFor="clientId">Cliente</Label>
+          <Combobox
+            value={clientId}
+            onChange={setClientId}
+            options={clientOptions}
+            placeholder="Buscar cliente cadastrado..."
+            emptyMessage="Nenhum cliente encontrado."
+          />
+          <input type="hidden" name="clientId" value={clientId} />
+          <Link href="/cadastros/clientes/novo" target="_blank" className="text-xs text-muted-foreground underline">
+            Cliente não encontrado? Cadastrar novo cliente
+          </Link>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefone">Telefone</Label>

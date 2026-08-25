@@ -1,9 +1,10 @@
 import { ObraForm } from "@/components/obras/obra-form";
 import { createWork } from "@/server/actions/obras";
 import { listActiveProfessionals } from "@/server/actions/profissionais";
+import { listClients } from "@/server/actions/clientes";
 
 export default async function NovaObraPage() {
-  const professionals = await listActiveProfessionals();
+  const [professionals, clients] = await Promise.all([listActiveProfessionals(), listClients()]);
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
@@ -11,7 +12,7 @@ export default async function NovaObraPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Nova obra</h1>
         <p className="text-muted-foreground">Cadastre uma nova obra para começar a lançar dados nela.</p>
       </div>
-      <ObraForm action={createWork} submitLabel="Criar obra" professionals={professionals} />
+      <ObraForm action={createWork} submitLabel="Criar obra" professionals={professionals} clients={clients} />
     </div>
   );
 }

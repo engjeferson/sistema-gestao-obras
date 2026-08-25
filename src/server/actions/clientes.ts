@@ -22,6 +22,12 @@ function parseClientForm(formData: FormData) {
     telefone: formData.get("telefone") ?? undefined,
     email: formData.get("email") ?? undefined,
     endereco: formData.get("endereco") ?? undefined,
+    cep: formData.get("cep") ?? undefined,
+    numero: formData.get("numero") ?? undefined,
+    complemento: formData.get("complemento") ?? undefined,
+    bairro: formData.get("bairro") ?? undefined,
+    cidade: formData.get("cidade") ?? undefined,
+    uf: formData.get("uf") ?? undefined,
     observacoes: formData.get("observacoes") ?? undefined,
   });
 }
@@ -43,6 +49,12 @@ export async function createClient(_prevState: string | undefined, formData: For
       telefone: data.telefone || null,
       email: data.email || null,
       endereco: data.endereco || null,
+      cep: data.cep || null,
+      numero: data.numero || null,
+      complemento: data.complemento || null,
+      bairro: data.bairro || null,
+      cidade: data.cidade || null,
+      uf: data.uf || null,
       observacoes: data.observacoes || null,
     },
   });
@@ -69,6 +81,12 @@ export async function updateClient(clientId: string, _prevState: string | undefi
       telefone: data.telefone || null,
       email: data.email || null,
       endereco: data.endereco || null,
+      cep: data.cep || null,
+      numero: data.numero || null,
+      complemento: data.complemento || null,
+      bairro: data.bairro || null,
+      cidade: data.cidade || null,
+      uf: data.uf || null,
       observacoes: data.observacoes || null,
     },
   });

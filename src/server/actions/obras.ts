@@ -8,20 +8,26 @@ import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
-async function findOrCreateClientId(nome: string | undefined) {
-  const trimmed = nome?.trim();
-  if (!trimmed) return null;
-  const existing = await prisma.client.findFirst({ where: { nome: trimmed } });
-  if (existing) return existing.id;
-  const created = await prisma.client.create({ data: { nome: trimmed } });
-  return created.id;
+/**
+ * Gera o próximo código sequencial (ex.: "003") a partir do maior número já
+ * usado em qualquer código existente — funciona com os formatos livres já
+ * cadastrados ("002", "OBRA-001"). Usado quando o usuário não digita um
+ * código manualmente na criação da obra.
+ */
+async function gerarProximoCodigo(): Promise<string> {
+  const works = await prisma.work.findMany({ select: { codigo: true } });
+  const max = works.reduce((acc, w) => {
+    const match = w.codigo.match(/(\d+)/);
+    return Math.max(acc, match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  return String(max + 1).padStart(3, "0");
 }
 
 function parseWorkForm(formData: FormData) {
   return workFormSchema.safeParse({
     nome: formData.get("nome"),
-    codigo: formData.get("codigo"),
-    clienteNome: formData.get("clienteNome") ?? undefined,
+    codigo: formData.get("codigo") ?? undefined,
+    clientId: formData.get("clientId"),
     responsavelTecnicoId: formData.get("responsavelTecnicoId") ?? undefined,
     encarregadoId: formData.get("encarregadoId") ?? undefined,
     telefone: formData.get("telefone") ?? undefined,
@@ -46,18 +52,17 @@ export async function createWork(_prevState: string | undefined, formData: FormD
   }
   const data = parsed.data;
 
-  const existingCodigo = await prisma.work.findUnique({ where: { codigo: data.codigo } });
+  const codigo = data.codigo || (await gerarProximoCodigo());
+  const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
   if (existingCodigo) {
     return "Já existe uma obra com esse código.";
   }
 
-  const clientId = await findOrCreateClientId(data.clienteNome);
-
   const work = await prisma.work.create({
     data: {
       nome: data.nome,
-      codigo: data.codigo,
-      clientId,
+      codigo,
+      clientId: data.clientId,
       responsavelTecnicoId: data.responsavelTecnicoId || null,
       encarregadoId: data.encarregadoId || null,
       telefone: data.telefone || null,
@@ -85,19 +90,18 @@ export async function updateWork(workId: string, _prevState: string | undefined,
   }
   const data = parsed.data;
 
-  const existingCodigo = await prisma.work.findUnique({ where: { codigo: data.codigo } });
+  const codigo = data.codigo || (await gerarProximoCodigo());
+  const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
   if (existingCodigo && existingCodigo.id !== workId) {
     return "Já existe uma obra com esse código.";
   }
-
-  const clientId = await findOrCreateClientId(data.clienteNome);
 
   await prisma.work.update({
     where: { id: workId },
     data: {
       nome: data.nome,
-      codigo: data.codigo,
-      clientId,
+      codigo,
+      clientId: data.clientId,
       responsavelTecnicoId: data.responsavelTecnicoId || null,
       encarregadoId: data.encarregadoId || null,
       telefone: data.telefone || null,

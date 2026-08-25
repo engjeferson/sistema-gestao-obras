@@ -4,8 +4,8 @@ export const workStatusValues = ["PLANEJAMENTO", "EM_ANDAMENTO", "PARALISADA", "
 
 export const workFormSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome da obra."),
-  codigo: z.string().trim().min(1, "Informe o código da obra."),
-  clienteNome: z.string().trim().optional(),
+  codigo: z.string().trim().optional(),
+  clientId: z.string().trim().min(1, "Selecione um cliente cadastrado."),
   responsavelTecnicoId: z.string().trim().optional(),
   encarregadoId: z.string().trim().optional(),
   telefone: z.string().trim().optional(),
