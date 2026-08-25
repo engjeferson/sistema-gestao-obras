@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -279,17 +279,28 @@ export function TemplatePlanningEditor({
       <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Importar planilha</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setImportOpen((v) => !v);
-              setImportSummary(null);
-            }}
-          >
-            <Upload /> {importOpen ? "Cancelar" : "Colar planilha"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              render={<a href="/api/planejamento-templates/modelo" download="modelo-planejamento.xlsx" />}
+              nativeButton={false}
+            >
+              <Download /> Baixar planilha modelo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportOpen((v) => !v);
+                setImportSummary(null);
+              }}
+            >
+              <Upload /> {importOpen ? "Cancelar" : "Colar planilha"}
+            </Button>
+          </div>
         </div>
         {importOpen ? (
           <div className="flex flex-col gap-2">
