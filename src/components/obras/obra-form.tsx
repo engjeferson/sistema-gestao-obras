@@ -18,17 +18,36 @@ type ObraFormDefaultValues = Partial<Omit<WorkModel, "valorContrato" | "areaCons
   areaConstruida?: number | null;
 };
 
+type ClientOption = {
+  id: string;
+  nome: string;
+  endereco: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+};
+
 type ObraFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: ObraFormDefaultValues;
   submitLabel: string;
   professionals: { id: string; nome: string; tipo: { nome: string } }[];
-  clients: { id: string; nome: string }[];
+  clients: ClientOption[];
   renderPreviewUrl?: string | null;
 };
 
 function isEngenheiro(tipoNome: string) {
   return tipoNome.toLowerCase().includes("engenheiro");
+}
+
+function formatEnderecoCompleto(client: ClientOption | undefined): string {
+  if (!client) return "";
+  const linha1 = [client.endereco, client.numero].filter(Boolean).join(", ");
+  const linha2 = [client.complemento, client.bairro].filter(Boolean).join(" - ");
+  const cidadeUf = [client.cidade, client.uf].filter(Boolean).join("/");
+  return [linha1, linha2, cidadeUf].filter(Boolean).join(" - ");
 }
 
 function toDateInputValue(date: Date | string | undefined | null) {
@@ -47,9 +66,17 @@ export function ObraForm({
 }: ObraFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [clientId, setClientId] = useState(defaultValues?.clientId ?? "");
+  const [endereco, setEndereco] = useState(defaultValues?.endereco ?? "");
   const engenheiros = professionals.filter((p) => isEngenheiro(p.tipo.nome));
   const naoEngenheiros = professionals.filter((p) => !isEngenheiro(p.tipo.nome));
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.nome }));
+
+  function handleClientChange(newClientId: string) {
+    setClientId(newClientId);
+    const client = clients.find((c) => c.id === newClientId);
+    const enderecoCliente = formatEnderecoCompleto(client);
+    if (enderecoCliente) setEndereco(enderecoCliente);
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -68,7 +95,7 @@ export function ObraForm({
           <Label htmlFor="clientId">Cliente</Label>
           <Combobox
             value={clientId}
-            onChange={setClientId}
+            onChange={handleClientChange}
             options={clientOptions}
             placeholder="Buscar cliente cadastrado..."
             emptyMessage="Nenhum cliente encontrado."
@@ -106,7 +133,7 @@ export function ObraForm({
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="endereco">Endereço</Label>
-          <Input id="endereco" name="endereco" defaultValue={defaultValues?.endereco ?? ""} />
+          <Input id="endereco" name="endereco" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valorContrato">Valor do contrato (R$)</Label>
