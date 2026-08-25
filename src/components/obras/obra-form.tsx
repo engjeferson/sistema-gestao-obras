@@ -79,10 +79,6 @@ export function ObraForm({
           </Link>
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="telefone">Telefone</Label>
-          <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
-        </div>
-        <div className="flex flex-col gap-2">
           <Label htmlFor="responsavelTecnicoId">Responsável técnico</Label>
           <NativeSelect
             id="responsavelTecnicoId"
