@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createPlanningTemplate } from "@/server/actions/planejamento-templates";
 
-type TemplateRow = {
+export type TemplateRow = {
   clientId: string;
   tipo: "ETAPA" | "ATIVIDADE";
   parentClientId: string;
@@ -32,11 +32,23 @@ function newRow(tipo: "ETAPA" | "ATIVIDADE", parentClientId = ""): TemplateRow {
   };
 }
 
-export function TemplatePlanningEditor() {
-  const [errorMessage, formAction, isPending] = useActionState(createPlanningTemplate, undefined);
-  const [nome, setNome] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [rows, setRows] = useState<TemplateRow[]>([newRow("ETAPA")]);
+export function TemplatePlanningEditor({
+  action = createPlanningTemplate,
+  submitLabel = "Salvar template",
+  defaultNome = "",
+  defaultDescricao = "",
+  defaultRows,
+}: {
+  action?: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
+  submitLabel?: string;
+  defaultNome?: string;
+  defaultDescricao?: string;
+  defaultRows?: TemplateRow[];
+} = {}) {
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [nome, setNome] = useState(defaultNome);
+  const [descricao, setDescricao] = useState(defaultDescricao);
+  const [rows, setRows] = useState<TemplateRow[]>(defaultRows ?? [newRow("ETAPA")]);
 
   const etapaRows = rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = rows.filter((r) => r.tipo === "ATIVIDADE");
@@ -218,7 +230,7 @@ export function TemplatePlanningEditor() {
 
       <div>
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Salvando..." : "Salvar template"}
+          {isPending ? "Salvando..." : submitLabel}
         </Button>
       </div>
     </form>

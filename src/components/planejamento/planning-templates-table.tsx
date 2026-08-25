@@ -2,7 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateBR } from "@/lib/status-labels";
@@ -73,7 +74,12 @@ export function PlanningTemplatesTable({ templates }: { templates: PlanningTempl
               <TableCell>{t.createdByName}</TableCell>
               <TableCell>{formatDateBR(t.createdAt)}</TableCell>
               <TableCell className="text-right">
-                <DeleteButton templateId={t.id} />
+                <div className="flex justify-end gap-1">
+                  <Button variant="ghost" size="icon" render={<Link href={`/planejamento-templates/${t.id}/editar`} />} nativeButton={false} title="Editar">
+                    <Pencil className="size-4" />
+                  </Button>
+                  <DeleteButton templateId={t.id} />
+                </div>
               </TableCell>
             </TableRow>
           ))}

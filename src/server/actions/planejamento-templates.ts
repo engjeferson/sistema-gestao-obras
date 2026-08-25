@@ -28,6 +28,46 @@ export async function listPlanningTemplates() {
   }));
 }
 
+export async function getPlanningTemplateForEdit(templateId: string) {
+  const template = await prisma.planningTemplate.findUnique({
+    where: { id: templateId },
+    include: {
+      stages: {
+        include: { tasks: { include: { predecessors: true }, orderBy: { ordem: "asc" } } },
+        orderBy: { ordem: "asc" },
+      },
+    },
+  });
+  if (!template) return null;
+
+  const rows = [
+    ...template.stages.map((stage) => ({
+      clientId: stage.id,
+      tipo: "ETAPA" as const,
+      parentClientId: "",
+      codigo: stage.codigo ?? "",
+      nome: stage.nome,
+      offsetInicioDias: undefined,
+      duracaoDias: undefined,
+      predecessorClientIds: [],
+    })),
+    ...template.stages.flatMap((stage) =>
+      stage.tasks.map((task) => ({
+        clientId: task.id,
+        tipo: "ATIVIDADE" as const,
+        parentClientId: stage.id,
+        codigo: task.codigo ?? "",
+        nome: task.nome,
+        offsetInicioDias: task.offsetInicioDias,
+        duracaoDias: task.duracaoDias,
+        predecessorClientIds: task.predecessors.map((dep) => dep.predecessorTaskId),
+      })),
+    ),
+  ];
+
+  return { id: template.id, nome: template.nome, descricao: template.descricao, rows };
+}
+
 export async function deletePlanningTemplate(templateId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
@@ -79,6 +119,100 @@ export async function createPlanningTemplate(_prevState: string | undefined, for
       const created = await tx.planningTemplateStage.create({
         data: {
           templateId: template.id,
+          codigo: row.codigo || String(index + 1).padStart(2, "0"),
+          nome: row.nome,
+          ordem: index,
+        },
+      });
+      stageIdMap.set(row.clientId, created.id);
+    }
+
+    const taskIdMap = new Map<string, string>();
+    const taskCountByStage = new Map<string, number>();
+    for (const row of atividadeRows) {
+      const stageId = stageIdMap.get(row.parentClientId!);
+      if (!stageId) continue;
+      const countSoFar = taskCountByStage.get(stageId) ?? 0;
+      const created = await tx.planningTemplateTask.create({
+        data: {
+          templateStageId: stageId,
+          codigo: row.codigo || undefined,
+          nome: row.nome,
+          ordem: countSoFar,
+          offsetInicioDias: row.offsetInicioDias!,
+          duracaoDias: row.duracaoDias!,
+        },
+      });
+      taskIdMap.set(row.clientId, created.id);
+      taskCountByStage.set(stageId, countSoFar + 1);
+    }
+
+    for (const row of atividadeRows) {
+      const successorId = taskIdMap.get(row.clientId);
+      if (!successorId || !row.predecessorClientIds) continue;
+      for (const predecessorClientId of row.predecessorClientIds) {
+        const predecessorId = taskIdMap.get(predecessorClientId);
+        if (!predecessorId) continue;
+        await tx.planningTemplateDependency.create({
+          data: { predecessorTaskId: predecessorId, successorTaskId: successorId },
+        });
+      }
+    }
+  });
+
+  revalidatePath("/planejamento-templates");
+  redirect("/planejamento-templates");
+}
+
+export async function updatePlanningTemplate(templateId: string, _prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  let rowsParsed: unknown;
+  try {
+    rowsParsed = JSON.parse(String(formData.get("rowsJson") ?? "[]"));
+  } catch {
+    return "Linhas inválidas.";
+  }
+
+  const parsed = createTemplateSchema.safeParse({
+    nome: formData.get("nome"),
+    descricao: formData.get("descricao") ?? undefined,
+    rows: rowsParsed,
+  });
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+  const data = parsed.data;
+
+  const etapaRows = data.rows.filter((r) => r.tipo === "ETAPA");
+  const atividadeRows = data.rows.filter((r) => r.tipo === "ATIVIDADE");
+
+  for (const row of atividadeRows) {
+    if (!row.parentClientId) {
+      return `A atividade "${row.nome}" precisa estar dentro de uma etapa.`;
+    }
+    if (row.offsetInicioDias === undefined || row.duracaoDias === undefined) {
+      return `Informe o dia de início e a duração da atividade "${row.nome}".`;
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.planningTemplate.update({
+      where: { id: templateId },
+      data: { nome: data.nome, descricao: data.descricao || null },
+    });
+
+    // Recria a estrutura do zero — mais simples e robusto do que tentar
+    // fazer diff de etapas/atividades/dependências alteradas, removidas e
+    // adicionadas. As dependências e tasks caem em cascata (onDelete: Cascade).
+    await tx.planningTemplateStage.deleteMany({ where: { templateId } });
+
+    const stageIdMap = new Map<string, string>();
+    for (const [index, row] of etapaRows.entries()) {
+      const created = await tx.planningTemplateStage.create({
+        data: {
+          templateId,
           codigo: row.codigo || String(index + 1).padStart(2, "0"),
           nome: row.nome,
           ordem: index,
