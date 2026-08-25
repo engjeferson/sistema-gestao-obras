@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatDocumento, formatTelefone } from "@/lib/masks";
 import type { ClientModel } from "@/generated/prisma/models";
 
 function formatCep(value: string) {
@@ -29,6 +30,8 @@ export function ClientForm({
   submitLabel: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [documento, setDocumento] = useState(formatDocumento(defaultValues?.documento ?? ""));
+  const [telefone, setTelefone] = useState(formatTelefone(defaultValues?.telefone ?? ""));
   const [cep, setCep] = useState(defaultValues?.cep ?? "");
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [endereco, setEndereco] = useState<Endereco>({
@@ -73,11 +76,25 @@ export function ClientForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="documento">CPF/CNPJ</Label>
-          <Input id="documento" name="documento" defaultValue={defaultValues?.documento ?? ""} />
+          <Input
+            id="documento"
+            name="documento"
+            value={documento}
+            onChange={(e) => setDocumento(formatDocumento(e.target.value))}
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefone">Telefone</Label>
-          <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
+          <Input
+            id="telefone"
+            name="telefone"
+            value={telefone}
+            onChange={(e) => setTelefone(formatTelefone(e.target.value))}
+            inputMode="numeric"
+            placeholder="(00) 00000-0000"
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">E-mail</Label>
