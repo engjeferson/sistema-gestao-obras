@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Import } from "lucide-react";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 import { listPlanningTemplates } from "@/server/actions/planejamento-templates";
-import { PlanningView } from "@/components/planejamento/planning-view";
+import { PlanningEditor } from "@/components/planejamento/planning-editor";
 import { ApplyTemplatePicker } from "@/components/planejamento/apply-template-picker";
 import { SaveAsTemplateButton } from "@/components/planejamento/save-as-template-dialog";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
           <Import /> Lançamento em bloco
         </Button>
       </div>
-      <PlanningView stages={stages} workId={id} />
+      <PlanningEditor stages={stages} workId={id} />
     </div>
   );
 }

@@ -445,6 +445,20 @@ export async function reorderChildren(
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 
+/** Move uma atividade pra outra etapa/sub (arrastar entre etapas) — entra no fim da nova lista. */
+export async function moveTaskToStage(taskId: string, workId: string, newStageId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const ordem = await nextChildOrdem(prisma, workId, newStageId);
+  await prisma.planningTask.update({
+    where: { id: taskId },
+    data: { stageId: newStageId, ordem },
+  });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
 export async function createTask(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);

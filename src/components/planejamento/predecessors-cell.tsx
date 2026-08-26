@@ -1,51 +1,86 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { addPlanningDependencyByCode, removeGroupedDependency, type PredecessorChip } from "@/server/actions/planejamento";
 
 /**
- * Célula de predecessoras reutilizável tanto pra um Item (owner = ownerTaskId) quanto pra uma
- * Etapa/Sub inteira (owner = ownerStageId) — nesse caso a predecessora passa a valer pra todos
- * os itens dela. A predecessora digitada também pode ser um código de etapa/sub (ex: "1") ou
- * de item (ex: "1.1") — resolvido no servidor.
+ * Célula de predecessoras reutilizável tanto pra uma Atividade (owner = ownerTaskId) quanto pra
+ * uma Etapa/Sub inteira (owner = ownerStageId) — nesse caso a predecessora passa a valer pra
+ * todos os itens dela. `options` vem da árvore já carregada na página (etapas e atividades,
+ * rótulo "1.2 — Vigas baldrame") — selecionar chama a mesma action de sempre, resolvida pelo
+ * código; o servidor não muda, só a UI de seleção (antes era um input de texto livre).
  */
 export function PredecessorsCell({
   workId,
   ownerStageId = null,
   ownerTaskId = null,
+  ownCode,
   chips,
+  options,
 }: {
   workId: string;
   ownerStageId?: string | null;
   ownerTaskId?: string | null;
+  ownCode: string;
   chips: PredecessorChip[];
+  options: { value: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
-  const [codeInput, setCodeInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  function handleAdd() {
-    const trimmed = codeInput.trim();
-    if (!trimmed) return;
+  function updatePosition() {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 240) });
+  }
 
-    setError(null);
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  function handleOpen() {
+    setOpen(true);
+    requestAnimationFrame(updatePosition);
+  }
+
+  function handleSelect(option: { value: string; label: string }) {
     startTransition(async () => {
       try {
-        await addPlanningDependencyByCode(workId, trimmed, ownerStageId, ownerTaskId);
-        toast.success("Predecessora adicionada.");
-        setOpen(false);
-        setCodeInput("");
+        await addPlanningDependencyByCode(workId, option.value, ownerStageId, ownerTaskId);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Não foi possível adicionar.");
+        toast.error(err instanceof Error ? err.message : "Não foi possível adicionar.");
       }
     });
+    setQuery("");
+    inputRef.current?.focus();
   }
 
   function handleRemove(chip: PredecessorChip) {
@@ -57,13 +92,18 @@ export function PredecessorsCell({
         ownerStageId,
         ownerTaskId,
       );
-      toast.success("Predecessora removida.");
       router.refresh();
     });
   }
 
+  const chipCodes = new Set(chips.map((c) => c.codigo));
+  const available = options.filter((o) => o.value !== ownCode && !chipCodes.has(o.value));
+  const filtered = query.trim()
+    ? available.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : available;
+
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div ref={wrapperRef} className="flex flex-wrap items-center gap-1">
       {chips.map((chip) => (
         <span
           key={`${chip.type}-${chip.id}`}
@@ -78,36 +118,54 @@ export function PredecessorsCell({
       ))}
 
       {open ? (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1">
-            <input
-              autoFocus
-              value={codeInput}
-              onChange={(e) => {
-                setCodeInput(e.target.value);
-                setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAdd();
-                }
-                if (e.key === "Escape") setOpen(false);
-              }}
-              placeholder="Código (etapa ou atividade)"
-              className="h-6 w-28 rounded border px-1.5 text-xs"
-            />
-            <Button size="icon-xs" variant="ghost" disabled={isPending || !codeInput.trim()} onClick={handleAdd}>
-              <Plus className="size-3" />
-            </Button>
-          </div>
-          {error ? <span className="text-[0.65rem] text-destructive">{error}</span> : null}
-        </div>
+        <Input
+          ref={inputRef}
+          value={query}
+          autoFocus
+          placeholder="Buscar etapa ou atividade..."
+          onChange={(e) => {
+            setQuery(e.target.value);
+            handleOpen();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              setQuery("");
+            }
+          }}
+          className="h-6 w-40 text-xs"
+        />
       ) : (
-        <Button size="icon-xs" variant="ghost" onClick={() => setOpen(true)} title="Adicionar predecessora (etapa ou atividade, pelo código)">
+        <Button size="icon-xs" variant="ghost" onClick={handleOpen} title="Adicionar predecessora">
           <Plus className="size-3" />
         </Button>
       )}
+
+      {open && rect
+        ? createPortal(
+            <div
+              className="fixed z-50 max-h-56 overflow-y-auto rounded-md border bg-popover shadow-md"
+              style={{ top: rect.top, left: rect.left, width: rect.width }}
+            >
+              {filtered.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">Nenhum resultado.</p>
+              ) : (
+                filtered.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(option)}
+                    className="block w-full truncate px-3 py-1.5 text-left text-sm hover:bg-muted"
+                  >
+                    {option.label}
+                  </button>
+                ))
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
