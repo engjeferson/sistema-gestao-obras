@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PlanningTablePane } from "@/components/planejamento/planning-table-pane";
 import { GanttCanvas, todayUTC } from "@/components/gantt/gantt-canvas";
 import { buildPlanningRows, collectAllTasks, flattenPredecessorOptions, type PlainStage } from "@/components/planejamento/stage-list";
+import type { WorkCalendar } from "@/lib/schedule-dates";
 
 const ZOOM_LEVELS = [8, 14, 22, 34, 50];
 const DEFAULT_LEFT_WIDTH = 836;
@@ -34,7 +35,15 @@ function collectStageIds(stages: PlainStage[]): string[] {
  * painéis dispara a mesma server action + `router.refresh()`, e ambos re-renderizam a partir dos
  * mesmos dados do servidor.
  */
-export function PlanningEditor({ stages, workId }: { stages: PlainStage[]; workId: string }) {
+export function PlanningEditor({
+  stages,
+  workId,
+  calendar,
+}: {
+  stages: PlainStage[];
+  workId: string;
+  calendar: WorkCalendar;
+}) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [zoomIndex, setZoomIndex] = useState(2);
   const [fullscreen, setFullscreen] = useState(false);
@@ -175,6 +184,7 @@ export function PlanningEditor({ stages, workId }: { stages: PlainStage[]; workI
                 onToggleCollapse={toggleCollapse}
                 onExpand={expandStage}
                 predecessorOptions={predecessorOptions}
+                calendar={calendar}
               />
             </div>
             <div
@@ -183,7 +193,15 @@ export function PlanningEditor({ stages, workId }: { stages: PlainStage[]; workI
               title="Arrastar para redimensionar"
             />
             <div className="min-w-0 flex-1">
-              <GanttCanvas ref={ganttScrollRef} rows={rows} workId={workId} rangeStart={rangeStart} totalDays={totalDays} pxPerDay={pxPerDay} />
+              <GanttCanvas
+                ref={ganttScrollRef}
+                rows={rows}
+                workId={workId}
+                rangeStart={rangeStart}
+                totalDays={totalDays}
+                pxPerDay={pxPerDay}
+                calendar={calendar}
+              />
             </div>
           </div>
         </div>

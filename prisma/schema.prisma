@@ -289,6 +289,7 @@ model Work {
   dataPrevistaTermino   DateTime   @db.Date
   status                WorkStatus @default(PLANEJAMENTO)
   observacoes           String?
+  workingWeekdays       Int[]      @default([1, 2, 3, 4, 5])
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
@@ -304,8 +305,22 @@ model Work {
   rdos                  Rdo[]
   stockMovementsOrigem  StockMovement[] @relation("StockMovementOrigem")
   stockMovementsDestino StockMovement[] @relation("StockMovementDestino")
+  holidays              WorkHoliday[]
 
   @@index([status])
+}
+
+model WorkHoliday {
+  id        String   @id @default(cuid())
+  workId    String
+  data      DateTime @db.Date
+  descricao String?
+  createdAt DateTime @default(now())
+
+  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([workId, data])
+  @@index([workId])
 }
 
 model FinancialTransaction {

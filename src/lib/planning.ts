@@ -1,4 +1,5 @@
 import type { PlanningStatus } from "@/generated/prisma/enums";
+import { addWorkingDays, countWorkingDays, type WorkCalendar } from "@/lib/schedule-dates";
 
 export function getEffectiveStatus(task: { percentualExecutado: number; dataFimPrevista: Date }): PlanningStatus {
   const hoje = new Date();
@@ -24,18 +25,18 @@ export type DependencyForCascade = {
   lagDias: number;
 };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 /**
  * Recalcula datas das sucessoras a partir de uma atividade que teve sua data de término alterada.
- * Regra: início da sucessora = max(início atual, fim da predecessora + lag + 1 dia), preservando a
- * duração original da sucessora. Propaga recursivamente pela cadeia de dependências, com proteção
- * contra ciclos. Função pura — não acessa o banco.
+ * Regra: início da sucessora = max(início atual, próximo dia útil após fim da predecessora + lag
+ * dias úteis), preservando a duração original da sucessora **em dias úteis** (não em milissegundos
+ * corridos). Propaga recursivamente pela cadeia de dependências, com proteção contra ciclos.
+ * Função pura — não acessa o banco; `calendar` já vem resolvido (dias da semana + feriados do work).
  */
 export function computeCascade(
   tasks: TaskForCascade[],
   dependencies: DependencyForCascade[],
   changedTaskId: string,
+  calendar: WorkCalendar,
 ): Map<string, { dataInicioPrevista: Date; dataFimPrevista: Date }> {
   const taskMap = new Map(tasks.map((t) => [t.id, { ...t }]));
   const updates = new Map<string, { dataInicioPrevista: Date; dataFimPrevista: Date }>();
@@ -58,11 +59,11 @@ export function computeCascade(
       const successor = taskMap.get(dep.successorTaskId);
       if (!successor) continue;
 
-      const earliestStart = new Date(predecessor.dataFimPrevista.getTime() + (dep.lagDias + 1) * MS_PER_DAY);
+      const earliestStart = addWorkingDays(predecessor.dataFimPrevista, dep.lagDias + 1, calendar);
       if (earliestStart.getTime() > successor.dataInicioPrevista.getTime()) {
-        const duration = successor.dataFimPrevista.getTime() - successor.dataInicioPrevista.getTime();
+        const durationWorkingDays = countWorkingDays(successor.dataInicioPrevista, successor.dataFimPrevista, calendar);
         const newStart = earliestStart;
-        const newEnd = new Date(newStart.getTime() + duration);
+        const newEnd = addWorkingDays(newStart, Math.max(durationWorkingDays, 1) - 1, calendar);
 
         successor.dataInicioPrevista = newStart;
         successor.dataFimPrevista = newEnd;

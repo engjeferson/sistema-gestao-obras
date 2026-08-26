@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
+import { toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
 import { stageFormSchema, taskFormSchema, bulkPlanningSchema } from "@/lib/validations/planejamento";
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -56,8 +57,19 @@ function assignChildCodes(node: StageNode) {
   });
 }
 
+export async function getWorkCalendar(client: TxClient, workId: string): Promise<WorkCalendar> {
+  const [work, holidays] = await Promise.all([
+    client.work.findUniqueOrThrow({ where: { id: workId }, select: { workingWeekdays: true } }),
+    client.workHoliday.findMany({ where: { workId }, select: { data: true } }),
+  ]);
+  return {
+    workingWeekdays: work.workingWeekdays,
+    holidays: new Set(holidays.map((h) => toDateOnlyString(h.data))),
+  };
+}
+
 export async function applyCascadeForTask(tx: TxClient, workId: string, changedTaskId: string) {
-  const [tasks, dependencies] = await Promise.all([
+  const [tasks, dependencies, calendar] = await Promise.all([
     tx.planningTask.findMany({
       where: { workId },
       select: { id: true, dataInicioPrevista: true, dataFimPrevista: true },
@@ -66,9 +78,10 @@ export async function applyCascadeForTask(tx: TxClient, workId: string, changedT
       where: { predecessorTask: { workId }, successorTask: { workId } },
       select: { predecessorTaskId: true, successorTaskId: true, lagDias: true },
     }),
+    getWorkCalendar(tx, workId),
   ]);
 
-  const updates = computeCascade(tasks, dependencies, changedTaskId);
+  const updates = computeCascade(tasks, dependencies, changedTaskId, calendar);
   for (const [taskId, dates] of updates) {
     await tx.planningTask.update({ where: { id: taskId }, data: dates });
   }

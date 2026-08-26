@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { addDays, differenceInCalendarDays } from "date-fns";
 import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,7 @@ import {
   type PlanningRow,
 } from "@/components/planejamento/stage-list";
 import { PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
+import { addWorkingDays, countWorkingDays, type WorkCalendar } from "@/lib/schedule-dates";
 import {
   createStage,
   createTask,
@@ -62,6 +62,7 @@ export function PlanningTablePane({
   onToggleCollapse,
   onExpand,
   predecessorOptions,
+  calendar,
 }: {
   rows: PlanningRow[];
   workId: string;
@@ -69,6 +70,7 @@ export function PlanningTablePane({
   onToggleCollapse: (stageId: string) => void;
   onExpand: (stageId: string) => void;
   predecessorOptions: { value: string; label: string }[];
+  calendar: WorkCalendar;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<PendingRow | null>(null);
@@ -275,6 +277,7 @@ export function PlanningTablePane({
                 else rowRefs.current.delete(row.task.id);
               }}
               onGripPointerDown={() => startDrag(row)}
+              calendar={calendar}
             />
           ),
         )}
@@ -495,6 +498,7 @@ function TaskRowView({
   predecessorOptions,
   rowRef,
   onGripPointerDown,
+  calendar,
 }: {
   row: Extract<PlanningRow, { type: "task" }>;
   workId: string;
@@ -502,6 +506,7 @@ function TaskRowView({
   predecessorOptions: { value: string; label: string }[];
   rowRef: (el: HTMLDivElement | null) => void;
   onGripPointerDown: () => void;
+  calendar: WorkCalendar;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -532,7 +537,7 @@ function TaskRowView({
   function handleDurationChange(value: string) {
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
-    const nextEnd = toDateInputValue(addDays(new Date(start), dias - 1));
+    const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
     setEnd(nextEnd);
     commit(start, nextEnd);
   }
@@ -546,7 +551,7 @@ function TaskRowView({
     });
   }
 
-  const duration = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+  const duration = countWorkingDays(new Date(start), new Date(end), calendar);
 
   return (
     <div
@@ -584,6 +589,7 @@ function TaskRowView({
         min={1}
         disabled={isPending}
         value={duration}
+        title="Dias úteis, conforme o calendário da obra"
         onChange={(e) => handleDurationChange(e.target.value)}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />

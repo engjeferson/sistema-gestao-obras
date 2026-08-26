@@ -4,8 +4,9 @@ import { forwardRef, useEffect, useMemo, useRef, useState, useTransition } from 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addDays, differenceInCalendarDays } from "date-fns";
-import { updatePlanningTaskDates, type PredecessorChip } from "@/server/actions/planejamento";
+import { addPlanningDependencyByCode, updatePlanningTaskDates, type PredecessorChip } from "@/server/actions/planejamento";
 import type { PlainTask, PlanningRow } from "@/components/planejamento/stage-list";
+import { isWorkingDay, type WorkCalendar } from "@/lib/schedule-dates";
 import { PLANNING_STATUS_LABELS } from "@/lib/status-labels";
 
 // As datas do planejamento são meia-noite UTC (@db.Date). Formatar com timeZone "UTC" explícito
@@ -27,6 +28,7 @@ export const HEADER_HEIGHT = 34;
 
 type DragMode = "move" | "resize-start" | "resize-end";
 type DragState = { taskId: string; mode: DragMode; startClientX: number; originalStart: Date; originalEnd: Date };
+type ConnectDragState = { sourceTaskId: string; sourceCode: string; startX: number; startY: number; currentX: number; currentY: number };
 
 export function todayUTC() {
   const now = new Date();
@@ -47,12 +49,16 @@ export const GanttCanvas = forwardRef<
     rangeStart: Date;
     totalDays: number;
     pxPerDay: number;
+    calendar: WorkCalendar;
   }
->(function GanttCanvas({ rows, workId, rangeStart, totalDays, pxPerDay }, scrollRef) {
+>(function GanttCanvas({ rows, workId, rangeStart, totalDays, pxPerDay, calendar }, scrollRef) {
   const [isPending, startTransition] = useTransition();
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragPreview, setDragPreview] = useState<{ start: Date; end: Date } | null>(null);
   const dragPreviewRef = useRef<{ start: Date; end: Date } | null>(null);
+  const [connectDrag, setConnectDrag] = useState<ConnectDragState | null>(null);
+  const connectDragRef = useRef<ConnectDragState | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const timelineWidth = totalDays * pxPerDay;
@@ -204,6 +210,63 @@ export const GanttCanvas = forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag, pxPerDay, workId]);
 
+  // Criar dependência arrastando do ponto de conexão (borda direita da barra) até outra barra —
+  // solta fora de qualquer barra cancela sem chamar o servidor. Reaproveita a mesma action já
+  // usada pelo seletor de predecessoras da tabela (resolve pelo código da atividade de origem).
+  useEffect(() => {
+    if (!connectDrag) return;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = "crosshair";
+
+    function onMove(e: PointerEvent) {
+      const body = bodyRef.current;
+      if (!body) return;
+      const rect = body.getBoundingClientRect();
+      setConnectDrag((prev) => (prev ? { ...prev, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top } : prev));
+    }
+
+    function onUp(e: PointerEvent) {
+      const active = connectDragRef.current;
+      setConnectDrag(null);
+      if (!active) return;
+      const body = bodyRef.current;
+      if (!body) return;
+      const rect = body.getBoundingClientRect();
+      const relY = e.clientY - rect.top;
+      const rowIndex = Math.floor(relY / ROW_HEIGHT);
+      const targetRow = rows[rowIndex];
+      if (!targetRow || targetRow.type !== "task" || targetRow.task.id === active.sourceTaskId) return;
+
+      const relX = e.clientX - rect.left;
+      const barLeft = xForDate(targetRow.task.dataInicioPrevista);
+      const barWidth = (differenceInCalendarDays(targetRow.task.dataFimPrevista, targetRow.task.dataInicioPrevista) + 1) * pxPerDay;
+      if (relX < barLeft || relX > barLeft + barWidth) return;
+
+      startTransition(async () => {
+        try {
+          await addPlanningDependencyByCode(workId, active.sourceCode, null, targetRow.task.id);
+          toast.success("Predecessora criada.");
+          router.refresh();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Não foi possível criar a dependência.");
+        }
+      });
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = previousCursor;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectDrag, rows, pxPerDay, workId]);
+
+  useEffect(() => {
+    connectDragRef.current = connectDrag;
+  }, [connectDrag]);
+
   return (
     <div ref={scrollRef} className="h-full overflow-x-auto">
       <div style={{ width: timelineWidth }}>
@@ -223,15 +286,15 @@ export const GanttCanvas = forwardRef<
           })}
         </div>
 
-        <div className="relative" style={{ height: rows.length * ROW_HEIGHT }}>
+        <div ref={bodyRef} className="relative" style={{ height: rows.length * ROW_HEIGHT }}>
           {showTodayLine ? (
             <div className="absolute top-0 bottom-0 w-px bg-destructive/60" style={{ left: todayX }} title="Hoje" />
           ) : null}
 
-          {days.map((_, i) => (
+          {days.map((day, i) => (
             <div
               key={i}
-              className="absolute top-0 bottom-0 border-r border-border/60"
+              className={`absolute top-0 bottom-0 border-r border-border/60 ${!isWorkingDay(day, calendar) ? "bg-muted-foreground/[0.06]" : ""}`}
               style={{ left: i * pxPerDay, width: pxPerDay }}
             />
           ))}
@@ -278,11 +341,13 @@ export const GanttCanvas = forwardRef<
             const width = (differenceInCalendarDays(barEnd, barStart) + 1) * pxPerDay;
             const progressPct = Math.min(Math.max(Number(task.percentualExecutado), 0), 100);
             const remainderColor = task.status === "ATRASADA" ? "bg-destructive" : "bg-warning";
+            const barTop = i * ROW_HEIGHT + 9;
+            const barHeight = ROW_HEIGHT - 18;
             return (
+              <div key={task.id} className="group contents">
               <div
-                key={task.id}
                 className={`absolute cursor-grab overflow-hidden rounded-md select-none ${isDragging ? "ring-2 ring-brand-teal" : ""}`}
-                style={{ top: i * ROW_HEIGHT + 9, height: ROW_HEIGHT - 18, left, width: Math.max(width, 4) }}
+                style={{ top: barTop, height: barHeight, left, width: Math.max(width, 4) }}
                 title={`${task.nome} — ${PLANNING_STATUS_LABELS[task.status]} (${progressPct.toFixed(0)}%)`}
                 onPointerDown={(e) => {
                   if (isPending || drag) return;
@@ -329,8 +394,38 @@ export const GanttCanvas = forwardRef<
                   }}
                 />
               </div>
+              <div
+                className="absolute z-10 size-2.5 -translate-y-1/2 cursor-crosshair rounded-full border border-background bg-brand-teal opacity-0 group-hover:opacity-100"
+                style={{ top: barTop + barHeight / 2, left: left + Math.max(width, 4) - 5 }}
+                title="Arrastar para criar predecessora"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isPending || drag) return;
+                  const body = bodyRef.current;
+                  const rect = body?.getBoundingClientRect();
+                  const x = rect ? e.clientX - rect.left : left + width;
+                  const y = rect ? e.clientY - rect.top : barTop + barHeight / 2;
+                  setConnectDrag({ sourceTaskId: task.id, sourceCode: task.codigo, startX: x, startY: y, currentX: x, currentY: y });
+                }}
+              />
+              </div>
             );
           })}
+
+          {connectDrag ? (
+            <svg className="pointer-events-none absolute top-0 left-0 z-20" width={timelineWidth} height={rows.length * ROW_HEIGHT}>
+              <line
+                x1={connectDrag.startX}
+                y1={connectDrag.startY}
+                x2={connectDrag.currentX}
+                y2={connectDrag.currentY}
+                className="stroke-brand-teal"
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+              />
+            </svg>
+          ) : null}
         </div>
       </div>
     </div>

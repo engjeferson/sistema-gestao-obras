@@ -9,6 +9,7 @@ const TABS = [
   { slug: "financeiro", label: "Financeiro" },
   { slug: "materiais", label: "Materiais/NFs" },
   { slug: "planejamento", label: "Planejamento" },
+  { slug: "calendario", label: "Calendário" },
   { slug: "orcamento", label: "Orçamento" },
   { slug: "rdo", label: "RDO" },
   { slug: "contratos", label: "Contratos" },

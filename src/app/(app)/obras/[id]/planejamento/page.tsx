@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Import } from "lucide-react";
-import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
+import { prisma } from "@/lib/prisma";
+import { listStagesWithTasks, getWorkCalendar, type StageTreeNode } from "@/server/actions/planejamento";
 import { listPlanningTemplates } from "@/server/actions/planejamento-templates";
 import { PlanningEditor } from "@/components/planejamento/planning-editor";
 import { ApplyTemplatePicker } from "@/components/planejamento/apply-template-picker";
@@ -58,7 +59,7 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
           <Import /> Lançamento em bloco
         </Button>
       </div>
-      <PlanningEditor stages={stages} workId={id} />
+      <PlanningEditor stages={stages} workId={id} calendar={await getWorkCalendar(prisma, id)} />
     </div>
   );
 }
