@@ -1,4 +1,4 @@
-import { addDays, eachDayOfInterval } from "date-fns";
+import { addDays, subDays, eachDayOfInterval } from "date-fns";
 
 /**
  * Calendário de dias úteis de uma obra: quais dias da semana contam como úteis
@@ -28,6 +28,17 @@ export function addWorkingDays(start: Date, workingDaysToAdd: number, calendar: 
   let counted = isWorkingDay(date, calendar) ? 1 : 0;
   while (counted <= workingDaysToAdd) {
     date = addDays(date, 1);
+    if (isWorkingDay(date, calendar)) counted++;
+  }
+  return date;
+}
+
+/** Simétrico a `addWorkingDays`, andando pra trás — usado na passada de volta do caminho crítico. */
+export function subtractWorkingDays(end: Date, workingDaysToSubtract: number, calendar: WorkCalendar): Date {
+  let date = end;
+  let counted = isWorkingDay(date, calendar) ? 1 : 0;
+  while (counted <= workingDaysToSubtract) {
+    date = subDays(date, 1);
     if (isWorkingDay(date, calendar)) counted++;
   }
   return date;

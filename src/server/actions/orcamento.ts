@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
@@ -181,7 +182,7 @@ export async function getWorkAlerts(workId: string) {
       where: { workId, status: "PENDENTE", dataVencimento: { gte: hoje, lte: em7Dias } },
       _sum: { valor: true },
     }),
-    prisma.planningTask.findMany({ where: { workId, status: "ATRASADA" }, select: { nome: true } }),
+    prisma.planningTask.findMany({ where: { workId, status: "ATRASADA" }, select: { nome: true, dataFimPrevista: true } }),
   ]);
 
   const totalVencendo = Number(contasVencendoAgg._sum.valor ?? 0);
@@ -192,7 +193,9 @@ export async function getWorkAlerts(workId: string) {
     });
   }
   for (const task of atrasadas) {
-    alerts.push({ tipo: "danger", mensagem: `${task.nome} está atrasada no cronograma.` });
+    const diasAtraso = differenceInCalendarDays(hoje, task.dataFimPrevista);
+    const sufixo = diasAtraso > 0 ? ` há ${diasAtraso} dia${diasAtraso === 1 ? "" : "s"}` : "";
+    alerts.push({ tipo: "danger", mensagem: `${task.nome} está atrasada${sufixo} no cronograma.` });
   }
 
   return alerts;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { differenceInCalendarDays } from "date-fns";
 import { ChevronDown, ChevronRight, GripVertical, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,7 @@ export function PlanningTablePane({
   onExpand,
   predecessorOptions,
   calendar,
+  criticalPath,
 }: {
   rows: PlanningRow[];
   workId: string;
@@ -71,6 +73,7 @@ export function PlanningTablePane({
   onExpand: (stageId: string) => void;
   predecessorOptions: { value: string; label: string }[];
   calendar: WorkCalendar;
+  criticalPath: Map<string, boolean> | null;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<PendingRow | null>(null);
@@ -278,6 +281,7 @@ export function PlanningTablePane({
               }}
               onGripPointerDown={() => startDrag(row)}
               calendar={calendar}
+              isCritical={criticalPath?.get(row.task.id) ?? false}
             />
           ),
         )}
@@ -499,6 +503,7 @@ function TaskRowView({
   rowRef,
   onGripPointerDown,
   calendar,
+  isCritical,
 }: {
   row: Extract<PlanningRow, { type: "task" }>;
   workId: string;
@@ -507,6 +512,7 @@ function TaskRowView({
   rowRef: (el: HTMLDivElement | null) => void;
   onGripPointerDown: () => void;
   calendar: WorkCalendar;
+  isCritical: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -552,11 +558,12 @@ function TaskRowView({
   }
 
   const duration = countWorkingDays(new Date(start), new Date(end), calendar);
+  const varianceDays = task.baselineFim ? differenceInCalendarDays(task.dataFimPrevista, task.baselineFim) : null;
 
   return (
     <div
       ref={rowRef}
-      className={`grid items-center border-b px-1 ${row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""}`}
+      className={`grid items-center border-b px-1 ${row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""} ${isCritical ? "bg-destructive/5 ring-1 ring-inset ring-destructive/30" : ""}`}
       style={{ gridTemplateColumns: GRID, height: ROW_HEIGHT }}
     >
       <GripCell onGripPointerDown={onGripPointerDown} />
@@ -574,16 +581,29 @@ function TaskRowView({
         }}
         className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
-      <input
-        type="date"
-        disabled={isPending}
-        value={end}
-        onChange={(e) => {
-          setEnd(e.target.value);
-          commit(start, e.target.value);
-        }}
-        className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
-      />
+      <div className="relative">
+        <input
+          type="date"
+          disabled={isPending}
+          value={end}
+          onChange={(e) => {
+            setEnd(e.target.value);
+            commit(start, e.target.value);
+          }}
+          className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+        />
+        {varianceDays ? (
+          <span
+            className={`absolute -top-1.5 -right-1 rounded-full px-1 text-[0.55rem] font-semibold leading-tight ${
+              varianceDays > 0 ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"
+            }`}
+            title={`Linha de base: término em ${formatDateBR(task.baselineFim!)}`}
+          >
+            {varianceDays > 0 ? "+" : ""}
+            {varianceDays}d
+          </span>
+        ) : null}
+      </div>
       <input
         type="number"
         min={1}

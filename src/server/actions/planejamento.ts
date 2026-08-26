@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
+import { computeCriticalPath } from "@/lib/critical-path";
 import { toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
 import { stageFormSchema, taskFormSchema, bulkPlanningSchema } from "@/lib/validations/planejamento";
 
@@ -88,6 +89,50 @@ export async function applyCascadeForTask(tx: TxClient, workId: string, changedT
   return updates;
 }
 
+/** Caminho crítico da obra inteira — calculado a cada carregamento da página (barato, sem cache). */
+export async function getCriticalPathForWork(workId: string) {
+  const [tasks, dependencies, calendar] = await Promise.all([
+    prisma.planningTask.findMany({
+      where: { workId },
+      select: { id: true, dataInicioPrevista: true, dataFimPrevista: true },
+    }),
+    prisma.planningDependency.findMany({
+      where: { predecessorTask: { workId }, successorTask: { workId } },
+      select: { predecessorTaskId: true, successorTaskId: true, lagDias: true },
+    }),
+    getWorkCalendar(prisma, workId),
+  ]);
+
+  const result = computeCriticalPath(tasks, dependencies, calendar);
+  return new Map([...result].map(([taskId, r]) => [taskId, r.isCritical]));
+}
+
+/**
+ * Fixa a linha de base da obra inteira: copia as datas atuais de cada atividade pra
+ * `baselineInicio`/`baselineFim`. Chamar de novo SOBRESCREVE a linha de base anterior — não há
+ * versionamento, é uma referência fixa só (bate com a spec: "início/término planejado" único).
+ */
+export async function setPlanningBaseline(workId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const tasks = await prisma.planningTask.findMany({
+    where: { workId },
+    select: { id: true, dataInicioPrevista: true, dataFimPrevista: true },
+  });
+
+  await prisma.$transaction(
+    tasks.map((t) =>
+      prisma.planningTask.update({
+        where: { id: t.id },
+        data: { baselineInicio: t.dataInicioPrevista, baselineFim: t.dataFimPrevista },
+      }),
+    ),
+  );
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
 export async function listStagesForAllWorks() {
   const stages = await prisma.planningStage.findMany({
     include: { tasks: { orderBy: { ordem: "asc" }, select: { id: true, codigo: true, nome: true } } },
@@ -136,6 +181,8 @@ export type StageTreeNode = {
     nome: string;
     dataInicioPrevista: Date;
     dataFimPrevista: Date;
+    baselineInicio: Date | null;
+    baselineFim: Date | null;
     percentualExecutado: number;
     status: string;
     predecessors: { id: string; predecessorTask: { id: string; codigo: string | null; nome: string } }[];

@@ -554,6 +554,8 @@ model PlanningTask {
   ordem               Int            @default(0)
   dataInicioPrevista  DateTime       @db.Date
   dataFimPrevista     DateTime       @db.Date
+  baselineInicio      DateTime?      @db.Date
+  baselineFim         DateTime?      @db.Date
   percentualExecutado Decimal        @default(0) @db.Decimal(5, 2)
   status              PlanningStatus @default(NAO_INICIADA)
   createdAt           DateTime       @default(now())

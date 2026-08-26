@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Receipt,
 } from "lucide-react";
+import { differenceInCalendarDays } from "date-fns";
 import { getWorkOverview } from "@/server/actions/obras";
 import { getWorkCostSummary, getWorkAlerts } from "@/server/actions/orcamento";
 import { listOverdueTasks, listUpcomingTasks } from "@/server/actions/planejamento";
@@ -135,15 +136,27 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
             {atrasadas.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma atividade atrasada.</p>
             ) : (
-              atrasadas.map((task) => (
-                <div key={task.id} className="flex items-center justify-between py-2 text-sm first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{task.nome}</p>
-                    <p className="text-muted-foreground">{task.stage.nome}</p>
+              atrasadas.map((task) => {
+                const hoje = new Date();
+                hoje.setUTCHours(0, 0, 0, 0);
+                const diasAtraso = differenceInCalendarDays(hoje, task.dataFimPrevista);
+                return (
+                  <div key={task.id} className="flex items-center justify-between py-2 text-sm first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{task.nome}</p>
+                      <p className="text-muted-foreground">{task.stage.nome}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-destructive">{formatDateBR(task.dataFimPrevista)}</p>
+                      {diasAtraso > 0 ? (
+                        <p className="text-xs text-destructive/80">
+                          {diasAtraso} dia{diasAtraso === 1 ? "" : "s"} de atraso
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                  <span className="shrink-0 text-destructive">{formatDateBR(task.dataFimPrevista)}</span>
-                </div>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>

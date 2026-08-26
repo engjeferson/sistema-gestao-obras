@@ -6,6 +6,8 @@ export type PlainTask = {
   nome: string;
   dataInicioPrevista: Date;
   dataFimPrevista: Date;
+  baselineInicio: Date | null;
+  baselineFim: Date | null;
   percentualExecutado: number;
   status: string;
   predecessorChips: PredecessorChip[];

@@ -50,8 +50,9 @@ export const GanttCanvas = forwardRef<
     totalDays: number;
     pxPerDay: number;
     calendar: WorkCalendar;
+    criticalPath: Map<string, boolean> | null;
   }
->(function GanttCanvas({ rows, workId, rangeStart, totalDays, pxPerDay, calendar }, scrollRef) {
+>(function GanttCanvas({ rows, workId, rangeStart, totalDays, pxPerDay, calendar, criticalPath }, scrollRef) {
   const [isPending, startTransition] = useTransition();
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragPreview, setDragPreview] = useState<{ start: Date; end: Date } | null>(null);
@@ -343,10 +344,23 @@ export const GanttCanvas = forwardRef<
             const remainderColor = task.status === "ATRASADA" ? "bg-destructive" : "bg-warning";
             const barTop = i * ROW_HEIGHT + 9;
             const barHeight = ROW_HEIGHT - 18;
+            const isCritical = criticalPath?.get(task.id) ?? false;
+            const hasBaseline = task.baselineInicio && task.baselineFim;
+            const baselineLeft = hasBaseline ? xForDate(task.baselineInicio!) : 0;
+            const baselineWidth = hasBaseline
+              ? (differenceInCalendarDays(task.baselineFim!, task.baselineInicio!) + 1) * pxPerDay
+              : 0;
             return (
               <div key={task.id} className="group contents">
+              {hasBaseline ? (
+                <div
+                  className="absolute rounded-md border border-dashed border-muted-foreground/50"
+                  style={{ top: barTop + barHeight - 3, height: 6, left: baselineLeft, width: Math.max(baselineWidth, 4) }}
+                  title={`Linha de base: ${task.baselineInicio!.toISOString().slice(0, 10)} — ${task.baselineFim!.toISOString().slice(0, 10)}`}
+                />
+              ) : null}
               <div
-                className={`absolute cursor-grab overflow-hidden rounded-md select-none ${isDragging ? "ring-2 ring-brand-teal" : ""}`}
+                className={`absolute cursor-grab overflow-hidden rounded-md select-none ${isDragging ? "ring-2 ring-brand-teal" : ""} ${isCritical ? "ring-2 ring-destructive" : ""}`}
                 style={{ top: barTop, height: barHeight, left, width: Math.max(width, 4) }}
                 title={`${task.nome} — ${PLANNING_STATUS_LABELS[task.status]} (${progressPct.toFixed(0)}%)`}
                 onPointerDown={(e) => {

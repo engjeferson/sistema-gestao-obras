@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { addDays, differenceInCalendarDays } from "date-fns";
-import { ChevronsDownUp, ChevronsUpDown, Maximize2, Minimize2, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Flag, Maximize2, Minimize2, Route, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlanningTablePane } from "@/components/planejamento/planning-table-pane";
 import { GanttCanvas, todayUTC } from "@/components/gantt/gantt-canvas";
 import { buildPlanningRows, collectAllTasks, flattenPredecessorOptions, type PlainStage } from "@/components/planejamento/stage-list";
+import { setPlanningBaseline } from "@/server/actions/planejamento";
 import type { WorkCalendar } from "@/lib/schedule-dates";
 
 const ZOOM_LEVELS = [8, 14, 22, 34, 50];
@@ -39,17 +42,22 @@ export function PlanningEditor({
   stages,
   workId,
   calendar,
+  criticalPath,
 }: {
   stages: PlainStage[];
   workId: string;
   calendar: WorkCalendar;
+  criticalPath: Map<string, boolean>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [zoomIndex, setZoomIndex] = useState(2);
   const [fullscreen, setFullscreen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [isSettingBaseline, startBaselineTransition] = useTransition();
   const resizingRef = useRef(false);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Lido só depois da hidratação (client-only) — ler localStorage já no useState divergiria do
   // HTML gerado no servidor e quebraria a hidratação.
@@ -92,6 +100,17 @@ export function PlanningEditor({
       const next = new Set(prev);
       next.delete(stageId);
       return next;
+    });
+  }
+
+  function handleSetBaseline() {
+    if (!confirm("Fixar a linha de base substitui a anterior pelas datas atuais de todas as atividades. Continuar?")) {
+      return;
+    }
+    startBaselineTransition(async () => {
+      await setPlanningBaseline(workId);
+      toast.success("Linha de base fixada.");
+      router.refresh();
     });
   }
 
@@ -146,6 +165,16 @@ export function PlanningEditor({
         <Button variant="outline" size="sm" onClick={goToToday}>
           Hoje
         </Button>
+        <Button variant="outline" size="sm" onClick={handleSetBaseline} disabled={isSettingBaseline}>
+          <Flag /> Linha de base
+        </Button>
+        <Button
+          variant={showCriticalPath ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowCriticalPath((v) => !v)}
+        >
+          <Route /> Caminho crítico
+        </Button>
         <Button
           variant="outline"
           size="icon-sm"
@@ -185,6 +214,7 @@ export function PlanningEditor({
                 onExpand={expandStage}
                 predecessorOptions={predecessorOptions}
                 calendar={calendar}
+                criticalPath={showCriticalPath ? criticalPath : null}
               />
             </div>
             <div
@@ -201,6 +231,7 @@ export function PlanningEditor({
                 totalDays={totalDays}
                 pxPerDay={pxPerDay}
                 calendar={calendar}
+                criticalPath={showCriticalPath ? criticalPath : null}
               />
             </div>
           </div>
