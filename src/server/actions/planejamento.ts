@@ -673,6 +673,17 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
         },
       });
       taskIdMap.set(row.clientId, created.id);
+
+      if (row.custoPrevisto) {
+        await tx.budgetItem.create({
+          data: {
+            workId: data.workId,
+            taskId: created.id,
+            tipoCusto: row.tipoCusto ?? "OUTROS",
+            valorTotalPrevisto: row.custoPrevisto,
+          },
+        });
+      }
     }
 
     for (const row of atividadeRows) {

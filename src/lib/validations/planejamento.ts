@@ -27,6 +27,12 @@ export const bulkPlanningRowSchema = z.object({
   dataInicioPrevista: z.string().optional(),
   dataFimPrevista: z.string().optional(),
   predecessorClientIds: z.array(z.string()).optional(),
+  // Orçamento previsto opcional por atividade — vira um BudgetItem só (sem detalhamento por
+  // material/mão de obra); detalhar item por item continua sendo feito na tela de Orçamento.
+  custoPrevisto: z.coerce.number().positive().optional().or(z.literal("").transform(() => undefined)),
+  tipoCusto: z
+    .enum(["MATERIAL", "MAO_DE_OBRA", "SERVICO_TERCEIRIZADO", "EQUIPAMENTO", "TRANSPORTE", "OUTROS"])
+    .optional(),
 });
 
 export const bulkPlanningSchema = z.object({
