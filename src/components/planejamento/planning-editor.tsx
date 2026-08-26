@@ -4,7 +4,19 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addDays, differenceInCalendarDays } from "date-fns";
-import { ChevronsDownUp, ChevronsUpDown, Flag, Maximize2, Minimize2, Route, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns2,
+  Flag,
+  GanttChartSquare,
+  List,
+  Maximize2,
+  Minimize2,
+  Route,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlanningTablePane } from "@/components/planejamento/planning-table-pane";
 import { GanttCanvas, todayUTC } from "@/components/gantt/gantt-canvas";
@@ -17,12 +29,24 @@ const DEFAULT_LEFT_WIDTH = 836;
 const MIN_LEFT_WIDTH = 480;
 const MAX_LEFT_WIDTH = 1200;
 const LEFT_WIDTH_STORAGE_KEY = "planning-editor-left-width";
+const VIEW_MODE_STORAGE_KEY = "planning-editor-view-mode";
+
+type ViewMode = "tabela" | "gantt" | "ambos";
 
 function readStoredLeftWidth(): number | null {
   try {
     const raw = window.localStorage.getItem(LEFT_WIDTH_STORAGE_KEY);
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) ? Math.min(MAX_LEFT_WIDTH, Math.max(MIN_LEFT_WIDTH, parsed)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredViewMode(): ViewMode | null {
+  try {
+    const raw = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return raw === "tabela" || raw === "gantt" || raw === "ambos" ? raw : null;
   } catch {
     return null;
   }
@@ -53,6 +77,7 @@ export function PlanningEditor({
   const [zoomIndex, setZoomIndex] = useState(2);
   const [fullscreen, setFullscreen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [viewMode, setViewModeState] = useState<ViewMode>("ambos");
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isSettingBaseline, startBaselineTransition] = useTransition();
   const resizingRef = useRef(false);
@@ -64,7 +89,18 @@ export function PlanningEditor({
   useEffect(() => {
     const stored = readStoredLeftWidth();
     if (stored !== null) setLeftWidth(stored);
+    const storedMode = readStoredViewMode();
+    if (storedMode !== null) setViewModeState(storedMode);
   }, []);
+
+  function setViewMode(mode: ViewMode) {
+    setViewModeState(mode);
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    } catch {
+      // localStorage indisponível (modo privado etc.) — não é crítico, só perde a preferência.
+    }
+  }
 
   const pxPerDay = ZOOM_LEVELS[zoomIndex];
 
@@ -156,6 +192,35 @@ export function PlanningEditor({
   return (
     <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col gap-2 bg-background p-4" : "flex flex-col gap-2"}>
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex overflow-hidden rounded-lg border">
+          <Button
+            variant={viewMode === "tabela" ? "default" : "ghost"}
+            size="sm"
+            className="rounded-none"
+            onClick={() => setViewMode("tabela")}
+            title="Só a tabela"
+          >
+            <List /> Tabela
+          </Button>
+          <Button
+            variant={viewMode === "gantt" ? "default" : "ghost"}
+            size="sm"
+            className="rounded-none"
+            onClick={() => setViewMode("gantt")}
+            title="Só o Gantt"
+          >
+            <GanttChartSquare /> Gantt
+          </Button>
+          <Button
+            variant={viewMode === "ambos" ? "default" : "ghost"}
+            size="sm"
+            className="rounded-none"
+            onClick={() => setViewMode("ambos")}
+            title="Tabela e Gantt lado a lado"
+          >
+            <Columns2 /> Ambos
+          </Button>
+        </div>
         <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set(collectStageIds(stages)))}>
           <ChevronsDownUp /> Recolher tudo
         </Button>
@@ -205,35 +270,44 @@ export function PlanningEditor({
       ) : (
         <div className={`overflow-hidden rounded-lg border ${fullscreen ? "flex-1" : "h-[calc(100vh-280px)] min-h-[420px]"}`}>
           <div className="flex h-full overflow-y-auto">
-            <div className="shrink-0 overflow-x-auto border-r" style={{ width: leftWidth }}>
-              <PlanningTablePane
-                rows={rows}
-                workId={workId}
-                collapsed={collapsed}
-                onToggleCollapse={toggleCollapse}
-                onExpand={expandStage}
-                predecessorOptions={predecessorOptions}
-                calendar={calendar}
-                criticalPath={showCriticalPath ? criticalPath : null}
+            {viewMode !== "gantt" ? (
+              <div
+                className="shrink-0 overflow-x-auto border-r"
+                style={viewMode === "ambos" ? { width: leftWidth } : { width: "100%" }}
+              >
+                <PlanningTablePane
+                  rows={rows}
+                  workId={workId}
+                  collapsed={collapsed}
+                  onToggleCollapse={toggleCollapse}
+                  onExpand={expandStage}
+                  predecessorOptions={predecessorOptions}
+                  calendar={calendar}
+                  criticalPath={showCriticalPath ? criticalPath : null}
+                />
+              </div>
+            ) : null}
+            {viewMode === "ambos" ? (
+              <div
+                onPointerDown={startResize}
+                className="w-1.5 shrink-0 cursor-col-resize touch-none bg-border/60 hover:bg-brand-teal/60"
+                title="Arrastar para redimensionar"
               />
-            </div>
-            <div
-              onPointerDown={startResize}
-              className="w-1.5 shrink-0 cursor-col-resize touch-none bg-border/60 hover:bg-brand-teal/60"
-              title="Arrastar para redimensionar"
-            />
-            <div className="min-w-0 flex-1">
-              <GanttCanvas
-                ref={ganttScrollRef}
-                rows={rows}
-                workId={workId}
-                rangeStart={rangeStart}
-                totalDays={totalDays}
-                pxPerDay={pxPerDay}
-                calendar={calendar}
-                criticalPath={showCriticalPath ? criticalPath : null}
-              />
-            </div>
+            ) : null}
+            {viewMode !== "tabela" ? (
+              <div className="min-w-0 flex-1">
+                <GanttCanvas
+                  ref={ganttScrollRef}
+                  rows={rows}
+                  workId={workId}
+                  rangeStart={rangeStart}
+                  totalDays={totalDays}
+                  pxPerDay={pxPerDay}
+                  calendar={calendar}
+                  criticalPath={showCriticalPath ? criticalPath : null}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       )}
