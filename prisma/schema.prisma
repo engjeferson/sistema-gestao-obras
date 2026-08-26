@@ -116,6 +116,16 @@ enum StockMovementType {
   TRANSFERENCIA
 }
 
+enum AgendaEventSource {
+  MANUAL
+  WHATSAPP
+}
+
+enum AgendaEventStatus {
+  CONFIRMADO
+  CANCELADO
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -131,6 +141,8 @@ model User {
   financialTransactions FinancialTransaction[]  @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
   planningTemplates     PlanningTemplate[]
+  agendaEvents          AgendaEvent[]           @relation("AgendaEventCreatedBy")
+  whatsappAccount       WhatsAppAccount?
 
   @@index([role])
 }
@@ -199,6 +211,7 @@ model Client {
 
   works                 Work[]
   financialTransactions FinancialTransaction[]
+  agendaEvents          AgendaEvent[]
 }
 
 model Supplier {
@@ -304,6 +317,7 @@ model Work {
   rdos                  Rdo[]
   stockMovementsOrigem  StockMovement[] @relation("StockMovementOrigem")
   stockMovementsDestino StockMovement[] @relation("StockMovementDestino")
+  agendaEvents          AgendaEvent[]
 
   @@index([status])
 }
@@ -709,4 +723,44 @@ model RdoOccurrence {
   createdAt DateTime       @default(now())
 
   rdo Rdo @relation(fields: [rdoId], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppAccount {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  telefone  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AgendaEvent {
+  id                String            @id @default(cuid())
+  titulo            String
+  descricao         String?
+  local             String?
+  inicio            DateTime
+  fim               DateTime?
+  diaTodo           Boolean           @default(false)
+  status            AgendaEventStatus @default(CONFIRMADO)
+  origem            AgendaEventSource @default(MANUAL)
+  workId            String?
+  clientId          String?
+  createdById       String?
+  mensagemOriginal  String?           @db.Text
+  whatsappTelefone  String?
+  whatsappMessageId String?           @unique
+  lembreteEnviadoEm DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  work      Work?   @relation(fields: [workId], references: [id])
+  client    Client? @relation(fields: [clientId], references: [id])
+  createdBy User?   @relation("AgendaEventCreatedBy", fields: [createdById], references: [id])
+
+  @@index([inicio])
+  @@index([workId])
+  @@index([clientId])
+  @@index([status])
 }

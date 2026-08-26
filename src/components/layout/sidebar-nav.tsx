@@ -13,6 +13,7 @@ import {
   Boxes,
   Smartphone,
   LayoutTemplate,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/generated/prisma/enums";
@@ -22,7 +23,15 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; role
 const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
   {
     label: null,
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] }],
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
+      {
+        href: "/agenda",
+        label: "Agenda",
+        icon: CalendarDays,
+        roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO", "OBRA"],
+      },
+    ],
   },
   {
     label: "Obras",
