@@ -11,6 +11,8 @@ export type ParsedNFe = {
   fornecedorNome: string | null;
   items: InvoiceItemValues[];
   duplicatas: ParsedNFeDuplicata[];
+  valorDesconto: number;
+  valorFrete: number;
 };
 
 const UNIT_MAP: Record<string, InvoiceItemValues["unidade"]> = {
@@ -106,5 +108,19 @@ export function parseNFeXml(xmlText: string): ParsedNFe {
         .filter((d): d is ParsedNFeDuplicata => d !== null)
     : [];
 
-  return { numero, dataEmissao, fornecedorNome, items, duplicatas };
+  // <total><ICMSTot> traz o desconto e o frete já totalizados pelo emitente — evita o usuário ter
+  // que calcular/digitar isso de novo quando a nota já vem com XML.
+  const icmsTot = infNFe.getElementsByTagName("total")[0]?.getElementsByTagName("ICMSTot")[0] ?? null;
+  const vDesc = Number(text(icmsTot?.getElementsByTagName("vDesc")[0] ?? null) ?? "0");
+  const vFrete = Number(text(icmsTot?.getElementsByTagName("vFrete")[0] ?? null) ?? "0");
+
+  return {
+    numero,
+    dataEmissao,
+    fornecedorNome,
+    items,
+    duplicatas,
+    valorDesconto: Number.isFinite(vDesc) ? vDesc : 0,
+    valorFrete: Number.isFinite(vFrete) ? vFrete : 0,
+  };
 }

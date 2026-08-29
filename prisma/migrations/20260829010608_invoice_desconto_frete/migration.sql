@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Invoice" ADD COLUMN     "valorDesconto" DECIMAL(14,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "valorFrete" DECIMAL(14,2) NOT NULL DEFAULT 0;

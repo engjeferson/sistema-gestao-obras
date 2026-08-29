@@ -12,6 +12,7 @@ import { InvoiceInstallmentsEditor } from "@/components/notas-fiscais/invoice-in
 import { XmlItemsReviewDialog } from "@/components/notas-fiscais/xml-items-review-dialog";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { parseNFeXml } from "@/lib/parse-nfe-xml";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 import { ESTOQUE_GERAL_VALUE } from "@/lib/validations/notas-fiscais";
 import type { InvoiceItemValues, InvoiceInstallmentValues } from "@/lib/validations/notas-fiscais";
 
@@ -51,7 +52,10 @@ export function InvoiceForm({
   const [gerarContaPagar, setGerarContaPagar] = useState(false);
   const [parcelar, setParcelar] = useState(false);
   const [parcelas, setParcelas] = useState<InvoiceInstallmentValues[]>([]);
-  const totalValor = items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const [valorDesconto, setValorDesconto] = useState(0);
+  const [valorFrete, setValorFrete] = useState(0);
+  const itemsSum = items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const totalValor = Math.max(0, itemsSum - valorDesconto + valorFrete);
   const [selectedWorkId, setSelectedWorkId] = useState(defaultWorkId ?? "");
   const [selectedStageId, setSelectedStageId] = useState("");
   const isEstoqueGeral = selectedWorkId === ESTOQUE_GERAL_VALUE;
@@ -86,6 +90,8 @@ export function InvoiceForm({
     if (parsed.items.length > 0) {
       setPendingXmlItems(parsed.items);
     }
+    if (parsed.valorDesconto > 0) setValorDesconto(parsed.valorDesconto);
+    if (parsed.valorFrete > 0) setValorFrete(parsed.valorFrete);
     if (parsed.duplicatas.length >= 2) {
       setGerarContaPagar(true);
       setParcelar(true);
@@ -175,6 +181,8 @@ export function InvoiceForm({
     <>
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="itemsJson" value={JSON.stringify(items)} readOnly />
+      <input type="hidden" name="valorDesconto" value={valorDesconto} readOnly />
+      <input type="hidden" name="valorFrete" value={valorFrete} readOnly />
       <input type="hidden" name="parcelasJson" value={JSON.stringify(parcelas)} readOnly />
       <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
       <input type="hidden" name="arquivoXmlUrl" value={arquivoXmlUrl ?? ""} readOnly />
@@ -297,6 +305,46 @@ export function InvoiceForm({
       <div className="flex flex-col gap-2">
         <Label>Itens da nota</Label>
         <InvoiceItemsEditor items={items} onChange={setItems} materials={materials} />
+
+        <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="valorDescontoInput" className="text-xs font-normal text-muted-foreground">
+              Desconto (R$)
+            </Label>
+            <Input
+              id="valorDescontoInput"
+              type="number"
+              min={0}
+              step="0.01"
+              value={valorDesconto || ""}
+              onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))}
+              placeholder="0,00"
+              className="w-32"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="valorFreteInput" className="text-xs font-normal text-muted-foreground">
+              Frete (R$)
+            </Label>
+            <Input
+              id="valorFreteInput"
+              type="number"
+              min={0}
+              step="0.01"
+              value={valorFrete || ""}
+              onChange={(e) => setValorFrete(Math.max(0, Number(e.target.value) || 0))}
+              placeholder="0,00"
+              className="w-32"
+            />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Subtotal dos itens: {formatCurrencyBRL(itemsSum)}
+            {valorDesconto > 0 ? <> — Desconto: -{formatCurrencyBRL(valorDesconto)}</> : null}
+            {valorFrete > 0 ? <> — Frete: +{formatCurrencyBRL(valorFrete)}</> : null}
+            {" — "}
+            <strong className="text-foreground">Total: {formatCurrencyBRL(totalValor)}</strong>
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 sm:max-w-sm">

@@ -26,7 +26,8 @@ export async function createInvoiceWithFinancialEntry(
   comprovanteUrl: string | null,
 ) {
   const supplierId = await findOrCreateSupplierId(data.supplierNome);
-  const valorTotal = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const itemsSum = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const valorTotal = Math.max(0, itemsSum - data.valorDesconto + data.valorFrete);
   const stageId = data.workId ? data.stageId || null : null;
   const taskId = data.workId ? data.taskId || null : null;
 
@@ -49,6 +50,8 @@ export async function createInvoiceWithFinancialEntry(
         numero: data.numero || "",
         dataEmissao: new Date(data.dataEmissao),
         valorTotal,
+        valorDesconto: data.valorDesconto,
+        valorFrete: data.valorFrete,
         categoriaId: data.categoriaId,
         arquivoUrl,
         arquivoXmlUrl,

@@ -396,6 +396,8 @@ model Invoice {
   numero        String
   dataEmissao   DateTime @db.Date
   valorTotal    Decimal  @db.Decimal(14, 2)
+  valorDesconto Decimal  @default(0) @db.Decimal(14, 2)
+  valorFrete    Decimal  @default(0) @db.Decimal(14, 2)
   categoriaId   String
   arquivoUrl    String?
   arquivoXmlUrl String?

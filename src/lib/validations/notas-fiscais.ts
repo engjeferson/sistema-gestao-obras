@@ -37,6 +37,8 @@ export const invoiceFormSchema = z
     categoriaId: z.string().min(1, "Selecione a categoria."),
     observacao: z.string().trim().optional(),
     items: z.array(invoiceItemSchema).min(1, "Adicione ao menos um item."),
+    valorDesconto: z.coerce.number().nonnegative().optional().default(0),
+    valorFrete: z.coerce.number().nonnegative().optional().default(0),
     gerarContaPagar: z.boolean().optional(),
     contaPaga: z.boolean().optional(),
     dataVencimento: z.string().optional(),

@@ -81,6 +81,8 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
     categoriaId: formData.get("categoriaId"),
     observacao: formData.get("observacao") ?? undefined,
     items: itemsParsed,
+    valorDesconto: formData.get("valorDesconto") || 0,
+    valorFrete: formData.get("valorFrete") || 0,
     gerarContaPagar: formData.get("gerarContaPagar") === "on",
     contaPaga: formData.get("contaPaga") === "on",
     dataVencimento: formData.get("dataVencimento") || undefined,
@@ -101,7 +103,8 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
   }
 
   if (data.gerarContaPagar && data.parcelar && data.parcelas) {
-    const valorTotal = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+    const itemsSum = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+    const valorTotal = Math.max(0, itemsSum - data.valorDesconto + data.valorFrete);
     const somaEntrada = data.temEntrada && data.entrada ? data.entrada.valor : 0;
     const somaParcelas = somaEntrada + data.parcelas.reduce((sum, parcela) => sum + parcela.valor, 0);
     if (Math.abs(somaParcelas - valorTotal) > 0.01) {
