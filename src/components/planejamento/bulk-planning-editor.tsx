@@ -35,6 +35,58 @@ function existingDepthMap(stages: PlainStage[], depth = 0, map = new Map<string,
   return map;
 }
 
+// Índices auxiliares pra numerar a coluna "#" em formato EAP (1, 1.1, 2, 2.1, 2.2...), igual ao
+// código real salvo no banco — pra linha já existente usa o `codigo` real direto; pra linha nova
+// do lote, calcula continuando a contagem a partir de quantos filhos aquele pai já tinha.
+function buildCodigoIndex(stages: PlainStage[], map = new Map<string, string>()) {
+  for (const stage of stages) {
+    map.set(stage.id, stage.codigo);
+    for (const task of stage.tasks) map.set(task.id, task.codigo);
+    buildCodigoIndex(stage.children, map);
+  }
+  return map;
+}
+
+function buildExistingChildCount(stages: PlainStage[], map = new Map<string, number>()) {
+  for (const stage of stages) {
+    map.set(stage.id, stage.tasks.length + stage.children.length);
+    buildExistingChildCount(stage.children, map);
+  }
+  return map;
+}
+
+function computeRowCodes(rows: BulkRow[], stages: PlainStage[]): Map<string, string> {
+  const codigoById = buildCodigoIndex(stages);
+  const existingChildCount = buildExistingChildCount(stages);
+  const codeByClientId = new Map<string, string>();
+  const newCountByParent = new Map<string, number>();
+
+  function codeOfParent(parentClientId: string): string {
+    if (!parentClientId) return "";
+    if (parentClientId.startsWith(EXISTING_PREFIX)) return codigoById.get(parentClientId.slice(EXISTING_PREFIX.length)) ?? "";
+    return codeByClientId.get(parentClientId) ?? "";
+  }
+
+  for (const row of rows) {
+    if (row.clientId.startsWith(EXISTING_PREFIX)) {
+      codeByClientId.set(row.clientId, codigoById.get(row.clientId.slice(EXISTING_PREFIX.length)) ?? "?");
+      continue;
+    }
+    const parentKey = row.parentClientId || "__toplevel__";
+    const baseCount = !row.parentClientId
+      ? stages.length
+      : row.parentClientId.startsWith(EXISTING_PREFIX)
+        ? (existingChildCount.get(row.parentClientId.slice(EXISTING_PREFIX.length)) ?? 0)
+        : 0;
+    const alreadyNew = newCountByParent.get(parentKey) ?? 0;
+    newCountByParent.set(parentKey, alreadyNew + 1);
+    const prefix = codeOfParent(row.parentClientId);
+    codeByClientId.set(row.clientId, prefix ? `${prefix}.${baseCount + alreadyNew + 1}` : `${baseCount + alreadyNew + 1}`);
+  }
+
+  return codeByClientId;
+}
+
 function batchEtapaDepth(row: BulkRow, etapaRows: BulkRow[], depthMap: Map<string, number>, guard = 0): number {
   if (!row.parentClientId || guard > etapaRows.length) return 0;
   if (row.parentClientId.startsWith(EXISTING_PREFIX)) {
@@ -175,24 +227,24 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   }
 
   const canAddAtividade = existingOptions.length > 0 || etapaRows.length > 0;
-  const rowNumber = new Map(rows.map((r, i) => [r.clientId, i + 1]));
+  const rowCode = computeRowCodes(rows, stages);
 
-  // Predecessoras são digitadas como número(s) de linha separados por vírgula (ex: "2, 5") em vez
-  // de um multi-select — resolvido pro clientId real só ao perder o foco, pra não reformatar o
-  // texto (e mexer no cursor) a cada tecla digitada.
+  // Predecessoras são digitadas como código(s) de item separados por vírgula (ex: "1.1, 2.3") —
+  // mesmo código da coluna "#" — em vez de um multi-select. Resolvido pro clientId real só ao
+  // perder o foco, pra não reformatar o texto (e mexer no cursor) a cada tecla digitada.
   function predecessorDisplayText(row: BulkRow) {
     return row.predecessorClientIds
-      .map((id) => rowNumber.get(id))
-      .filter((n): n is number => n !== undefined)
+      .map((id) => rowCode.get(id))
+      .filter((c): c is string => !!c)
       .join(", ");
   }
 
   function commitPredecessorText(row: BulkRow, text: string) {
     const ids = text
       .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isFinite(n))
-      .map((n) => atividadeRows.find((a) => a.clientId !== row.clientId && rowNumber.get(a.clientId) === n)?.clientId)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((code) => atividadeRows.find((a) => a.clientId !== row.clientId && rowCode.get(a.clientId) === code)?.clientId)
       .filter((id): id is string => !!id);
     updateRow(row.clientId, { predecessorClientIds: [...new Set(ids)] });
   }
@@ -265,7 +317,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
               const locked = isExisting(row.clientId);
               return (
                 <tr key={row.clientId} className={`border-b last:border-0 ${locked ? "bg-muted/30" : ""}`}>
-                  <td className="p-2 text-muted-foreground">{rowNumber.get(row.clientId)}</td>
+                  <td className="p-2 text-muted-foreground">{rowCode.get(row.clientId)}</td>
                   <td className="p-2">
                     <RowTypeBadge tipo={row.tipo} />
                     {locked ? <span className="ml-1 text-[0.65rem] text-muted-foreground">já existe</span> : null}
@@ -341,7 +393,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                         onKeyDown={(e) => {
                           if (e.key === "Enter") e.currentTarget.blur();
                         }}
-                        placeholder="Ex: 2, 5"
+                        placeholder="Ex: 1.1, 2.3"
                         className="w-24"
                         disabled={locked}
                       />
