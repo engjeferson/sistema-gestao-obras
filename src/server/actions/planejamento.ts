@@ -615,6 +615,12 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
   }
 
   const EXISTING_PREFIX = "existing:";
+  const isExistingRow = (clientId: string) => clientId.startsWith(EXISTING_PREFIX);
+  // Linhas "existing:" já representam etapas/atividades reais (carregadas na tela pra dar
+  // contexto e servir de predecessora) — este lote só CRIA as demais, nunca recria/edita as
+  // que já existem.
+  const newEtapaRows = etapaRows.filter((r) => !isExistingRow(r.clientId));
+  const newAtividadeRows = atividadeRows.filter((r) => !isExistingRow(r.clientId));
 
   await prisma.$transaction(async (tx) => {
     const stageIdMap = new Map<string, string>(); // clientId (deste lote) -> id real
@@ -628,7 +634,7 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
     // Cria as ETAPA em ordem topológica: uma linha só é criada depois que sua etapa-pai (quando
     // é outra linha ETAPA deste mesmo lote) já tiver sido criada — permite aninhar em qualquer
     // nível dentro do próprio lote, além de aninhar em etapas/subs já existentes.
-    const pending = [...etapaRows];
+    const pending = [...newEtapaRows];
     let progressed = true;
     while (pending.length > 0 && progressed) {
       progressed = false;
@@ -636,7 +642,7 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
         const row = pending[i];
         const parentId = row.parentClientId;
         const waitingOnBatchParent =
-          parentId && !parentId.startsWith(EXISTING_PREFIX) && etapaRows.some((e) => e.clientId === parentId) && !stageIdMap.has(parentId);
+          parentId && !parentId.startsWith(EXISTING_PREFIX) && newEtapaRows.some((e) => e.clientId === parentId) && !stageIdMap.has(parentId);
         if (waitingOnBatchParent) continue;
 
         const resolvedParentId = resolveParentStageId(parentId);
@@ -655,9 +661,14 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
       throw new Error("Referência circular entre etapas do lote.");
     }
 
-    const taskIdMap = new Map<string, string>();
-
+    const taskIdMap = new Map<string, string>(); // clientId (existente ou deste lote) -> id real
     for (const row of atividadeRows) {
+      if (isExistingRow(row.clientId)) {
+        taskIdMap.set(row.clientId, row.clientId.slice(EXISTING_PREFIX.length));
+      }
+    }
+
+    for (const row of newAtividadeRows) {
       const stageId = resolveParentStageId(row.parentClientId);
       if (!stageId) continue;
 
@@ -686,17 +697,23 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
       }
     }
 
+    // Percorre TODAS as atividades (novas + existentes, essas últimas já com sua predecessora
+    // pré-marcada na tela) — createMany + skipDuplicates deixa de graça o caso comum de uma
+    // atividade existente reenviar um vínculo que já existe, e ainda permite uma atividade NOVA
+    // apontar pra uma já existente (algo que a tela não deixava fazer antes).
+    const dependencyPairs: { predecessorTaskId: string; successorTaskId: string }[] = [];
     for (const row of atividadeRows) {
       const successorId = taskIdMap.get(row.clientId);
       if (!successorId || !row.predecessorClientIds) continue;
 
       for (const predecessorClientId of row.predecessorClientIds) {
         const predecessorId = taskIdMap.get(predecessorClientId);
-        if (!predecessorId) continue;
-        await tx.planningDependency.create({
-          data: { predecessorTaskId: predecessorId, successorTaskId: successorId },
-        });
+        if (!predecessorId || predecessorId === successorId) continue;
+        dependencyPairs.push({ predecessorTaskId: predecessorId, successorTaskId: successorId });
       }
+    }
+    if (dependencyPairs.length > 0) {
+      await tx.planningDependency.createMany({ data: dependencyPairs, skipDuplicates: true });
     }
   });
 

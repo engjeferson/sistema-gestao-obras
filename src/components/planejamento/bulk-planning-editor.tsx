@@ -3,14 +3,13 @@
 import { useActionState, useRef, useState } from "react";
 import { Plus, Trash2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { importPlanningBulk } from "@/server/actions/planejamento";
 import { flattenStageOptions } from "@/components/planejamento/add-stage-form";
-import { COST_TYPE_LABELS, PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
+import { COST_TYPE_LABELS } from "@/lib/status-labels";
 import type { ParsedBulkRow as BulkRow, ParsePlanilhaResult, TipoCusto } from "@/lib/planning-sheet-parser";
-import type { PlainStage } from "@/components/planejamento/stage-list";
+import { toDateInputValue, type PlainStage } from "@/components/planejamento/stage-list";
 
 const EXISTING_PREFIX = "existing:";
 
@@ -46,59 +45,56 @@ function batchEtapaDepth(row: BulkRow, etapaRows: BulkRow[], depthMap: Map<strin
   return batchEtapaDepth(parent, etapaRows, depthMap, guard + 1) + 1;
 }
 
-// Painel só de leitura mostrando o que a obra já tem lançado — o "Lançamento em bloco" só CRIA
-// etapas/atividades novas (não edita as existentes), então sem isso a tela parece ter zerado o
-// planejamento mesmo quando já existe bastante coisa cadastrada.
-function ExistingPlanningReference({ stages }: { stages: PlainStage[] }) {
-  if (stages.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Nenhuma etapa cadastrada ainda nesta obra — o que você montar abaixo vai ser o início do planejamento.
-      </p>
-    );
+// Etapas/atividades que a obra já tem lançado entram como linhas travadas (não editáveis aqui —
+// o "Lançamento em bloco" só CRIA itens novos) no topo da própria tabela, em vez de um resumo à
+// parte: assim o que já existe fica visível junto do que está sendo montado, e uma atividade nova
+// pode escolher uma já existente como predecessora (antes só dava pra encadear dentro do lote).
+function buildExistingRows(stages: PlainStage[], parentClientId = ""): BulkRow[] {
+  const rows: BulkRow[] = [];
+  for (const stage of stages) {
+    const stageClientId = `${EXISTING_PREFIX}${stage.id}`;
+    rows.push({
+      clientId: stageClientId,
+      tipo: "ETAPA",
+      parentClientId,
+      nome: stage.nome,
+      dataInicioPrevista: "",
+      dataFimPrevista: "",
+      predecessorClientIds: [],
+      custoPrevisto: "",
+      tipoCusto: undefined,
+    });
+    for (const task of stage.tasks) {
+      rows.push({
+        clientId: `${EXISTING_PREFIX}${task.id}`,
+        tipo: "ATIVIDADE",
+        parentClientId: stageClientId,
+        nome: task.nome,
+        dataInicioPrevista: toDateInputValue(task.dataInicioPrevista),
+        dataFimPrevista: toDateInputValue(task.dataFimPrevista),
+        predecessorClientIds: task.predecessorChips
+          .filter((c) => c.type === "task")
+          .map((c) => `${EXISTING_PREFIX}${c.id}`),
+        custoPrevisto: "",
+        tipoCusto: undefined,
+      });
+    }
+    rows.push(...buildExistingRows(stage.children, stageClientId));
   }
-  return (
-    <ul className="flex max-h-60 flex-col gap-2 overflow-y-auto text-sm">
-      {stages.map((stage) => (
-        <ExistingStageNode key={stage.id} stage={stage} />
-      ))}
-    </ul>
-  );
-}
-
-function ExistingStageNode({ stage }: { stage: PlainStage }) {
-  return (
-    <li>
-      <p className="font-medium">{stage.nome}</p>
-      {stage.tasks.length > 0 || stage.children.length > 0 ? (
-        <ul className="mt-1 flex flex-col gap-1 border-l pl-3">
-          {stage.tasks.map((task) => (
-            <li key={task.id} className="flex flex-wrap items-center gap-2 text-muted-foreground">
-              <span className="text-foreground">{task.nome}</span>
-              <span className="text-xs">
-                {formatDateBR(task.dataInicioPrevista)} – {formatDateBR(task.dataFimPrevista)}
-              </span>
-              <Badge variant={PLANNING_STATUS_BADGE[task.status]} className="text-[0.65rem]">
-                {PLANNING_STATUS_LABELS[task.status]}
-              </Badge>
-            </li>
-          ))}
-          {stage.children.map((child) => (
-            <ExistingStageNode key={child.id} stage={child} />
-          ))}
-        </ul>
-      ) : null}
-    </li>
-  );
+  return rows;
 }
 
 export function BulkPlanningEditor({ workId, stages }: { workId: string; stages: PlainStage[] }) {
   const [errorMessage, formAction, isPending] = useActionState(importPlanningBulk, undefined);
-  const [rows, setRows] = useState<BulkRow[]>([newRow("ETAPA")]);
+  const [rows, setRows] = useState<BulkRow[]>(() => {
+    const existing = buildExistingRows(stages);
+    return existing.length > 0 ? existing : [newRow("ETAPA")];
+  });
   const [isImporting, setIsImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isExisting = (clientId: string) => clientId.startsWith(EXISTING_PREFIX);
   const etapaRows = rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = rows.filter((r) => r.tipo === "ATIVIDADE");
 
@@ -110,7 +106,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
 
   function parentOptionsFor(excludeClientId?: string) {
     const batchOptions = etapaRows
-      .filter((r) => r.clientId !== excludeClientId)
+      .filter((r) => r.clientId !== excludeClientId && !isExisting(r.clientId))
       .map((r) => ({
         value: r.clientId,
         label: `${"— ".repeat(batchEtapaDepth(r, etapaRows, depthMap))}${r.nome || "(sem nome)"}`,
@@ -123,6 +119,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   }
 
   function removeRow(clientId: string) {
+    if (isExisting(clientId)) return;
     setRows((prev) =>
       prev
         .filter((r) => r.clientId !== clientId)
@@ -144,8 +141,8 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   }
 
   async function handleFileSelected(file: File) {
-    const hasContent = rows.some((r) => r.nome.trim() !== "");
-    if (hasContent && !confirm("Importar a planilha vai substituir as linhas atuais desta tela. Continuar?")) {
+    const hasContent = rows.some((r) => !isExisting(r.clientId) && r.nome.trim() !== "");
+    if (hasContent && !confirm("Importar a planilha vai substituir as linhas novas desta tela. Continuar?")) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -162,7 +159,8 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
         return;
       }
       const result = data as ParsePlanilhaResult;
-      setRows(result.rows);
+      // Mantém as linhas já existentes (travadas) na tela — a planilha só substitui o que era novo.
+      setRows((prev) => [...prev.filter((r) => isExisting(r.clientId)), ...result.rows]);
       setImportSummary(
         `${result.etapaCount} etapa(s) e ${result.atividadeCount} atividade(s) importadas de "${file.name}".` +
           (result.unresolved.length > 0 ? ` Avisos: ${result.unresolved.join("; ")}` : ""),
@@ -183,13 +181,12 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
       <input type="hidden" name="workId" value={workId} />
       <input type="hidden" name="rowsJson" value={JSON.stringify(rows)} readOnly />
 
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
-        <p className="text-sm font-medium">Já planejado nesta obra</p>
+      {rows.some((r) => isExisting(r.clientId)) ? (
         <p className="text-xs text-muted-foreground">
-          O que você adicionar abaixo entra como novas etapas/atividades — isso aqui não muda o que já existe.
+          As linhas destacadas abaixo já estão lançadas nesta obra (não são editáveis aqui) — use-as como
+          predecessora das atividades novas. O que você adicionar entra como novas etapas/atividades.
         </p>
-        <ExistingPlanningReference stages={stages} />
-      </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
         <div className="flex items-center justify-between">
@@ -243,125 +240,136 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.clientId} className="border-b last:border-0">
-                <td className="p-2 text-muted-foreground">{rowNumber.get(row.clientId)}</td>
-                <td className="p-2">
-                  <RowTypeBadge tipo={row.tipo} />
-                </td>
-                <td className="p-2">
-                  <NativeSelect
-                    value={row.parentClientId}
-                    onChange={(e) => updateRow(row.clientId, { parentClientId: e.target.value })}
-                    className="min-w-[180px]"
-                  >
-                    {row.tipo === "ETAPA" ? <option value="">— Nível superior —</option> : null}
-                    {row.tipo === "ATIVIDADE" ? (
-                      <option value="" disabled>
-                        Selecione a etapa
-                      </option>
-                    ) : null}
-                    {parentOptionsFor(row.clientId).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </td>
-                <td className="p-2">
-                  <Input
-                    value={row.nome}
-                    onChange={(e) => updateRow(row.clientId, { nome: e.target.value })}
-                    placeholder={row.tipo === "ETAPA" ? "Ex: Fundação" : "Ex: Escavação"}
-                    className="min-w-[160px]"
-                  />
-                </td>
-                <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
-                    <Input
-                      type="date"
-                      value={row.dataInicioPrevista}
-                      onChange={(e) => updateRow(row.clientId, { dataInicioPrevista: e.target.value })}
-                    />
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
-                    <Input
-                      type="date"
-                      value={row.dataFimPrevista}
-                      onChange={(e) => updateRow(row.clientId, { dataFimPrevista: e.target.value })}
-                    />
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
-                    <select
-                      multiple
-                      value={row.predecessorClientIds}
-                      onChange={(e) =>
-                        updateRow(row.clientId, {
-                          predecessorClientIds: Array.from(e.target.selectedOptions).map((o) => o.value),
-                        })
-                      }
-                      className="h-16 min-w-[160px] rounded border bg-background px-1 text-xs"
-                    >
-                      {atividadeRows
-                        .filter((a) => a.clientId !== row.clientId)
-                        .map((a) => (
-                          <option key={a.clientId} value={a.clientId}>
-                            {rowNumber.get(a.clientId)}
-                          </option>
-                        ))}
-                    </select>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
+            {rows.map((row) => {
+              const locked = isExisting(row.clientId);
+              return (
+                <tr key={row.clientId} className={`border-b last:border-0 ${locked ? "bg-muted/30" : ""}`}>
+                  <td className="p-2 text-muted-foreground">{rowNumber.get(row.clientId)}</td>
+                  <td className="p-2">
+                    <RowTypeBadge tipo={row.tipo} />
+                    {locked ? <span className="ml-1 text-[0.65rem] text-muted-foreground">já existe</span> : null}
+                  </td>
+                  <td className="p-2">
                     <NativeSelect
-                      value={row.tipoCusto ?? ""}
-                      onChange={(e) => updateRow(row.clientId, { tipoCusto: (e.target.value || undefined) as TipoCusto | undefined })}
-                      className="min-w-[140px]"
+                      value={row.parentClientId}
+                      onChange={(e) => updateRow(row.clientId, { parentClientId: e.target.value })}
+                      className="min-w-[180px]"
+                      disabled={locked}
                     >
-                      <option value="">—</option>
-                      {Object.entries(COST_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
+                      {row.tipo === "ETAPA" ? <option value="">— Nível superior —</option> : null}
+                      {row.tipo === "ATIVIDADE" ? (
+                        <option value="" disabled>
+                          Selecione a etapa
+                        </option>
+                      ) : null}
+                      {parentOptionsFor(row.clientId).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
                         </option>
                       ))}
                     </NativeSelect>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  {row.tipo === "ATIVIDADE" ? (
+                  </td>
+                  <td className="p-2">
                     <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={row.custoPrevisto}
-                      onChange={(e) => updateRow(row.clientId, { custoPrevisto: e.target.value })}
-                      placeholder="R$"
-                      className="w-24"
+                      value={row.nome}
+                      onChange={(e) => updateRow(row.clientId, { nome: e.target.value })}
+                      placeholder={row.tipo === "ETAPA" ? "Ex: Fundação" : "Ex: Escavação"}
+                      className="min-w-[160px]"
+                      disabled={locked}
                     />
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(row.clientId)}>
-                    <Trash2 className="size-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="p-2">
+                    {row.tipo === "ATIVIDADE" ? (
+                      <Input
+                        type="date"
+                        value={row.dataInicioPrevista}
+                        onChange={(e) => updateRow(row.clientId, { dataInicioPrevista: e.target.value })}
+                        disabled={locked}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {row.tipo === "ATIVIDADE" ? (
+                      <Input
+                        type="date"
+                        value={row.dataFimPrevista}
+                        onChange={(e) => updateRow(row.clientId, { dataFimPrevista: e.target.value })}
+                        disabled={locked}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {row.tipo === "ATIVIDADE" ? (
+                      <select
+                        multiple
+                        value={row.predecessorClientIds}
+                        onChange={(e) =>
+                          updateRow(row.clientId, {
+                            predecessorClientIds: Array.from(e.target.selectedOptions).map((o) => o.value),
+                          })
+                        }
+                        className="h-16 min-w-[160px] rounded border bg-background px-1 text-xs"
+                        disabled={locked}
+                      >
+                        {atividadeRows
+                          .filter((a) => a.clientId !== row.clientId)
+                          .map((a) => (
+                            <option key={a.clientId} value={a.clientId}>
+                              {rowNumber.get(a.clientId)}
+                            </option>
+                          ))}
+                      </select>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {row.tipo === "ATIVIDADE" && !locked ? (
+                      <NativeSelect
+                        value={row.tipoCusto ?? ""}
+                        onChange={(e) => updateRow(row.clientId, { tipoCusto: (e.target.value || undefined) as TipoCusto | undefined })}
+                        className="min-w-[140px]"
+                      >
+                        <option value="">—</option>
+                        {Object.entries(COST_TYPE_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {row.tipo === "ATIVIDADE" && !locked ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={row.custoPrevisto}
+                        onChange={(e) => updateRow(row.clientId, { custoPrevisto: e.target.value })}
+                        placeholder="R$"
+                        className="w-24"
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {!locked ? (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(row.clientId)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
