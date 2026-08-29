@@ -2,16 +2,28 @@ import { BulkPlanningEditor } from "@/components/planejamento/bulk-planning-edit
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 import type { PlainStage } from "@/components/planejamento/stage-list";
 
-// Só precisamos de id/codigo/nome/children pra montar o seletor de pai — sem tasks/chips.
+// Traz a árvore completa (não só id/nome) — além de alimentar o seletor de pai, agora também
+// mostra pro usuário o que já está lançado nesta obra (pra não parecer que a tela zerou tudo).
 function mapStage(stage: StageTreeNode): PlainStage {
   return {
     id: stage.id,
     codigo: stage.codigo!,
     nome: stage.nome,
-    dataInicioPrevista: null,
-    dataFimPrevista: null,
-    predecessorChips: [],
-    tasks: [],
+    dataInicioPrevista: stage.dataInicioPrevista,
+    dataFimPrevista: stage.dataFimPrevista,
+    predecessorChips: stage.predecessorChips,
+    tasks: stage.tasks.map((task) => ({
+      id: task.id,
+      codigo: task.codigo!,
+      nome: task.nome,
+      dataInicioPrevista: task.dataInicioPrevista,
+      dataFimPrevista: task.dataFimPrevista,
+      baselineInicio: task.baselineInicio,
+      baselineFim: task.baselineFim,
+      percentualExecutado: Number(task.percentualExecutado),
+      status: task.status,
+      predecessorChips: task.predecessorChips,
+    })),
     children: stage.children.map(mapStage),
   };
 }

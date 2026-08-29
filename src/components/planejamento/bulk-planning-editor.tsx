@@ -3,11 +3,12 @@
 import { useActionState, useRef, useState } from "react";
 import { Plus, Trash2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { importPlanningBulk } from "@/server/actions/planejamento";
 import { flattenStageOptions } from "@/components/planejamento/add-stage-form";
-import { COST_TYPE_LABELS } from "@/lib/status-labels";
+import { COST_TYPE_LABELS, PLANNING_STATUS_BADGE, PLANNING_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 import type { ParsedBulkRow as BulkRow, ParsePlanilhaResult, TipoCusto } from "@/lib/planning-sheet-parser";
 import type { PlainStage } from "@/components/planejamento/stage-list";
 
@@ -43,6 +44,52 @@ function batchEtapaDepth(row: BulkRow, etapaRows: BulkRow[], depthMap: Map<strin
   const parent = etapaRows.find((r) => r.clientId === row.parentClientId);
   if (!parent) return 0;
   return batchEtapaDepth(parent, etapaRows, depthMap, guard + 1) + 1;
+}
+
+// Painel só de leitura mostrando o que a obra já tem lançado — o "Lançamento em bloco" só CRIA
+// etapas/atividades novas (não edita as existentes), então sem isso a tela parece ter zerado o
+// planejamento mesmo quando já existe bastante coisa cadastrada.
+function ExistingPlanningReference({ stages }: { stages: PlainStage[] }) {
+  if (stages.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nenhuma etapa cadastrada ainda nesta obra — o que você montar abaixo vai ser o início do planejamento.
+      </p>
+    );
+  }
+  return (
+    <ul className="flex max-h-60 flex-col gap-2 overflow-y-auto text-sm">
+      {stages.map((stage) => (
+        <ExistingStageNode key={stage.id} stage={stage} />
+      ))}
+    </ul>
+  );
+}
+
+function ExistingStageNode({ stage }: { stage: PlainStage }) {
+  return (
+    <li>
+      <p className="font-medium">{stage.nome}</p>
+      {stage.tasks.length > 0 || stage.children.length > 0 ? (
+        <ul className="mt-1 flex flex-col gap-1 border-l pl-3">
+          {stage.tasks.map((task) => (
+            <li key={task.id} className="flex flex-wrap items-center gap-2 text-muted-foreground">
+              <span className="text-foreground">{task.nome}</span>
+              <span className="text-xs">
+                {formatDateBR(task.dataInicioPrevista)} – {formatDateBR(task.dataFimPrevista)}
+              </span>
+              <Badge variant={PLANNING_STATUS_BADGE[task.status]} className="text-[0.65rem]">
+                {PLANNING_STATUS_LABELS[task.status]}
+              </Badge>
+            </li>
+          ))}
+          {stage.children.map((child) => (
+            <ExistingStageNode key={child.id} stage={child} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
 }
 
 export function BulkPlanningEditor({ workId, stages }: { workId: string; stages: PlainStage[] }) {
@@ -136,6 +183,14 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
       <input type="hidden" name="workId" value={workId} />
       <input type="hidden" name="rowsJson" value={JSON.stringify(rows)} readOnly />
 
+      <div className="flex flex-col gap-2 rounded-lg border p-3">
+        <p className="text-sm font-medium">Já planejado nesta obra</p>
+        <p className="text-xs text-muted-foreground">
+          O que você adicionar abaixo entra como novas etapas/atividades — isso aqui não muda o que já existe.
+        </p>
+        <ExistingPlanningReference stages={stages} />
+      </div>
+
       <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Importar planilha</p>
@@ -192,7 +247,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
               <tr key={row.clientId} className="border-b last:border-0">
                 <td className="p-2 text-muted-foreground">{rowNumber.get(row.clientId)}</td>
                 <td className="p-2">
-                  <Badge tipo={row.tipo} />
+                  <RowTypeBadge tipo={row.tipo} />
                 </td>
                 <td className="p-2">
                   <NativeSelect
@@ -331,7 +386,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   );
 }
 
-function Badge({ tipo }: { tipo: "ETAPA" | "ATIVIDADE" }) {
+function RowTypeBadge({ tipo }: { tipo: "ETAPA" | "ATIVIDADE" }) {
   return (
     <span
       className={`rounded px-1.5 py-0.5 text-xs font-medium ${
