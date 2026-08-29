@@ -92,6 +92,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   });
   const [isImporting, setIsImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [predecessorDraft, setPredecessorDraft] = useState<{ clientId: string; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isExisting = (clientId: string) => clientId.startsWith(EXISTING_PREFIX);
@@ -175,6 +176,26 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
 
   const canAddAtividade = existingOptions.length > 0 || etapaRows.length > 0;
   const rowNumber = new Map(rows.map((r, i) => [r.clientId, i + 1]));
+
+  // Predecessoras são digitadas como número(s) de linha separados por vírgula (ex: "2, 5") em vez
+  // de um multi-select — resolvido pro clientId real só ao perder o foco, pra não reformatar o
+  // texto (e mexer no cursor) a cada tecla digitada.
+  function predecessorDisplayText(row: BulkRow) {
+    return row.predecessorClientIds
+      .map((id) => rowNumber.get(id))
+      .filter((n): n is number => n !== undefined)
+      .join(", ");
+  }
+
+  function commitPredecessorText(row: BulkRow, text: string) {
+    const ids = text
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n))
+      .map((n) => atividadeRows.find((a) => a.clientId !== row.clientId && rowNumber.get(a.clientId) === n)?.clientId)
+      .filter((id): id is string => !!id);
+    updateRow(row.clientId, { predecessorClientIds: [...new Set(ids)] });
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -304,25 +325,26 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                   </td>
                   <td className="p-2">
                     {row.tipo === "ATIVIDADE" ? (
-                      <select
-                        multiple
-                        value={row.predecessorClientIds}
-                        onChange={(e) =>
-                          updateRow(row.clientId, {
-                            predecessorClientIds: Array.from(e.target.selectedOptions).map((o) => o.value),
-                          })
+                      <Input
+                        type="text"
+                        value={
+                          predecessorDraft?.clientId === row.clientId
+                            ? predecessorDraft.text
+                            : predecessorDisplayText(row)
                         }
-                        className="h-16 min-w-[160px] rounded border bg-background px-1 text-xs"
+                        onFocus={() => setPredecessorDraft({ clientId: row.clientId, text: predecessorDisplayText(row) })}
+                        onChange={(e) => setPredecessorDraft({ clientId: row.clientId, text: e.target.value })}
+                        onBlur={(e) => {
+                          commitPredecessorText(row, e.target.value);
+                          setPredecessorDraft(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                        }}
+                        placeholder="Ex: 2, 5"
+                        className="w-24"
                         disabled={locked}
-                      >
-                        {atividadeRows
-                          .filter((a) => a.clientId !== row.clientId)
-                          .map((a) => (
-                            <option key={a.clientId} value={a.clientId}>
-                              {rowNumber.get(a.clientId)}
-                            </option>
-                          ))}
-                      </select>
+                      />
                     ) : (
                       "—"
                     )}
