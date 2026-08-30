@@ -66,7 +66,15 @@ export default async function ContractDetailPage({
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            {contract.contratante} → {contract.contratado} · {formatDateBR(contract.data)}
+            {contract.contratante} →{" "}
+            {contract.contratadoSupplierId ? (
+              <Link href={`/cadastros/fornecedores/${contract.contratadoSupplierId}`} className="underline underline-offset-2 hover:text-foreground">
+                {contract.contratado}
+              </Link>
+            ) : (
+              contract.contratado
+            )}{" "}
+            · {formatDateBR(contract.data)}
           </p>
         </div>
         <div className="flex gap-2">

@@ -14,9 +14,13 @@ import { uploadFileToR2 } from "@/lib/upload-file";
 export function ContractForm({
   action,
   workId,
+  companyName,
+  supplierNames,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   workId: string;
+  companyName: string;
+  supplierNames: string[];
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [arquivoUrl, setArquivoUrl] = useState<string | null>(null);
@@ -69,11 +73,19 @@ export function ContractForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="contratante">Contratante</Label>
-          <Input id="contratante" name="contratante" required />
+          <Input id="contratante" value={companyName} disabled />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="contratado">Contratado</Label>
-          <Input id="contratado" name="contratado" required />
+          <Label htmlFor="contratadoNome">Contratado</Label>
+          <Input id="contratadoNome" name="contratadoNome" list="fornecedores-datalist" required />
+          <datalist id="fornecedores-datalist">
+            {supplierNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          <p className="text-xs text-muted-foreground">
+            Selecione um fornecedor já cadastrado ou digite um nome novo — o cadastro é criado automaticamente.
+          </p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valor">Valor (R$)</Label>

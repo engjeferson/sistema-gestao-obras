@@ -17,8 +17,9 @@ export const contractFormSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do contrato."),
   tipo: z.enum(contractTypeValues),
   direcao: z.enum(contractDirecaoValues),
-  contratante: z.string().trim().min(1, "Informe o contratante."),
-  contratado: z.string().trim().min(1, "Informe o contratado."),
+  // Contratante não vem mais do formulário — o servidor sempre preenche com o nome da empresa
+  // (CompanySettings). Contratado agora resolve/cria um Fornecedor de verdade a partir do nome.
+  contratadoNome: z.string().trim().min(1, "Informe o contratado."),
   valor: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
   data: z.string().min(1, "Informe a data."),
   observacoes: z.string().trim().optional(),

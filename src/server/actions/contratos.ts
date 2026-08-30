@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
+import { getCompanySettings } from "@/server/actions/empresa";
 
 function parseContractForm(formData: FormData) {
   return contractFormSchema.safeParse({
@@ -13,12 +14,22 @@ function parseContractForm(formData: FormData) {
     nome: formData.get("nome"),
     tipo: formData.get("tipo"),
     direcao: formData.get("direcao"),
-    contratante: formData.get("contratante"),
-    contratado: formData.get("contratado"),
+    contratadoNome: formData.get("contratadoNome"),
     valor: formData.get("valor") ?? "",
     data: formData.get("data"),
     observacoes: formData.get("observacoes") ?? undefined,
   });
+}
+
+// Resolve pelo nome — se já existe um fornecedor com esse nome, reaproveita; senão cria um novo
+// já classificado como "Serviços" (mesma ideia de `findOrCreateSupplierId` da Nota Fiscal, mas
+// essa tela lida majoritariamente com prestadores de serviço, não material).
+async function findOrCreateSupplierId(nome: string) {
+  const trimmed = nome.trim();
+  const existing = await prisma.supplier.findFirst({ where: { nome: trimmed } });
+  if (existing) return existing.id;
+  const created = await prisma.supplier.create({ data: { nome: trimmed, categoria: "SERVICOS" } });
+  return created.id;
 }
 
 export async function listContracts(workId: string) {
@@ -63,14 +74,20 @@ export async function createContract(_prevState: string | undefined, formData: F
   const data = parsed.data;
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
 
+  const [companySettings, contratadoSupplierId] = await Promise.all([
+    getCompanySettings(),
+    findOrCreateSupplierId(data.contratadoNome),
+  ]);
+
   await prisma.contract.create({
     data: {
       workId: data.workId,
       nome: data.nome,
       tipo: data.tipo,
       direcao: data.direcao,
-      contratante: data.contratante,
-      contratado: data.contratado,
+      contratante: companySettings.nome,
+      contratado: data.contratadoNome.trim(),
+      contratadoSupplierId,
       valor: data.valor ?? null,
       data: new Date(data.data),
       observacoes: data.observacoes || null,

@@ -218,6 +218,7 @@ model Supplier {
 
   invoices              Invoice[]
   financialTransactions FinancialTransaction[]
+  contracts             Contract[]
 }
 
 model Material {
@@ -470,25 +471,31 @@ model StockMovement {
 }
 
 model Contract {
-  id          String          @id @default(cuid())
-  workId      String
-  nome        String
-  tipo        ContractType
-  direcao     TransactionType @default(PAGAR)
-  contratante String
-  contratado  String
-  valor       Decimal?        @db.Decimal(14, 2)
-  data        DateTime        @db.Date
-  observacoes String?
-  arquivoUrl  String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                   String          @id @default(cuid())
+  workId               String
+  nome                 String
+  tipo                 ContractType
+  direcao              TransactionType @default(PAGAR)
+  // Texto solto, igual `InvoiceItem.material` — guarda o nome no momento da criação, pra exibição
+  // continuar funcionando mesmo que o fornecedor seja renomeado ou removido depois. `contratante`
+  // é sempre preenchido no servidor a partir de `CompanySettings.nome` (nunca mais digitado).
+  contratante          String
+  contratado           String
+  contratadoSupplierId String?
+  valor                Decimal?        @db.Decimal(14, 2)
+  data                 DateTime        @db.Date
+  observacoes          String?
+  arquivoUrl           String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
-  work         Work                  @relation(fields: [workId], references: [id], onDelete: Cascade)
-  measurements ContractMeasurement[]
-  addendums    ContractAddendum[]
+  work               Work                  @relation(fields: [workId], references: [id], onDelete: Cascade)
+  contratadoSupplier Supplier?             @relation(fields: [contratadoSupplierId], references: [id])
+  measurements       ContractMeasurement[]
+  addendums          ContractAddendum[]
 
   @@index([workId])
+  @@index([contratadoSupplierId])
 }
 
 model ContractAddendum {
