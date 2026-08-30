@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { computeSaldo, computeSaldoComValor } from "@/lib/stock";
 import { stockEntradaSchema, stockSaidaSchema, stockTransferenciaSchema } from "@/lib/validations/estoque";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 
 function normalizeWorkId(value: string | null | undefined) {
   return value && value.length > 0 ? value : null;
@@ -15,6 +16,10 @@ function normalizeWorkId(value: string | null | undefined) {
 
 export async function getStockBalances(workId?: string | null) {
   const local = normalizeWorkId(workId);
+  const workAccess = await getCurrentWorkAccess();
+  if (local && workAccess !== null && !workAccess.includes(local)) {
+    return [];
+  }
 
   const movements = await prisma.stockMovement.findMany({
     where: { OR: [{ origemWorkId: local }, { destinoWorkId: local }] },
@@ -73,12 +78,23 @@ export async function listStockMovements(filters?: {
   dataFim?: string;
 }) {
   const local = normalizeWorkId(filters?.workId);
+  const workAccess = await getCurrentWorkAccess();
+  if (local && workAccess !== null && !workAccess.includes(local)) {
+    return [];
+  }
+  const workScopeOr =
+    filters?.workId !== undefined
+      ? [{ origemWorkId: local }, { destinoWorkId: local }]
+      : workAccess !== null
+        ? [{ origemWorkId: { in: workAccess } }, { destinoWorkId: { in: workAccess } }]
+        : undefined;
+
   return prisma.stockMovement.findMany({
     where: {
       materialId: filters?.materialId,
       stageId: filters?.stageId,
       tipo: filters?.tipo,
-      OR: filters?.workId !== undefined ? [{ origemWorkId: local }, { destinoWorkId: local }] : undefined,
+      OR: workScopeOr,
       invoiceItem: filters?.supplierId ? { invoice: { supplierId: filters.supplierId } } : undefined,
       data: {
         gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,

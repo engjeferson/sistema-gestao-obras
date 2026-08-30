@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
 /**
@@ -131,8 +132,10 @@ export async function updateWorkStatus(workId: string, status: WorkStatus) {
 }
 
 export async function listWorks(filters?: { status?: WorkStatus; search?: string }) {
+  const workAccess = await getCurrentWorkAccess();
   return prisma.work.findMany({
     where: {
+      id: workAccess !== null ? { in: workAccess } : undefined,
       status: filters?.status,
       ...(filters?.search
         ? {
@@ -158,12 +161,16 @@ export async function getWork(workId: string) {
 const ACTIVE_STATUSES = ["PLANEJAMENTO", "EM_ANDAMENTO"] as const;
 
 export async function getObrasDashboard() {
+  const workAccess = await getCurrentWorkAccess();
+  const workWhere = workAccess !== null ? { id: { in: workAccess } } : {};
+
   const [works, totalCount] = await Promise.all([
     prisma.work.findMany({
+      where: workWhere,
       include: { client: true, responsavelTecnico: true, encarregado: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.work.count(),
+    prisma.work.count({ where: workWhere }),
   ]);
 
   const workIds = works.map((w) => w.id);

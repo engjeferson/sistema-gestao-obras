@@ -124,6 +124,10 @@ model User {
   role               Role
   active             Boolean  @default(true)
   financePermissions Json?
+  // Quando true, o usuário só enxerga/atua nas obras listadas em `assignedWorks` — abaixo disso
+  // continua vendo tudo, igual hoje (opt-in, não quebra usuário existente). Administrador sempre
+  // tem acesso total, independente deste campo.
+  restringirObras    Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -131,8 +135,22 @@ model User {
   financialTransactions FinancialTransaction[] @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
   planningTemplates     PlanningTemplate[]
+  assignedWorks         UserWork[]
 
   @@index([role])
+}
+
+model UserWork {
+  id        String   @id @default(cuid())
+  userId    String
+  workId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workId])
+  @@index([workId])
 }
 
 model CompanySettings {
@@ -308,6 +326,7 @@ model Work {
   stockMovementsOrigem  StockMovement[]        @relation("StockMovementOrigem")
   stockMovementsDestino StockMovement[]        @relation("StockMovementDestino")
   holidays              WorkHoliday[]
+  userAssignments       UserWork[]
 
   @@index([status])
 }

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export type TransactionFilters = {
@@ -58,9 +59,10 @@ async function resolveFavorecidoIds(tipo: "PAGAR" | "RECEBER", nome: string) {
 
 const PAGE_SIZE = 20;
 
-function buildTransactionWhere(filters?: TransactionFilters) {
+async function buildTransactionWhere(filters?: TransactionFilters) {
+  const workAccess = await getCurrentWorkAccess();
   return {
-    workId: filters?.workId,
+    workId: filters?.workId ?? (workAccess !== null ? { in: workAccess } : undefined),
     tipo: filters?.tipo,
     categoriaId: filters?.categoriaIdIn ? { in: filters.categoriaIdIn } : filters?.categoriaId,
     status:
@@ -107,7 +109,7 @@ async function healOverdueTransactions(filters?: TransactionFilters) {
 export async function listTransactions(filters?: TransactionFilters, page = 1) {
   await healOverdueTransactions(filters);
 
-  const where = buildTransactionWhere(filters);
+  const where = await buildTransactionWhere(filters);
 
   const [transactions, totalCount] = await Promise.all([
     prisma.financialTransaction.findMany({
@@ -150,7 +152,7 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
 export async function getTransactionsSummary(filters?: TransactionFilters) {
   const baseFilters: TransactionFilters = { ...filters, status: undefined };
   await healOverdueTransactions(baseFilters);
-  const where = buildTransactionWhere(baseFilters);
+  const where = await buildTransactionWhere(baseFilters);
 
   const [aPagar, pagas, pendentes] = await Promise.all([
     prisma.financialTransaction.aggregate({ where: { ...where, tipo: "PAGAR" }, _sum: { valor: true } }),

@@ -8,11 +8,16 @@ import { assertRole } from "@/lib/permissions";
 import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
 import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 
 const DEFAULT_PAGE_SIZE = 20;
 
 export async function listInvoices(workId?: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-  const where = workId ? { workId } : {};
+  const workAccess = await getCurrentWorkAccess();
+  if (workId && workAccess !== null && !workAccess.includes(workId)) {
+    return { items: [], totalCount: 0, totalPages: 1, page, pageSize };
+  }
+  const where = { workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined) };
   const [items, totalCount] = await Promise.all([
     prisma.invoice.findMany({
       where,

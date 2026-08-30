@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { FinancePermissionsFields } from "@/components/configuracoes/finance-permissions-fields";
+import { WorkAccessFields } from "@/components/configuracoes/work-access-fields";
 import { createUser } from "@/server/actions/usuarios";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -15,7 +16,13 @@ const ROLE_LABELS: Record<string, string> = {
   OBRA: "Obra (campo)",
 };
 
-export function UserForm({ categorias }: { categorias: { id: string; nome: string }[] }) {
+export function UserForm({
+  categorias,
+  works,
+}: {
+  categorias: { id: string; nome: string }[];
+  works: { id: string; nome: string; codigo: string }[];
+}) {
   const [errorMessage, formAction, isPending] = useActionState(createUser, undefined);
 
   return (
@@ -45,6 +52,7 @@ export function UserForm({ categorias }: { categorias: { id: string; nome: strin
         </div>
       </div>
       <FinancePermissionsFields categorias={categorias} />
+      <WorkAccessFields works={works} />
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       <div>
         <Button type="submit" disabled={isPending}>

@@ -1,5 +1,7 @@
 import type { Session } from "next-auth";
 import type { Role } from "@/generated/prisma/enums";
+import type { WorkAccess } from "@/lib/work-access";
+import { canAccessWork } from "@/lib/work-access";
 
 export class ForbiddenError extends Error {
   constructor(message = "Acesso não autorizado.") {
@@ -14,5 +16,11 @@ export function assertRole(session: Session | null, allowedRoles: Role[]): asser
   }
   if (!allowedRoles.includes(session.user.role)) {
     throw new ForbiddenError("Você não tem permissão para executar esta ação.");
+  }
+}
+
+export function assertWorkAccess(access: WorkAccess, workId: string): void {
+  if (!canAccessWork(access, workId)) {
+    throw new ForbiddenError("Você não tem acesso a esta obra.");
   }
 }

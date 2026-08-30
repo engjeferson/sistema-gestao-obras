@@ -2,9 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { getWorkCostSummary, getWorkAlerts } from "@/server/actions/orcamento";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import type { BudgetAlert } from "@/lib/budget";
 
 export async function getDashboardData() {
+  const workAccess = await getCurrentWorkAccess();
+  const workWhere = workAccess !== null ? { id: { in: workAccess } } : {};
+  const txWorkWhere = workAccess !== null ? { workId: { in: workAccess } } : {};
+
   const hoje = new Date();
   hoje.setUTCHours(0, 0, 0, 0);
   const em7Dias = new Date(hoje);
@@ -27,53 +32,55 @@ export async function getDashboardData() {
     proximasAtividades,
     contasProximasVencimento,
   ] = await Promise.all([
-    prisma.work.count({ where: { status: "EM_ANDAMENTO" } }),
-    prisma.work.count({ where: { status: "CONCLUIDA" } }),
+    prisma.work.count({ where: { ...workWhere, status: "EM_ANDAMENTO" } }),
+    prisma.work.count({ where: { ...workWhere, status: "CONCLUIDA" } }),
     prisma.financialTransaction.aggregate({
-      where: { tipo: "PAGAR", status: { in: ["PENDENTE", "VENCIDO"] } },
+      where: { ...txWorkWhere, tipo: "PAGAR", status: { in: ["PENDENTE", "VENCIDO"] } },
       _sum: { valor: true },
     }),
     prisma.financialTransaction.count({
-      where: { tipo: "PAGAR", status: "PENDENTE", dataVencimento: { lt: hoje } },
+      where: { ...txWorkWhere, tipo: "PAGAR", status: "PENDENTE", dataVencimento: { lt: hoje } },
     }),
     prisma.financialTransaction.count({
-      where: { tipo: "PAGAR", status: "PENDENTE", dataVencimento: { gte: hoje, lte: em7Dias } },
+      where: { ...txWorkWhere, tipo: "PAGAR", status: "PENDENTE", dataVencimento: { gte: hoje, lte: em7Dias } },
     }),
     prisma.financialTransaction.aggregate({
-      where: { tipo: "RECEBER", status: { in: ["PENDENTE", "VENCIDO"] } },
+      where: { ...txWorkWhere, tipo: "RECEBER", status: { in: ["PENDENTE", "VENCIDO"] } },
       _sum: { valor: true },
     }),
     prisma.financialTransaction.aggregate({
-      where: { tipo: "PAGAR", dataEmissao: { gte: inicioMes, lt: inicioProximoMes } },
+      where: { ...txWorkWhere, tipo: "PAGAR", dataEmissao: { gte: inicioMes, lt: inicioProximoMes } },
       _sum: { valor: true },
     }),
     prisma.financialTransaction.aggregate({
-      where: { tipo: "RECEBER", status: "PAGO", dataPagamento: { gte: inicioMes, lt: inicioProximoMes } },
+      where: { ...txWorkWhere, tipo: "RECEBER", status: "PAGO", dataPagamento: { gte: inicioMes, lt: inicioProximoMes } },
       _sum: { valor: true },
     }),
     prisma.financialTransaction.groupBy({
       by: ["workId"],
-      where: { tipo: "PAGAR" },
+      where: { ...txWorkWhere, tipo: "PAGAR" },
       _sum: { valor: true },
     }),
     prisma.financialTransaction.findMany({
+      where: txWorkWhere,
       orderBy: { createdAt: "desc" },
       take: 5,
       include: { work: true, categoria: true },
     }),
     prisma.rdo.findMany({
+      where: txWorkWhere,
       orderBy: { createdAt: "desc" },
       take: 5,
       include: { work: true, responsavel: true },
     }),
     prisma.planningTask.findMany({
-      where: { status: { in: ["NAO_INICIADA", "EM_ANDAMENTO"] } },
+      where: { ...txWorkWhere, status: { in: ["NAO_INICIADA", "EM_ANDAMENTO"] } },
       orderBy: { dataInicioPrevista: "asc" },
       take: 5,
       include: { work: true },
     }),
     prisma.financialTransaction.findMany({
-      where: { status: "PENDENTE", dataVencimento: { gte: hoje, lte: em7Dias } },
+      where: { ...txWorkWhere, status: "PENDENTE", dataVencimento: { gte: hoje, lte: em7Dias } },
       orderBy: { dataVencimento: "asc" },
       take: 5,
       include: { work: true },
@@ -81,15 +88,15 @@ export async function getDashboardData() {
   ]);
 
   const receitaTotalPagaAgg = await prisma.financialTransaction.aggregate({
-    where: { tipo: "RECEBER", status: "PAGO" },
+    where: { ...txWorkWhere, tipo: "RECEBER", status: "PAGO" },
     _sum: { valor: true },
   });
   const gastoTotalAgg = await prisma.financialTransaction.aggregate({
-    where: { tipo: "PAGAR" },
+    where: { ...txWorkWhere, tipo: "PAGAR" },
     _sum: { valor: true },
   });
 
-  const works = await prisma.work.findMany({ select: { id: true, nome: true, codigo: true } });
+  const works = await prisma.work.findMany({ where: workWhere, select: { id: true, nome: true, codigo: true } });
   const workMap = new Map(works.map((w) => [w.id, w]));
   const gastoPorObra = gastoPorObraRaw
     .map((item) => ({
@@ -143,7 +150,11 @@ export async function getDashboardData() {
 }
 
 export async function getCompanyOverview() {
-  const works = await prisma.work.findMany({ orderBy: { createdAt: "desc" } });
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: workAccess !== null ? { id: { in: workAccess } } : {},
+    orderBy: { createdAt: "desc" },
+  });
   const summaries = await Promise.all(works.map((work) => getWorkCostSummary(work.id)));
   const valid = summaries.filter((s): s is NonNullable<typeof s> => s !== null);
 
@@ -171,7 +182,11 @@ export async function getCompanyOverview() {
 }
 
 export async function getGlobalAlerts(): Promise<BudgetAlert[]> {
-  const works = await prisma.work.findMany({ where: { status: "EM_ANDAMENTO" }, select: { id: true, nome: true } });
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: { ...(workAccess !== null ? { id: { in: workAccess } } : {}), status: "EM_ANDAMENTO" },
+    select: { id: true, nome: true },
+  });
   const results = await Promise.all(
     works.map(async (work) => {
       const alerts = await getWorkAlerts(work.id);

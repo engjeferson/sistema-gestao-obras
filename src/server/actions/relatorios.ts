@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { getBudgetVsActualByStage } from "@/server/actions/orcamento";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import type { WorkAccess } from "@/lib/work-access";
 import {
   formatCurrencyBRL,
   formatDateBR,
@@ -12,8 +14,12 @@ import type { ReportTable } from "@/lib/reports";
 export type { ReportTable } from "@/lib/reports";
 
 export async function listCostHistory(search?: string) {
+  const workAccess = await getCurrentWorkAccess();
   const items = await prisma.invoiceItem.findMany({
-    where: search ? { material: { contains: search, mode: "insensitive" } } : undefined,
+    where: {
+      ...(search ? { material: { contains: search, mode: "insensitive" } } : {}),
+      ...(workAccess !== null ? { invoice: { workId: { in: workAccess } } } : {}),
+    },
     include: { invoice: { include: { work: true, supplier: true, stage: true } } },
     orderBy: { invoice: { dataEmissao: "desc" } },
     take: 100,
@@ -34,18 +40,25 @@ export async function listCostHistory(search?: string) {
 }
 
 export async function listWorksForFilter() {
-  return prisma.work.findMany({ select: { id: true, nome: true, codigo: true }, orderBy: { nome: "asc" } });
+  const workAccess = await getCurrentWorkAccess();
+  return prisma.work.findMany({
+    where: workAccess !== null ? { id: { in: workAccess } } : {},
+    select: { id: true, nome: true, codigo: true },
+    orderBy: { nome: "asc" },
+  });
 }
 
-async function requireWork(workId?: string) {
+async function requireWork(workId: string | undefined, workAccess: WorkAccess) {
+  if (workId && workAccess !== null && !workAccess.includes(workId)) return null;
+  const where = workAccess !== null ? { id: { in: workAccess } } : {};
   const work = workId
     ? await prisma.work.findUnique({ where: { id: workId } })
-    : await prisma.work.findFirst({ orderBy: { createdAt: "desc" } });
+    : await prisma.work.findFirst({ where, orderBy: { createdAt: "desc" } });
   return work;
 }
 
 export async function getReportOrcamentoObra(workId?: string): Promise<ReportTable> {
-  const work = await requireWork(workId);
+  const work = await requireWork(workId, await getCurrentWorkAccess());
   if (!work) return { title: "Orçamento da obra", columns: [], rows: [] };
 
   const stages = await getBudgetVsActualByStage(work.id);
@@ -76,7 +89,7 @@ export async function getReportOrcamentoObra(workId?: string): Promise<ReportTab
 }
 
 export async function getReportPrevistoRealizado(workId?: string): Promise<ReportTable> {
-  const work = await requireWork(workId);
+  const work = await requireWork(workId, await getCurrentWorkAccess());
   if (!work) return { title: "Previsto x realizado", columns: [], rows: [] };
 
   const stages = await getBudgetVsActualByStage(work.id);
@@ -121,7 +134,7 @@ export async function getReportPrevistoRealizado(workId?: string): Promise<Repor
 }
 
 export async function getReportCustosPorEtapa(workId?: string): Promise<ReportTable> {
-  const work = await requireWork(workId);
+  const work = await requireWork(workId, await getCurrentWorkAccess());
   if (!work) return { title: "Custos por etapa", columns: [], rows: [] };
 
   const stages = await getBudgetVsActualByStage(work.id);
@@ -165,7 +178,7 @@ export async function getReportCustosPorEtapa(workId?: string): Promise<ReportTa
 }
 
 export async function getReportFisicoFinanceiro(workId?: string): Promise<ReportTable> {
-  const work = await requireWork(workId);
+  const work = await requireWork(workId, await getCurrentWorkAccess());
   if (!work) return { title: "Físico x financeiro", columns: [], rows: [] };
 
   const stages = await getBudgetVsActualByStage(work.id);
@@ -190,7 +203,11 @@ export async function getReportFisicoFinanceiro(workId?: string): Promise<Report
 }
 
 export async function getReportDespesasPorObra(): Promise<ReportTable> {
-  const works = await prisma.work.findMany({ orderBy: { nome: "asc" } });
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: workAccess !== null ? { id: { in: workAccess } } : {},
+    orderBy: { nome: "asc" },
+  });
   const rows = await Promise.all(
     works.map(async (work) => {
       const [realizadoAgg, aPagarAgg] = await Promise.all([
@@ -227,9 +244,14 @@ export async function getReportDespesasPorObra(): Promise<ReportTable> {
 }
 
 export async function getReportDespesasPorFornecedor(): Promise<ReportTable> {
+  const workAccess = await getCurrentWorkAccess();
   const grouped = await prisma.financialTransaction.groupBy({
     by: ["supplierId", "status"],
-    where: { tipo: "PAGAR", supplierId: { not: null } },
+    where: {
+      tipo: "PAGAR",
+      supplierId: { not: null },
+      ...(workAccess !== null ? { workId: { in: workAccess } } : {}),
+    },
     _sum: { valor: true },
   });
 
@@ -271,9 +293,10 @@ export async function getReportDespesasPorFornecedor(): Promise<ReportTable> {
 }
 
 export async function getReportDespesasPorCategoria(): Promise<ReportTable> {
+  const workAccess = await getCurrentWorkAccess();
   const grouped = await prisma.financialTransaction.groupBy({
     by: ["categoriaId", "status"],
-    where: { tipo: "PAGAR" },
+    where: { tipo: "PAGAR", ...(workAccess !== null ? { workId: { in: workAccess } } : {}) },
     _sum: { valor: true },
   });
 
@@ -314,8 +337,12 @@ export async function getReportDespesasPorCategoria(): Promise<ReportTable> {
 }
 
 export async function getReportNotasFiscaisPorObra(workId?: string): Promise<ReportTable> {
+  const workAccess = await getCurrentWorkAccess();
+  if (workId && workAccess !== null && !workAccess.includes(workId)) {
+    return { title: "Notas fiscais por obra", columns: [], rows: [] };
+  }
   const invoices = await prisma.invoice.findMany({
-    where: workId ? { workId } : undefined,
+    where: { workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined) },
     include: { work: true, supplier: true },
     orderBy: { dataEmissao: "desc" },
     take: 200,
@@ -342,8 +369,16 @@ export async function getReportNotasFiscaisPorObra(workId?: string): Promise<Rep
 }
 
 export async function getReportContasAPagarPorObra(workId?: string): Promise<ReportTable> {
+  const workAccess = await getCurrentWorkAccess();
+  if (workId && workAccess !== null && !workAccess.includes(workId)) {
+    return { title: "Contas a pagar por obra", columns: [], rows: [] };
+  }
   const transactions = await prisma.financialTransaction.findMany({
-    where: { tipo: "PAGAR", status: { in: ["PENDENTE", "VENCIDO"] }, workId },
+    where: {
+      tipo: "PAGAR",
+      status: { in: ["PENDENTE", "VENCIDO"] },
+      workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined),
+    },
     include: { work: true },
     orderBy: { dataVencimento: "asc" },
     take: 200,

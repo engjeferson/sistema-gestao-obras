@@ -29,6 +29,13 @@ function buildFinancePermissions(data: ReturnType<typeof parseFinancePermissionF
   };
 }
 
+function parseWorkAccessFields(formData: FormData) {
+  return {
+    restringirObras: formData.get("restringirObras") === "on",
+    assignedWorkIds: formData.getAll("assignedWorkIds").map(String),
+  };
+}
+
 export async function listUsers() {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
@@ -38,7 +45,10 @@ export async function listUsers() {
 export async function getUser(userId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
-  return prisma.user.findUnique({ where: { id: userId } });
+  return prisma.user.findUnique({
+    where: { id: userId },
+    include: { assignedWorks: { select: { workId: true } } },
+  });
 }
 
 export async function createUser(_prevState: string | undefined, formData: FormData) {
@@ -46,12 +56,14 @@ export async function createUser(_prevState: string | undefined, formData: FormD
   assertRole(session, ["ADMINISTRADOR"]);
 
   const permissionFields = parseFinancePermissionFields(formData);
+  const workAccessFields = parseWorkAccessFields(formData);
   const parsed = userFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
     role: formData.get("role"),
     ...permissionFields,
+    ...workAccessFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -71,6 +83,10 @@ export async function createUser(_prevState: string | undefined, formData: FormD
       passwordHash,
       role: data.role,
       financePermissions: buildFinancePermissions(permissionFields),
+      restringirObras: workAccessFields.restringirObras,
+      assignedWorks: {
+        create: workAccessFields.assignedWorkIds.map((workId) => ({ workId })),
+      },
     },
   });
 
@@ -83,12 +99,14 @@ export async function updateUser(userId: string, _prevState: string | undefined,
   assertRole(session, ["ADMINISTRADOR"]);
 
   const permissionFields = parseFinancePermissionFields(formData);
+  const workAccessFields = parseWorkAccessFields(formData);
   const parsed = userEditFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password") || undefined,
     role: formData.get("role"),
     ...permissionFields,
+    ...workAccessFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -100,16 +118,23 @@ export async function updateUser(userId: string, _prevState: string | undefined,
     return "Já existe um usuário com esse e-mail.";
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      financePermissions: buildFinancePermissions(permissionFields),
-      ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
-    },
-  });
+  await prisma.$transaction([
+    prisma.userWork.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        financePermissions: buildFinancePermissions(permissionFields),
+        restringirObras: workAccessFields.restringirObras,
+        assignedWorks: {
+          create: workAccessFields.assignedWorkIds.map((workId) => ({ workId })),
+        },
+        ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
+      },
+    }),
+  ]);
 
   revalidatePath("/configuracoes/usuarios");
   redirect("/configuracoes/usuarios");
