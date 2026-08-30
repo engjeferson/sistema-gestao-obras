@@ -174,6 +174,8 @@ export type StageTreeNode = {
   ordem: number;
   dataInicioPrevista: Date | null;
   dataFimPrevista: Date | null;
+  percentualExecutado: number;
+  status: string;
   predecessorChips: PredecessorChip[];
   tasks: {
     id: string;
@@ -337,11 +339,39 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
     );
   }
 
+  // Mesma lógica de auto-cura, agora pra etapa: só é relevante enquanto ela funciona como "atividade
+  // solta" (sem nenhum item lançado), mas curar sempre é inofensivo — quando a etapa tem atividades,
+  // a tela ignora esse campo e mostra o agregado delas.
+  const toUpdateStages: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
+  const healedStageStatusById = new Map(
+    stages.map((stage) => {
+      const effectiveStatus = getEffectiveStatus({
+        percentualExecutado: Number(stage.percentualExecutado),
+        dataFimPrevista: stage.dataFimPrevista,
+      });
+      if (effectiveStatus !== stage.status) {
+        toUpdateStages.push({ id: stage.id, status: effectiveStatus });
+      }
+      return [stage.id, effectiveStatus];
+    }),
+  );
+
+  if (toUpdateStages.length > 0) {
+    await prisma.$transaction(
+      toUpdateStages.map((item) => prisma.planningStage.update({ where: { id: item.id }, data: { status: item.status } })),
+    );
+  }
+
   // Monta a árvore em memória (profundidade livre) a partir da lista plana.
   type Node = (typeof stages)[number] & { tasks: NonNullable<ReturnType<typeof healedTasksByStage.get>>; children: Node[] };
   const nodeById = new Map<string, Node>();
   for (const stage of stages) {
-    nodeById.set(stage.id, { ...stage, tasks: healedTasksByStage.get(stage.id) ?? [], children: [] });
+    nodeById.set(stage.id, {
+      ...stage,
+      status: healedStageStatusById.get(stage.id) ?? stage.status,
+      tasks: healedTasksByStage.get(stage.id) ?? [],
+      children: [],
+    });
   }
   const roots: Node[] = [];
   for (const stage of stages) {
@@ -466,6 +496,21 @@ export async function updateStageDates(stageId: string, workId: string, start: s
     where: { id: stageId },
     data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
   });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
+/**
+ * % executado "manual" da etapa/sub — mesma regra da data: só faz sentido (e só é editável na UI)
+ * enquanto ela ainda não tem nenhum item dentro. O status não é escolhido aqui — ele é sempre
+ * recalculado a partir do % e da data (mesma lógica de uma atividade) na próxima leitura.
+ */
+export async function updateStageProgress(stageId: string, workId: string, percentual: number) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const clamped = Math.min(100, Math.max(0, percentual));
+  await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
 
   revalidatePath(`/obras/${workId}/planejamento`);
 }

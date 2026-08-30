@@ -11,6 +11,8 @@ function mapStage(stage: StageTreeNode): PlainStage {
     nome: stage.nome,
     dataInicioPrevista: stage.dataInicioPrevista,
     dataFimPrevista: stage.dataFimPrevista,
+    percentualExecutado: Number(stage.percentualExecutado),
+    status: stage.status,
     predecessorChips: stage.predecessorChips,
     tasks: stage.tasks.map((task) => ({
       id: task.id,

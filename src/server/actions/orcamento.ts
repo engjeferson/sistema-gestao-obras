@@ -99,7 +99,10 @@ export async function getBudgetVsActualByStage(workId: string) {
     const saldo = computeSaldo({ orcado, projetado });
     const maoDeObra = sumTxCategoria((t) => t.stageId === stage.id, maoDeObraCategoriaId);
     const material = sumTxCategoria((t) => t.stageId === stage.id, materialCategoriaId);
-    const avancoFisico = tasks.length > 0 ? tasks.reduce((sum, t) => sum + t.avancoFisico, 0) / tasks.length : 0;
+    // Sem atividade nenhuma, a etapa funciona como uma "atividade solta" — usa o % próprio dela
+    // em vez de zerar o avanço físico da obra.
+    const avancoFisico =
+      tasks.length > 0 ? tasks.reduce((sum, t) => sum + t.avancoFisico, 0) / tasks.length : Number(stage.percentualExecutado);
     const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
     const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
 

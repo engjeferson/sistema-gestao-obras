@@ -28,6 +28,7 @@ import {
   updatePlanningTaskDates,
   updateStageDates,
   updateStageName,
+  updateStageProgress,
   updateTaskName,
 } from "@/server/actions/planejamento";
 import { ROW_HEIGHT, HEADER_HEIGHT } from "@/components/gantt/gantt-canvas";
@@ -401,7 +402,7 @@ function StageRowView({
       <EditableName value={stage.nome} bold onCommit={handleRename} />
       <StageDateCells stage={stage} row={row} workId={workId} />
       <span className="text-xs text-muted-foreground">—</span>
-      <span className="text-xs text-muted-foreground">—</span>
+      <StageProgressCells stage={stage} workId={workId} />
       <PredecessorsCell
         workId={workId}
         ownerStageId={stage.id}
@@ -491,6 +492,61 @@ function StageDateCells({
         }}
         className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
+    </>
+  );
+}
+
+// Mesma regra da data: enquanto a etapa/sub não tem nenhuma atividade em nível nenhum, ela
+// funciona como uma "atividade solta" — % editável direto aqui, com status sempre recalculado
+// a partir dele (igual uma atividade, nunca escolhido manualmente). Com atividades lançadas, os
+// dois campos ficam sem uso aqui (mostra só "—", igual já era antes).
+function StageProgressCells({ stage, workId }: { stage: PlainStage; workId: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [percent, setPercent] = useState(String(stage.percentualExecutado));
+
+  useEffect(() => {
+    setPercent(String(stage.percentualExecutado));
+  }, [stage.percentualExecutado]);
+
+  if (hasAnyTask(stage)) {
+    return (
+      <>
+        <span className="text-xs text-muted-foreground">—</span>
+        <span className="text-xs text-muted-foreground">—</span>
+      </>
+    );
+  }
+
+  function commit(value: string) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    startTransition(async () => {
+      await updateStageProgress(stage.id, workId, n);
+      router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <input
+        type="number"
+        min={0}
+        max={100}
+        disabled={isPending}
+        value={percent}
+        onChange={(e) => {
+          setPercent(e.target.value);
+          commit(e.target.value);
+        }}
+        className="w-12 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+      />
+      <Badge
+        variant={PLANNING_STATUS_BADGE[stage.status]}
+        className={stage.status === "ATRASADA" ? "animate-pulse-subtle w-fit" : "w-fit"}
+      >
+        {PLANNING_STATUS_LABELS[stage.status]}
+      </Badge>
     </>
   );
 }

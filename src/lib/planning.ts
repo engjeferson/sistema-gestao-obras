@@ -1,15 +1,20 @@
 import type { PlanningStatus } from "@/generated/prisma/enums";
 import { addWorkingDays, countWorkingDays, type WorkCalendar } from "@/lib/schedule-dates";
 
-export function getEffectiveStatus(task: { percentualExecutado: number; dataFimPrevista: Date }): PlanningStatus {
-  const hoje = new Date();
-  hoje.setUTCHours(0, 0, 0, 0);
-  const fimPrevista = new Date(task.dataFimPrevista);
-  fimPrevista.setUTCHours(0, 0, 0, 0);
+// `dataFimPrevista` é opcional pra cobrir etapas sem nenhuma atividade ainda (que podem não ter
+// data definida) — sem data, só não dá pra detectar atraso, o resto do cálculo é igual.
+export function getEffectiveStatus(entity: { percentualExecutado: number; dataFimPrevista: Date | null }): PlanningStatus {
+  if (entity.percentualExecutado >= 100) return "CONCLUIDA";
 
-  if (task.percentualExecutado >= 100) return "CONCLUIDA";
-  if (hoje > fimPrevista) return "ATRASADA";
-  if (task.percentualExecutado > 0) return "EM_ANDAMENTO";
+  if (entity.dataFimPrevista) {
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+    const fimPrevista = new Date(entity.dataFimPrevista);
+    fimPrevista.setUTCHours(0, 0, 0, 0);
+    if (hoje > fimPrevista) return "ATRASADA";
+  }
+
+  if (entity.percentualExecutado > 0) return "EM_ANDAMENTO";
   return "NAO_INICIADA";
 }
 

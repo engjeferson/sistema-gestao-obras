@@ -117,18 +117,18 @@ enum StockMovementType {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role
-  active       Boolean  @default(true)
+  id                 String   @id @default(cuid())
+  name               String
+  email              String   @unique
+  passwordHash       String
+  role               Role
+  active             Boolean  @default(true)
   financePermissions Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  rdosResponsavel       Rdo[]                   @relation("RdoResponsavel")
-  financialTransactions FinancialTransaction[]  @relation("FinancialCreatedBy")
+  rdosResponsavel       Rdo[]                  @relation("RdoResponsavel")
+  financialTransactions FinancialTransaction[] @relation("FinancialCreatedBy")
   stockMovements        StockMovement[]
   planningTemplates     PlanningTemplate[]
 
@@ -136,16 +136,16 @@ model User {
 }
 
 model CompanySettings {
-  id                    String   @id @default(cuid())
-  nome                  String
-  cnpj                  String?
-  uf                    String?
-  endereco              String?
-  telefone              String?
-  logoUrl               String?
-  sefazUltimoNsu        String?
+  id                     String    @id @default(cuid())
+  nome                   String
+  cnpj                   String?
+  uf                     String?
+  endereco               String?
+  telefone               String?
+  logoUrl                String?
+  sefazUltimoNsu         String?
   sefazUltimaTentativaEm DateTime?
-  updatedAt             DateTime @updatedAt
+  updatedAt              DateTime  @updatedAt
 }
 
 enum IncomingNFeStatus {
@@ -155,23 +155,23 @@ enum IncomingNFeStatus {
 }
 
 model IncomingNFe {
-  id           String            @id @default(cuid())
-  chaveAcesso  String            @unique
-  nsu          String
-  emitenteCnpj String?
-  emitenteNome String?
-  numero       String?
-  serie        String?
-  dataEmissao  DateTime?         @db.Date
-  valorTotal   Decimal?          @db.Decimal(14, 2)
-  status       IncomingNFeStatus @default(PENDENTE)
-  xmlCompleto  String?           @db.Text
-  manifestadoEm DateTime?
-  manifestacaoErro String?       @db.Text
+  id               String            @id @default(cuid())
+  chaveAcesso      String            @unique
+  nsu              String
+  emitenteCnpj     String?
+  emitenteNome     String?
+  numero           String?
+  serie            String?
+  dataEmissao      DateTime?         @db.Date
+  valorTotal       Decimal?          @db.Decimal(14, 2)
+  status           IncomingNFeStatus @default(PENDENTE)
+  xmlCompleto      String?           @db.Text
+  manifestadoEm    DateTime?
+  manifestacaoErro String?           @db.Text
   manifestacaoTipo String?
-  invoiceId    String?           @unique
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  invoiceId        String?           @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   invoice Invoice? @relation(fields: [invoiceId], references: [id])
 
@@ -221,14 +221,14 @@ model Supplier {
 }
 
 model Material {
-  id             String         @id @default(cuid())
-  nome           String
-  unidadePadrao  UnitOfMeasure?
-  categoria      String?
-  observacoes    String?
-  ativo          Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  nome          String
+  unidadePadrao UnitOfMeasure?
+  categoria     String?
+  observacoes   String?
+  ativo         Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   invoiceItems   InvoiceItem[]
   stockMovements StockMovement[]
@@ -273,29 +273,29 @@ model FinancialCategory {
 }
 
 model Work {
-  id                    String     @id @default(cuid())
-  codigo                String     @unique
-  nome                  String
-  portalToken           String     @unique @default(cuid())
-  renderUrl             String?
-  clientId              String?
-  responsavelTecnicoId  String?
-  encarregadoId         String?
-  telefone              String?
-  endereco              String?
-  valorContrato         Decimal    @db.Decimal(14, 2)
-  areaConstruida        Decimal?   @db.Decimal(10, 2)
-  dataInicio            DateTime   @db.Date
-  dataPrevistaTermino   DateTime   @db.Date
-  status                WorkStatus @default(PLANEJAMENTO)
-  observacoes           String?
-  workingWeekdays       Int[]      @default([1, 2, 3, 4, 5])
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  id                   String     @id @default(cuid())
+  codigo               String     @unique
+  nome                 String
+  portalToken          String     @unique @default(cuid())
+  renderUrl            String?
+  clientId             String?
+  responsavelTecnicoId String?
+  encarregadoId        String?
+  telefone             String?
+  endereco             String?
+  valorContrato        Decimal    @db.Decimal(14, 2)
+  areaConstruida       Decimal?   @db.Decimal(10, 2)
+  dataInicio           DateTime   @db.Date
+  dataPrevistaTermino  DateTime   @db.Date
+  status               WorkStatus @default(PLANEJAMENTO)
+  observacoes          String?
+  workingWeekdays      Int[]      @default([1, 2, 3, 4, 5])
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
-  client                Client?                 @relation(fields: [clientId], references: [id])
-  responsavelTecnico    Professional?           @relation("WorkResponsavelTecnico", fields: [responsavelTecnicoId], references: [id])
-  encarregado           Professional?           @relation("WorkEncarregado", fields: [encarregadoId], references: [id])
+  client                Client?                @relation(fields: [clientId], references: [id])
+  responsavelTecnico    Professional?          @relation("WorkResponsavelTecnico", fields: [responsavelTecnicoId], references: [id])
+  encarregado           Professional?          @relation("WorkEncarregado", fields: [encarregadoId], references: [id])
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   contracts             Contract[]
@@ -303,8 +303,8 @@ model Work {
   planningTasks         PlanningTask[]
   budgetItems           BudgetItem[]
   rdos                  Rdo[]
-  stockMovementsOrigem  StockMovement[] @relation("StockMovementOrigem")
-  stockMovementsDestino StockMovement[] @relation("StockMovementDestino")
+  stockMovementsOrigem  StockMovement[]        @relation("StockMovementOrigem")
+  stockMovementsDestino StockMovement[]        @relation("StockMovementDestino")
   holidays              WorkHoliday[]
 
   @@index([status])
@@ -324,44 +324,44 @@ model WorkHoliday {
 }
 
 model FinancialTransaction {
-  id             String            @id @default(cuid())
-  workId         String?
-  tipo           TransactionType
-  descricao      String
-  categoriaId    String
-  favorecidoNome String
-  supplierId     String?
-  clientId       String?
-  bankAccountId  String?
-  stageId        String?
-  taskId         String?
-  valor          Decimal           @db.Decimal(14, 2)
-  dataEmissao    DateTime          @db.Date
-  dataVencimento DateTime          @db.Date
-  dataPagamento  DateTime?         @db.Date
-  formaPagamento PaymentMethod?
-  status         TransactionStatus @default(PENDENTE)
-  observacao     String?
-  comprovanteUrl String?
-  invoiceId      String?
-  contractMeasurementId String?    @unique
-  parcelaGrupoId String?
-  parcelaNumero  Int?
-  parcelaTotal   Int?
-  createdById    String
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  workId                String?
+  tipo                  TransactionType
+  descricao             String
+  categoriaId           String
+  favorecidoNome        String
+  supplierId            String?
+  clientId              String?
+  bankAccountId         String?
+  stageId               String?
+  taskId                String?
+  valor                 Decimal           @db.Decimal(14, 2)
+  dataEmissao           DateTime          @db.Date
+  dataVencimento        DateTime          @db.Date
+  dataPagamento         DateTime?         @db.Date
+  formaPagamento        PaymentMethod?
+  status                TransactionStatus @default(PENDENTE)
+  observacao            String?
+  comprovanteUrl        String?
+  invoiceId             String?
+  contractMeasurementId String?           @unique
+  parcelaGrupoId        String?
+  parcelaNumero         Int?
+  parcelaTotal          Int?
+  createdById           String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
-  work                 Work?                 @relation(fields: [workId], references: [id], onDelete: Cascade)
-  categoria            FinancialCategory     @relation(fields: [categoriaId], references: [id])
-  supplier             Supplier?             @relation(fields: [supplierId], references: [id])
-  client               Client?               @relation(fields: [clientId], references: [id])
-  bankAccount          BankAccount?          @relation(fields: [bankAccountId], references: [id])
-  stage                PlanningStage?        @relation(fields: [stageId], references: [id])
-  task                 PlanningTask?         @relation(fields: [taskId], references: [id])
-  invoice              Invoice?              @relation(fields: [invoiceId], references: [id])
-  contractMeasurement  ContractMeasurement?  @relation(fields: [contractMeasurementId], references: [id])
-  createdBy            User                  @relation("FinancialCreatedBy", fields: [createdById], references: [id])
+  work                Work?                @relation(fields: [workId], references: [id], onDelete: Cascade)
+  categoria           FinancialCategory    @relation(fields: [categoriaId], references: [id])
+  supplier            Supplier?            @relation(fields: [supplierId], references: [id])
+  client              Client?              @relation(fields: [clientId], references: [id])
+  bankAccount         BankAccount?         @relation(fields: [bankAccountId], references: [id])
+  stage               PlanningStage?       @relation(fields: [stageId], references: [id])
+  task                PlanningTask?        @relation(fields: [taskId], references: [id])
+  invoice             Invoice?             @relation(fields: [invoiceId], references: [id])
+  contractMeasurement ContractMeasurement? @relation(fields: [contractMeasurementId], references: [id])
+  createdBy           User                 @relation("FinancialCreatedBy", fields: [createdById], references: [id])
 
   @@index([workId, status])
   @@index([dataVencimento])
@@ -405,14 +405,14 @@ model Invoice {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  work                 Work?                 @relation(fields: [workId], references: [id], onDelete: Cascade)
-  supplier             Supplier              @relation(fields: [supplierId], references: [id])
-  stage                PlanningStage?        @relation(fields: [stageId], references: [id])
-  task                 PlanningTask?         @relation(fields: [taskId], references: [id])
-  categoria            FinancialCategory     @relation(fields: [categoriaId], references: [id])
-  items                InvoiceItem[]
+  work                  Work?                  @relation(fields: [workId], references: [id], onDelete: Cascade)
+  supplier              Supplier               @relation(fields: [supplierId], references: [id])
+  stage                 PlanningStage?         @relation(fields: [stageId], references: [id])
+  task                  PlanningTask?          @relation(fields: [taskId], references: [id])
+  categoria             FinancialCategory      @relation(fields: [categoriaId], references: [id])
+  items                 InvoiceItem[]
   financialTransactions FinancialTransaction[]
-  incomingNFe          IncomingNFe?
+  incomingNFe           IncomingNFe?
 
   @@index([workId])
   @@index([stageId])
@@ -429,29 +429,29 @@ model InvoiceItem {
   valorUnitario Decimal       @db.Decimal(14, 2)
   valorTotal    Decimal       @db.Decimal(14, 2)
 
-  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  materialRef    Material?      @relation(fields: [materialId], references: [id])
-  stockMovement  StockMovement?
+  invoice       Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  materialRef   Material?      @relation(fields: [materialId], references: [id])
+  stockMovement StockMovement?
 
   @@index([materialId])
 }
 
 model StockMovement {
-  id             String            @id @default(cuid())
-  materialId     String
-  tipo           StockMovementType
-  origemWorkId   String?
-  destinoWorkId  String?
-  stageId        String?
-  taskId         String?
-  quantidade     Decimal           @db.Decimal(12, 3)
-  valorUnitario  Decimal?          @db.Decimal(14, 2)
-  data           DateTime          @db.Date
-  motivo         String?
-  invoiceItemId  String?           @unique
+  id              String            @id @default(cuid())
+  materialId      String
+  tipo            StockMovementType
+  origemWorkId    String?
+  destinoWorkId   String?
+  stageId         String?
+  taskId          String?
+  quantidade      Decimal           @db.Decimal(12, 3)
+  valorUnitario   Decimal?          @db.Decimal(14, 2)
+  data            DateTime          @db.Date
+  motivo          String?
+  invoiceItemId   String?           @unique
   transferGrupoId String?
-  createdById    String
-  createdAt      DateTime          @default(now())
+  createdById     String
+  createdAt       DateTime          @default(now())
 
   material    Material       @relation(fields: [materialId], references: [id])
   origemWork  Work?          @relation("StockMovementOrigem", fields: [origemWorkId], references: [id])
@@ -484,7 +484,7 @@ model Contract {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  work         Work                   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  work         Work                  @relation(fields: [workId], references: [id], onDelete: Cascade)
   measurements ContractMeasurement[]
   addendums    ContractAddendum[]
 
@@ -524,20 +524,25 @@ model ContractMeasurement {
 }
 
 model PlanningStage {
-  id                 String    @id @default(cuid())
-  workId             String
-  parentId           String?
-  codigo             String?
-  nome               String
-  ordem              Int       @default(0)
-  dataInicioPrevista DateTime? @db.Date
-  dataFimPrevista    DateTime? @db.Date
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                  String         @id @default(cuid())
+  workId              String
+  parentId            String?
+  codigo              String?
+  nome                String
+  ordem               Int            @default(0)
+  dataInicioPrevista  DateTime?      @db.Date
+  dataFimPrevista     DateTime?      @db.Date
+  // Só relevante enquanto a etapa não tem nenhuma atividade (nela ou em qualquer sub dela) —
+  // nesse caso ela é tratada como uma "atividade solta", igual data/valor previsto. Assim que
+  // ganha atividades, a tela passa a mostrar o agregado delas e este campo fica sem uso.
+  percentualExecutado Decimal        @default(0) @db.Decimal(5, 2)
+  status              PlanningStatus @default(NAO_INICIADA)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  work                  Work                    @relation(fields: [workId], references: [id], onDelete: Cascade)
-  parent                PlanningStage?          @relation("StageChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children              PlanningStage[]         @relation("StageChildren")
+  work                  Work                   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  parent                PlanningStage?         @relation("StageChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children              PlanningStage[]        @relation("StageChildren")
   tasks                 PlanningTask[]
   budgetItems           BudgetItem[]
   financialTransactions FinancialTransaction[]
@@ -564,15 +569,15 @@ model PlanningTask {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
-  stage                 PlanningStage           @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  work                  Work                    @relation(fields: [workId], references: [id], onDelete: Cascade)
+  stage                 PlanningStage          @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  work                  Work                   @relation(fields: [workId], references: [id], onDelete: Cascade)
   rdoActivities         RdoActivity[]
   budgetItems           BudgetItem[]
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   stockMovements        StockMovement[]
-  predecessors          PlanningDependency[]    @relation("SuccessorLinks")
-  successors            PlanningDependency[]    @relation("PredecessorLinks")
+  predecessors          PlanningDependency[]   @relation("SuccessorLinks")
+  successors            PlanningDependency[]   @relation("PredecessorLinks")
 
   @@index([workId, status])
 }
@@ -604,11 +609,11 @@ model PlanningTemplate {
 }
 
 model PlanningTemplateStage {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   templateId String
   codigo     String?
   nome       String
-  ordem      Int    @default(0)
+  ordem      Int     @default(0)
 
   template PlanningTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
   tasks    PlanningTemplateTask[]
@@ -617,11 +622,11 @@ model PlanningTemplateStage {
 }
 
 model PlanningTemplateTask {
-  id               String @id @default(cuid())
+  id               String  @id @default(cuid())
   templateStageId  String
   codigo           String?
   nome             String
-  ordem            Int    @default(0)
+  ordem            Int     @default(0)
   offsetInicioDias Int
   duracaoDias      Int
 
@@ -649,7 +654,7 @@ model PlanningTemplateDependency {
 // de custo pertence a UMA atividade específica OU é um valor solto direto numa etapa (lançado
 // antes dela estar quebrada em atividades) — nunca os dois.
 model BudgetItem {
-  id                    String    @id @default(cuid())
+  id                    String         @id @default(cuid())
   workId                String
   taskId                String?
   stageId               String?
@@ -657,15 +662,15 @@ model BudgetItem {
   descricao             String?
   tipoCusto             CostType
   unidade               UnitOfMeasure?
-  quantidadePrevista    Decimal?  @db.Decimal(12, 3)
-  valorUnitarioPrevisto Decimal?  @db.Decimal(14, 2)
-  valorTotalPrevisto    Decimal   @db.Decimal(14, 2)
+  quantidadePrevista    Decimal?       @db.Decimal(12, 3)
+  valorUnitarioPrevisto Decimal?       @db.Decimal(14, 2)
+  valorTotalPrevisto    Decimal        @db.Decimal(14, 2)
   observacoes           String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-  work  Work          @relation(fields: [workId], references: [id], onDelete: Cascade)
-  task  PlanningTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  work  Work           @relation(fields: [workId], references: [id], onDelete: Cascade)
+  task  PlanningTask?  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   stage PlanningStage? @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
   @@index([workId])
