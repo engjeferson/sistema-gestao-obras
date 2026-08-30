@@ -346,73 +346,26 @@ export async function removeGroupedDependency(
 }
 
 export async function listStagesWithTasks(workId: string): Promise<StageTreeNode[]> {
-  const stages = await prisma.planningStage.findMany({
-    where: { workId },
-    include: {
-      tasks: {
-        include: { predecessors: { include: { predecessorTask: { select: { id: true, codigo: true, nome: true } } } } },
-        orderBy: { ordem: "asc" },
+  const [stages, calendar] = await Promise.all([
+    prisma.planningStage.findMany({
+      where: { workId },
+      include: {
+        tasks: {
+          include: { predecessors: { include: { predecessorTask: { select: { id: true, codigo: true, nome: true } } } } },
+          orderBy: { ordem: "asc" },
+        },
       },
-    },
-    orderBy: { ordem: "asc" },
-  });
-
-  const toUpdate: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
-  const healedTasksByStage = new Map(
-    stages.map((stage) => [
-      stage.id,
-      stage.tasks.map((task) => {
-        const effectiveStatus = getEffectiveStatus({
-          percentualExecutado: Number(task.percentualExecutado),
-          dataFimPrevista: task.dataFimPrevista,
-        });
-        if (effectiveStatus !== task.status) {
-          toUpdate.push({ id: task.id, status: effectiveStatus });
-        }
-        return { ...task, status: effectiveStatus };
-      }),
-    ]),
-  );
-
-  if (toUpdate.length > 0) {
-    await prisma.$transaction(
-      toUpdate.map((item) => prisma.planningTask.update({ where: { id: item.id }, data: { status: item.status } })),
-    );
-  }
-
-  // Mesma lógica de auto-cura, agora pra etapa: só é relevante enquanto ela funciona como "atividade
-  // solta" (sem nenhum item lançado), mas curar sempre é inofensivo — quando a etapa tem atividades,
-  // a tela ignora esse campo e mostra o agregado delas.
-  const toUpdateStages: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
-  const healedStageStatusById = new Map(
-    stages.map((stage) => {
-      const effectiveStatus = getEffectiveStatus({
-        percentualExecutado: Number(stage.percentualExecutado),
-        dataFimPrevista: stage.dataFimPrevista,
-      });
-      if (effectiveStatus !== stage.status) {
-        toUpdateStages.push({ id: stage.id, status: effectiveStatus });
-      }
-      return [stage.id, effectiveStatus];
+      orderBy: { ordem: "asc" },
     }),
-  );
+    getWorkCalendar(prisma, workId),
+  ]);
 
-  if (toUpdateStages.length > 0) {
-    await prisma.$transaction(
-      toUpdateStages.map((item) => prisma.planningStage.update({ where: { id: item.id }, data: { status: item.status } })),
-    );
-  }
-
-  // Monta a árvore em memória (profundidade livre) a partir da lista plana.
-  type Node = (typeof stages)[number] & { tasks: NonNullable<ReturnType<typeof healedTasksByStage.get>>; children: Node[] };
+  // Monta a árvore em memória (profundidade livre) a partir da lista plana — precisa vir antes das
+  // curas abaixo porque a cascata de `predecessorRef` só sabe resolver o código já calculado.
+  type Node = (typeof stages)[number] & { children: Node[] };
   const nodeById = new Map<string, Node>();
   for (const stage of stages) {
-    nodeById.set(stage.id, {
-      ...stage,
-      status: healedStageStatusById.get(stage.id) ?? stage.status,
-      tasks: healedTasksByStage.get(stage.id) ?? [],
-      children: [],
-    });
+    nodeById.set(stage.id, { ...stage, children: [] });
   }
   const roots: Node[] = [];
   for (const stage of stages) {
@@ -424,6 +377,98 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
     }
   }
   assignCodes(roots as unknown as StageNode[]);
+
+  // Cascata "leve" das etapas soltas com `predecessorRef`: como não existe vínculo de verdade no
+  // banco pra essas (PlanningDependency só liga atividades), refaz esse cálculo a cada leitura —
+  // se a predecessora mudou de data desde a última vez, a etapa acompanha sozinha, sem precisar
+  // redigitar a predecessora de novo. Passe iterativo (repete até estabilizar) pra cobrir cadeias
+  // de várias etapas soltas em sequência, mesmo fora de ordem.
+  const nodeByCodigo = new Map<string, Node>();
+  (function collectByCodigo(nodes: Node[]) {
+    for (const n of nodes) {
+      if (n.codigo) nodeByCodigo.set(n.codigo, n);
+      collectByCodigo(n.children);
+    }
+  })(roots);
+
+  const stageDateUpdates = new Map<string, { dataInicioPrevista: Date; dataFimPrevista: Date }>();
+  let cascadeProgressed = true;
+  let cascadeGuard = 0;
+  while (cascadeProgressed && cascadeGuard <= nodeByCodigo.size) {
+    cascadeProgressed = false;
+    cascadeGuard += 1;
+    for (const node of nodeByCodigo.values()) {
+      if (node.tasks.length > 0 || node.children.length > 0 || !node.predecessorRef) continue;
+      const predecessorNode = nodeByCodigo.get(node.predecessorRef);
+      const predecessorFinish = predecessorNode ? maxFinishDate(predecessorNode as unknown as StageTreeNode) : null;
+      if (!predecessorFinish) continue;
+
+      const expectedStart = addWorkingDays(predecessorFinish, 1, calendar);
+      if (node.dataInicioPrevista && toDateOnlyString(node.dataInicioPrevista) === toDateOnlyString(expectedStart)) {
+        continue;
+      }
+      const currentDuration =
+        node.dataInicioPrevista && node.dataFimPrevista
+          ? countWorkingDays(node.dataInicioPrevista, node.dataFimPrevista, calendar)
+          : 1;
+      const expectedEnd = addWorkingDays(expectedStart, currentDuration - 1, calendar);
+
+      node.dataInicioPrevista = expectedStart;
+      node.dataFimPrevista = expectedEnd;
+      stageDateUpdates.set(node.id, { dataInicioPrevista: expectedStart, dataFimPrevista: expectedEnd });
+      cascadeProgressed = true;
+    }
+  }
+  if (stageDateUpdates.size > 0) {
+    await prisma.$transaction(
+      [...stageDateUpdates.entries()].map(([id, data]) => prisma.planningStage.update({ where: { id }, data })),
+    );
+  }
+
+  // Auto-cura de status de atividade — igual antes, só que direto na árvore já montada.
+  const toUpdate: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
+  (function healTasks(nodes: Node[]) {
+    for (const n of nodes) {
+      for (const t of n.tasks) {
+        const effectiveStatus = getEffectiveStatus({
+          percentualExecutado: Number(t.percentualExecutado),
+          dataFimPrevista: t.dataFimPrevista,
+        });
+        if (effectiveStatus !== t.status) {
+          toUpdate.push({ id: t.id, status: effectiveStatus });
+          t.status = effectiveStatus;
+        }
+      }
+      healTasks(n.children);
+    }
+  })(roots);
+  if (toUpdate.length > 0) {
+    await prisma.$transaction(
+      toUpdate.map((item) => prisma.planningTask.update({ where: { id: item.id }, data: { status: item.status } })),
+    );
+  }
+
+  // Auto-cura de status de etapa — roda depois da cascata acima, pra já refletir a data corrigida
+  // quando a etapa funciona como "atividade solta" (sem nenhum item lançado).
+  const toUpdateStages: { id: string; status: ReturnType<typeof getEffectiveStatus> }[] = [];
+  (function healStages(nodes: Node[]) {
+    for (const n of nodes) {
+      const effectiveStatus = getEffectiveStatus({
+        percentualExecutado: Number(n.percentualExecutado),
+        dataFimPrevista: n.dataFimPrevista,
+      });
+      if (effectiveStatus !== n.status) {
+        toUpdateStages.push({ id: n.id, status: effectiveStatus });
+        n.status = effectiveStatus;
+      }
+      healStages(n.children);
+    }
+  })(roots);
+  if (toUpdateStages.length > 0) {
+    await prisma.$transaction(
+      toUpdateStages.map((item) => prisma.planningStage.update({ where: { id: item.id }, data: { status: item.status } })),
+    );
+  }
 
   // Os `predecessors[].predecessorTask.codigo` vieram de um select à parte (não fazem parte da
   // árvore acima), então ficaram com o código antigo/cru do banco — corrige pelo código já calculado.
