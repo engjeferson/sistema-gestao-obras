@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus, FileSignature, Wallet, PiggyBank, Percent } from "lucide-react";
+import { Plus, Pencil, FileSignature, Wallet, PiggyBank, Percent } from "lucide-react";
 import { getContract } from "@/server/actions/contratos";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,14 @@ export default async function ContractDetailPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/obras/${id}/contratos/${contractId}/editar`} />}
+            nativeButton={false}
+          >
+            <Pencil /> Editar
+          </Button>
           <AddAddendumDialog contractId={contractId} workId={id} />
           <Button
             size="sm"

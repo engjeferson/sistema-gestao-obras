@@ -12,18 +12,29 @@ export const contractTypeValues = [
 
 export const contractDirecaoValues = ["PAGAR", "RECEBER"] as const;
 
-export const contractFormSchema = z.object({
-  workId: z.string().min(1, "Selecione a obra."),
-  nome: z.string().trim().min(1, "Informe o nome do contrato."),
-  tipo: z.enum(contractTypeValues),
-  direcao: z.enum(contractDirecaoValues),
-  // Contratante não vem mais do formulário — o servidor sempre preenche com o nome da empresa
-  // (CompanySettings). Contratado agora resolve/cria um Fornecedor de verdade a partir do nome.
-  contratadoNome: z.string().trim().min(1, "Informe o contratado."),
-  valor: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
-  data: z.string().min(1, "Informe a data."),
-  observacoes: z.string().trim().optional(),
-});
+export const contractFormSchema = z
+  .object({
+    workId: z.string().min(1, "Selecione a obra."),
+    nome: z.string().trim().min(1, "Informe o nome do contrato."),
+    tipo: z.enum(contractTypeValues),
+    direcao: z.enum(contractDirecaoValues),
+    // Despesa (PAGAR): contratante é sempre a própria empresa (servidor preenche via CompanySettings),
+    // contratado resolve/cria um Fornecedor de verdade a partir do nome digitado.
+    // Receita (RECEBER): contratante é um Cliente real (escolhido aqui), contratado é sempre a empresa.
+    contratanteClientId: z.string().optional().or(z.literal("").transform(() => undefined)),
+    contratadoNome: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
+    valor: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
+    data: z.string().min(1, "Informe a data."),
+    observacoes: z.string().trim().optional(),
+  })
+  .refine((data) => data.direcao !== "RECEBER" || Boolean(data.contratanteClientId), {
+    message: "Selecione o cliente contratante.",
+    path: ["contratanteClientId"],
+  })
+  .refine((data) => data.direcao !== "PAGAR" || Boolean(data.contratadoNome), {
+    message: "Informe o contratado.",
+    path: ["contratadoNome"],
+  });
 
 export type ContractFormValues = z.infer<typeof contractFormSchema>;
 

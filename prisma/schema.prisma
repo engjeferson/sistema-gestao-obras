@@ -199,6 +199,7 @@ model Client {
 
   works                 Work[]
   financialTransactions FinancialTransaction[]
+  contracts             Contract[]
 }
 
 model Supplier {
@@ -477,10 +478,12 @@ model Contract {
   tipo                 ContractType
   direcao              TransactionType @default(PAGAR)
   // Texto solto, igual `InvoiceItem.material` — guarda o nome no momento da criação, pra exibição
-  // continuar funcionando mesmo que o fornecedor seja renomeado ou removido depois. `contratante`
-  // é sempre preenchido no servidor a partir de `CompanySettings.nome` (nunca mais digitado).
+  // continuar funcionando mesmo que o cliente/fornecedor seja renomeado ou removido depois.
+  // Despesa (PAGAR): contratante é sempre a própria empresa, contratado é um Fornecedor.
+  // Receita (RECEBER): contratante é o Cliente, contratado é sempre a própria empresa.
   contratante          String
   contratado           String
+  contratanteClientId  String?
   contratadoSupplierId String?
   valor                Decimal?        @db.Decimal(14, 2)
   data                 DateTime        @db.Date
@@ -490,11 +493,13 @@ model Contract {
   updatedAt            DateTime        @updatedAt
 
   work               Work                  @relation(fields: [workId], references: [id], onDelete: Cascade)
+  contratanteClient  Client?               @relation(fields: [contratanteClientId], references: [id])
   contratadoSupplier Supplier?             @relation(fields: [contratadoSupplierId], references: [id])
   measurements       ContractMeasurement[]
   addendums          ContractAddendum[]
 
   @@index([workId])
+  @@index([contratanteClientId])
   @@index([contratadoSupplierId])
 }
 

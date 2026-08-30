@@ -14,7 +14,8 @@ function parseContractForm(formData: FormData) {
     nome: formData.get("nome"),
     tipo: formData.get("tipo"),
     direcao: formData.get("direcao"),
-    contratadoNome: formData.get("contratadoNome"),
+    contratanteClientId: formData.get("contratanteClientId") ?? "",
+    contratadoNome: formData.get("contratadoNome") ?? "",
     valor: formData.get("valor") ?? "",
     data: formData.get("data"),
     observacoes: formData.get("observacoes") ?? undefined,
@@ -30,6 +31,35 @@ async function findOrCreateSupplierId(nome: string) {
   if (existing) return existing.id;
   const created = await prisma.supplier.create({ data: { nome: trimmed, categoria: "SERVICOS" } });
   return created.id;
+}
+
+// Resolve contratante/contratado de acordo com a direção do contrato: despesa (PAGAR) tem a
+// empresa como contratante e um Fornecedor como contratado; receita (RECEBER) inverte — o
+// Cliente é o contratante e a própria empresa é o contratado.
+async function resolveContractParties(data: {
+  direcao: "PAGAR" | "RECEBER";
+  contratanteClientId?: string;
+  contratadoNome?: string;
+}) {
+  const companySettings = await getCompanySettings();
+
+  if (data.direcao === "RECEBER") {
+    const client = await prisma.client.findUniqueOrThrow({ where: { id: data.contratanteClientId! } });
+    return {
+      contratante: client.nome,
+      contratanteClientId: client.id,
+      contratado: companySettings.nome,
+      contratadoSupplierId: null as string | null,
+    };
+  }
+
+  const contratadoSupplierId = await findOrCreateSupplierId(data.contratadoNome!);
+  return {
+    contratante: companySettings.nome,
+    contratanteClientId: null as string | null,
+    contratado: data.contratadoNome!.trim(),
+    contratadoSupplierId,
+  };
 }
 
 export async function listContracts(workId: string) {
@@ -73,11 +103,7 @@ export async function createContract(_prevState: string | undefined, formData: F
   }
   const data = parsed.data;
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
-
-  const [companySettings, contratadoSupplierId] = await Promise.all([
-    getCompanySettings(),
-    findOrCreateSupplierId(data.contratadoNome),
-  ]);
+  const parties = await resolveContractParties(data);
 
   await prisma.contract.create({
     data: {
@@ -85,9 +111,7 @@ export async function createContract(_prevState: string | undefined, formData: F
       nome: data.nome,
       tipo: data.tipo,
       direcao: data.direcao,
-      contratante: companySettings.nome,
-      contratado: data.contratadoNome.trim(),
-      contratadoSupplierId,
+      ...parties,
       valor: data.valor ?? null,
       data: new Date(data.data),
       observacoes: data.observacoes || null,
@@ -97,6 +121,37 @@ export async function createContract(_prevState: string | undefined, formData: F
 
   revalidatePath(`/obras/${data.workId}/contratos`);
   redirect(`/obras/${data.workId}/contratos`);
+}
+
+export async function updateContract(contractId: string, _prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const parsed = parseContractForm(formData);
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+  }
+  const data = parsed.data;
+  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+  const parties = await resolveContractParties(data);
+
+  await prisma.contract.update({
+    where: { id: contractId },
+    data: {
+      nome: data.nome,
+      tipo: data.tipo,
+      direcao: data.direcao,
+      ...parties,
+      valor: data.valor ?? null,
+      data: new Date(data.data),
+      observacoes: data.observacoes || null,
+      arquivoUrl,
+    },
+  });
+
+  revalidatePath(`/obras/${data.workId}/contratos`);
+  revalidatePath(`/obras/${data.workId}/contratos/${contractId}`);
+  redirect(`/obras/${data.workId}/contratos/${contractId}`);
 }
 
 export async function deleteContract(contractId: string, workId: string) {
