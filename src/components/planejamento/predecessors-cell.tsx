@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { addPlanningDependencyByCode, removeGroupedDependency, type PredecessorChip } from "@/server/actions/planejamento";
+import {
+  addPlanningDependencyByCode,
+  clearStagePredecessorRef,
+  removeGroupedDependency,
+  type PredecessorChip,
+} from "@/server/actions/planejamento";
 
 /**
  * Célula de predecessoras reutilizável tanto pra uma Atividade (owner = ownerTaskId) quanto pra
@@ -19,6 +24,7 @@ export function PredecessorsCell({
   ownCode,
   chips,
   options,
+  manualRef = null,
 }: {
   workId: string;
   ownerStageId?: string | null;
@@ -26,12 +32,16 @@ export function PredecessorsCell({
   ownCode: string;
   chips: PredecessorChip[];
   options: { value: string; label: string }[];
+  // Código "lembrado" numa etapa sem atividades (ver `predecessorRef`) — não existe vínculo de
+  // verdade por trás (não há atividade pra sustentar), então só entra na exibição quando não há
+  // nenhum chip real.
+  manualRef?: string | null;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const displayText = chips.map((c) => c.codigo || c.nome).join(", ");
+  const displayText = chips.length > 0 ? chips.map((c) => c.codigo || c.nome).join(", ") : (manualRef ?? "");
   const validCodes = new Set(options.map((o) => o.value));
 
   function commit(text: string) {
@@ -40,8 +50,9 @@ export function PredecessorsCell({
 
     const toAdd = typedCodes.filter((code) => code !== ownCode && validCodes.has(code) && !currentCodes.has(code));
     const toRemove = chips.filter((c) => !typedCodes.includes(c.codigo));
+    const clearManualRef = ownerStageId && manualRef && chips.length === 0 && typedCodes.length === 0;
 
-    if (toAdd.length === 0 && toRemove.length === 0) return;
+    if (toAdd.length === 0 && toRemove.length === 0 && !clearManualRef) return;
 
     startTransition(async () => {
       try {
@@ -56,6 +67,9 @@ export function PredecessorsCell({
         }
         for (const code of toAdd) {
           await addPlanningDependencyByCode(workId, code, ownerStageId, ownerTaskId);
+        }
+        if (clearManualRef && ownerStageId) {
+          await clearStagePredecessorRef(ownerStageId, workId);
         }
         router.refresh();
       } catch (err) {
@@ -78,7 +92,7 @@ export function PredecessorsCell({
       }}
       placeholder="Ex: 1.1, 2.3"
       disabled={isPending}
-      className="h-6 w-32 text-xs"
+      className="h-6 w-44 text-xs"
     />
   );
 }

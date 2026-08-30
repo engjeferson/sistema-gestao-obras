@@ -537,6 +537,10 @@ model PlanningStage {
   // ganha atividades, a tela passa a mostrar o agregado delas e este campo fica sem uso.
   percentualExecutado Decimal        @default(0) @db.Decimal(5, 2)
   status              PlanningStatus @default(NAO_INICIADA)
+  // Código digitado como predecessora enquanto a etapa funciona como "atividade solta" (sem
+  // nenhum item ainda) — PlanningDependency só liga atividades, então não existe vínculo de
+  // verdade aqui; isso é só pra tela lembrar o que foi digitado e continuar mostrando no campo.
+  predecessorRef      String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 

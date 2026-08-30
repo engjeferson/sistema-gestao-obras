@@ -21,6 +21,7 @@ export type PlainStage = {
   dataFimPrevista: Date | null;
   percentualExecutado: number;
   status: string;
+  predecessorRef: string | null;
   predecessorChips: PredecessorChip[];
   tasks: PlainTask[];
   children: PlainStage[];

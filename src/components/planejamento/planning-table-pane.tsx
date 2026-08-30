@@ -33,7 +33,7 @@ import {
 } from "@/server/actions/planejamento";
 import { ROW_HEIGHT, HEADER_HEIGHT } from "@/components/gantt/gantt-canvas";
 
-const GRID = "28px 46px minmax(160px,1fr) 104px 104px 52px 52px 92px 170px 32px";
+const GRID = "28px 52px minmax(180px,1fr) 104px 104px 58px 58px 104px 190px 32px";
 
 type PendingRow = { kind: "stage" | "task"; groupId: string | null };
 type AugRow = PlanningRow | { type: "pending"; kind: "stage" | "task"; groupId: string | null };
@@ -389,7 +389,7 @@ function StageRowView({
   return (
     <div
       ref={rowRef}
-      className={`grid items-center border-b px-1 ${row.depth === 0 ? "bg-muted/40" : row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""} ${isCrossTarget ? "ring-2 ring-inset ring-brand-teal" : ""}`}
+      className={`grid items-center border-b px-1 transition-colors hover:bg-warning/10 focus-within:bg-warning/15 ${row.depth === 0 ? "bg-muted/40" : row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""} ${isCrossTarget ? "ring-2 ring-inset ring-brand-teal" : ""}`}
       style={{ gridTemplateColumns: GRID, height: ROW_HEIGHT }}
     >
       <GripCell onGripPointerDown={onGripPointerDown} />
@@ -411,6 +411,7 @@ function StageRowView({
         ownCode={stage.codigo}
         chips={stage.predecessorChips}
         options={predecessorOptions}
+        manualRef={stage.predecessorRef}
       />
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -451,6 +452,7 @@ function StageDateCells({
   const [isPending, startTransition] = useTransition();
   const [start, setStart] = useState(stage.dataInicioPrevista ? toDateInputValue(stage.dataInicioPrevista) : "");
   const [end, setEnd] = useState(stage.dataFimPrevista ? toDateInputValue(stage.dataFimPrevista) : "");
+  const [durationDraft, setDurationDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setStart(stage.dataInicioPrevista ? toDateInputValue(stage.dataInicioPrevista) : "");
@@ -478,6 +480,7 @@ function StageDateCells({
   // Só dá pra digitar a duração (e calcular o Fim sozinho) quando já tem um Início — sem isso não
   // tem de onde contar os dias.
   function handleDurationChange(value: string) {
+    setDurationDraft(value);
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -512,10 +515,12 @@ function StageDateCells({
       <input
         type="number"
         min={1}
-        disabled={isPending || !start}
-        value={duration ?? ""}
+        disabled={!start}
+        value={durationDraft ?? (duration !== null ? String(duration) : "")}
         title="Dias úteis, conforme o calendário da obra"
+        onFocus={() => setDurationDraft(duration !== null ? String(duration) : "")}
         onChange={(e) => handleDurationChange(e.target.value)}
+        onBlur={() => setDurationDraft(null)}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
     </>
@@ -565,7 +570,7 @@ function StageProgressCells({ stage, workId }: { stage: PlainStage; workId: stri
           setPercent(e.target.value);
           commit(e.target.value);
         }}
-        className="w-12 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+        className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <Badge
         variant={PLANNING_STATUS_BADGE[stage.status]}
@@ -601,6 +606,7 @@ function TaskRowView({
   const task = row.task;
   const [start, setStart] = useState(toDateInputValue(task.dataInicioPrevista));
   const [end, setEnd] = useState(toDateInputValue(task.dataFimPrevista));
+  const [durationDraft, setDurationDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setStart(toDateInputValue(task.dataInicioPrevista));
@@ -623,6 +629,7 @@ function TaskRowView({
   }
 
   function handleDurationChange(value: string) {
+    setDurationDraft(value);
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -645,7 +652,7 @@ function TaskRowView({
   return (
     <div
       ref={rowRef}
-      className={`grid items-center border-b px-1 ${row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""} ${isCritical ? "bg-destructive/5 ring-1 ring-inset ring-destructive/30" : ""}`}
+      className={`grid items-center border-b px-1 transition-colors hover:bg-warning/10 focus-within:bg-warning/15 ${row.stripe ? "bg-muted/10" : "bg-background"} ${isDragging ? "opacity-50" : ""} ${isCritical ? "bg-destructive/5 ring-1 ring-inset ring-destructive/30" : ""}`}
       style={{ gridTemplateColumns: GRID, height: ROW_HEIGHT }}
     >
       <GripCell onGripPointerDown={onGripPointerDown} />
@@ -689,10 +696,11 @@ function TaskRowView({
       <input
         type="number"
         min={1}
-        disabled={isPending}
-        value={duration}
+        value={durationDraft ?? String(duration)}
         title="Dias úteis, conforme o calendário da obra"
+        onFocus={() => setDurationDraft(String(duration))}
         onChange={(e) => handleDurationChange(e.target.value)}
+        onBlur={() => setDurationDraft(null)}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <span className="text-xs text-muted-foreground">{Number(task.percentualExecutado).toFixed(0)}%</span>

@@ -176,6 +176,7 @@ export type StageTreeNode = {
   dataFimPrevista: Date | null;
   percentualExecutado: number;
   status: string;
+  predecessorRef: string | null;
   predecessorChips: PredecessorChip[];
   tasks: {
     id: string;
@@ -295,7 +296,9 @@ export async function addPlanningDependencyByCode(
 
     await prisma.planningStage.update({
       where: { id: ownerStage.id },
-      data: { dataInicioPrevista: newStart, dataFimPrevista: newEnd },
+      // predecessorRef não é um vínculo de verdade (não existe atividade pra sustentar isso) —
+      // só pra tela lembrar o código digitado e continuar mostrando no campo de predecessoras.
+      data: { dataInicioPrevista: newStart, dataFimPrevista: newEnd, predecessorRef: predecessorCode.trim() },
     });
     revalidatePath(`/obras/${workId}/planejamento`);
     return;
@@ -550,6 +553,15 @@ export async function updateStageProgress(stageId: string, workId: string, perce
   const clamped = Math.min(100, Math.max(0, percentual));
   await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
 
+  revalidatePath(`/obras/${workId}/planejamento`);
+}
+
+/** Limpa o código de predecessora "lembrado" numa etapa sem atividades (ver `predecessorRef`). */
+export async function clearStagePredecessorRef(stageId: string, workId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  await prisma.planningStage.update({ where: { id: stageId }, data: { predecessorRef: null } });
   revalidatePath(`/obras/${workId}/planejamento`);
 }
 
