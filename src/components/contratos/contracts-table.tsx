@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, FileText, ChevronRight } from "lucide-react";
+import { Trash2, FileText, ChevronRight, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { deleteContract } from "@/server/actions/contratos";
+import { deleteContract, reorderContracts } from "@/server/actions/contratos";
 import { CONTRACT_TYPE_LABELS, formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { cn } from "@/lib/utils";
 
 type ContractRow = {
   id: string;
@@ -58,6 +59,69 @@ function DeleteContractButton({ contractId, workId }: { contractId: string; work
 }
 
 export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]; workId: string }) {
+  const router = useRouter();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [displayOrder, setDisplayOrder] = useState<string[] | null>(null);
+  const draggingIdRef = useRef(draggingId);
+  const displayOrderRef = useRef(displayOrder);
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    draggingIdRef.current = draggingId;
+    displayOrderRef.current = displayOrder;
+  }, [draggingId, displayOrder]);
+
+  useEffect(() => {
+    if (!draggingId) return;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
+    function onMove(e: PointerEvent) {
+      const id = draggingIdRef.current;
+      if (!id) return;
+      for (const [otherId, el] of cardRefs.current) {
+        if (otherId === id) continue;
+        const rect = el.getBoundingClientRect();
+        if (e.clientY < rect.top || e.clientY > rect.bottom) continue;
+        setDisplayOrder((prev) => {
+          if (!prev) return prev;
+          const next = prev.filter((x) => x !== id);
+          next.splice(next.indexOf(otherId), 0, id);
+          return next;
+        });
+        break;
+      }
+    }
+
+    function onUp() {
+      const finalOrder = displayOrderRef.current;
+      setDraggingId(null);
+      setDisplayOrder(null);
+      if (!finalOrder) return;
+      const originalOrder = contracts.map((c) => c.id);
+      if (JSON.stringify(finalOrder) === JSON.stringify(originalOrder)) return;
+      reorderContracts(workId, finalOrder).then(() => router.refresh());
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [draggingId, contracts, workId, router]);
+
+  function startDrag(id: string) {
+    setDisplayOrder(contracts.map((c) => c.id));
+    setDraggingId(id);
+  }
+
+  const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
+  const orderedContracts = displayOrder
+    ? displayOrder.map((id) => contractById.get(id)).filter((c): c is ContractRow => !!c)
+    : contracts;
+
   if (contracts.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -68,17 +132,36 @@ export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]
 
   return (
     <div className="flex flex-col gap-3">
-      {contracts.map((contract) => (
-        <Card key={contract.id}>
+      {orderedContracts.map((contract) => (
+        <Card
+          key={contract.id}
+          ref={(el) => {
+            if (el) cardRefs.current.set(contract.id, el);
+            else cardRefs.current.delete(contract.id);
+          }}
+          className={cn(draggingId === contract.id && "opacity-60")}
+        >
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-4">
-              <Link
-                href={`/obras/${workId}/contratos/${contract.id}`}
-                className="flex items-center gap-1 font-medium hover:underline"
-              >
-                {contract.nome}
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </Link>
+              <div className="flex items-center gap-2">
+                <span
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    startDrag(contract.id);
+                  }}
+                  title="Arrastar para reordenar"
+                  className="flex touch-none cursor-grab items-center justify-center text-muted-foreground active:cursor-grabbing"
+                >
+                  <GripVertical className="size-4" />
+                </span>
+                <Link
+                  href={`/obras/${workId}/contratos/${contract.id}`}
+                  className="flex items-center gap-1 font-medium hover:underline"
+                >
+                  {contract.nome}
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </Link>
+              </div>
               <div className="flex items-center gap-1">
                 {contract.arquivoUrl ? (
                   <Button

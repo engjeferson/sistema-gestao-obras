@@ -65,7 +65,7 @@ async function resolveContractParties(data: {
 export async function listContracts(workId: string) {
   const contracts = await prisma.contract.findMany({
     where: { workId },
-    orderBy: { data: "desc" },
+    orderBy: { ordem: "asc" },
     include: { measurements: { include: { financialTransaction: true } }, addendums: true },
   });
 
@@ -103,7 +103,10 @@ export async function createContract(_prevState: string | undefined, formData: F
   }
   const data = parsed.data;
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
-  const parties = await resolveContractParties(data);
+  const [parties, contratosCount] = await Promise.all([
+    resolveContractParties(data),
+    prisma.contract.count({ where: { workId: data.workId } }),
+  ]);
 
   await prisma.contract.create({
     data: {
@@ -116,11 +119,23 @@ export async function createContract(_prevState: string | undefined, formData: F
       data: new Date(data.data),
       observacoes: data.observacoes || null,
       arquivoUrl,
+      ordem: contratosCount,
     },
   });
 
   revalidatePath(`/obras/${data.workId}/contratos`);
   redirect(`/obras/${data.workId}/contratos`);
+}
+
+export async function reorderContracts(workId: string, orderedIds: string[]) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) => prisma.contract.updateMany({ where: { id, workId }, data: { ordem: index } })),
+  );
+
+  revalidatePath(`/obras/${workId}/contratos`);
 }
 
 export async function updateContract(contractId: string, _prevState: string | undefined, formData: FormData) {
