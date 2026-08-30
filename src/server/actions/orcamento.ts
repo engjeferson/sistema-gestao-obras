@@ -28,7 +28,7 @@ export async function getBudgetVsActualByStage(workId: string) {
       include: { tasks: { orderBy: { ordem: "asc" } } },
       orderBy: { ordem: "asc" },
     }),
-    prisma.budgetItem.findMany({ where: { workId }, select: { taskId: true, valorTotalPrevisto: true } }),
+    prisma.budgetItem.findMany({ where: { workId }, select: { taskId: true, stageId: true, valorTotalPrevisto: true } }),
     prisma.financialTransaction.findMany({
       where: { workId, tipo: "PAGAR" },
       select: { valor: true, status: true, stageId: true, taskId: true, categoriaId: true },
@@ -37,8 +37,13 @@ export async function getBudgetVsActualByStage(workId: string) {
   ]);
 
   const orcadoByTask = new Map<string, number>();
+  const orcadoByStage = new Map<string, number>();
   for (const item of budgetItems) {
-    orcadoByTask.set(item.taskId, (orcadoByTask.get(item.taskId) ?? 0) + Number(item.valorTotalPrevisto));
+    if (item.taskId) {
+      orcadoByTask.set(item.taskId, (orcadoByTask.get(item.taskId) ?? 0) + Number(item.valorTotalPrevisto));
+    } else if (item.stageId) {
+      orcadoByStage.set(item.stageId, (orcadoByStage.get(item.stageId) ?? 0) + Number(item.valorTotalPrevisto));
+    }
   }
 
   const maoDeObraCategoriaId = categorias.find((c) => c.nome === "Mão de obra")?.id;
@@ -87,7 +92,7 @@ export async function getBudgetVsActualByStage(workId: string) {
       };
     });
 
-    const orcado = tasks.reduce((sum, t) => sum + t.orcado, 0);
+    const orcado = tasks.reduce((sum, t) => sum + t.orcado, 0) + (orcadoByStage.get(stage.id) ?? 0);
     const realizado = sumTx((t) => t.stageId === stage.id, ["PAGO"]);
     const aPagar = sumTx((t) => t.stageId === stage.id, ["PENDENTE", "VENCIDO"]);
     const projetado = computeProjetado({ realizado, aPagar });
@@ -212,20 +217,31 @@ export async function listBudgetByStage(workId: string) {
   ]);
 
   const itemsByTask = new Map<string, typeof budgetItems>();
+  const itemsByStage = new Map<string, typeof budgetItems>();
   for (const item of budgetItems) {
-    const list = itemsByTask.get(item.taskId) ?? [];
-    list.push(item);
-    itemsByTask.set(item.taskId, list);
+    if (item.taskId) {
+      const list = itemsByTask.get(item.taskId) ?? [];
+      list.push(item);
+      itemsByTask.set(item.taskId, list);
+    } else if (item.stageId) {
+      const list = itemsByStage.get(item.stageId) ?? [];
+      list.push(item);
+      itemsByStage.set(item.stageId, list);
+    }
+  }
+
+  function toPlainItem(item: (typeof budgetItems)[number]) {
+    return {
+      ...item,
+      quantidadePrevista: item.quantidadePrevista ? Number(item.quantidadePrevista) : null,
+      valorUnitarioPrevisto: item.valorUnitarioPrevisto ? Number(item.valorUnitarioPrevisto) : null,
+      valorTotalPrevisto: Number(item.valorTotalPrevisto),
+    };
   }
 
   return stages.map((stage) => {
     const tasks = stage.tasks.map((task) => {
-      const items = (itemsByTask.get(task.id) ?? []).map((item) => ({
-        ...item,
-        quantidadePrevista: item.quantidadePrevista ? Number(item.quantidadePrevista) : null,
-        valorUnitarioPrevisto: item.valorUnitarioPrevisto ? Number(item.valorUnitarioPrevisto) : null,
-        valorTotalPrevisto: Number(item.valorTotalPrevisto),
-      }));
+      const items = (itemsByTask.get(task.id) ?? []).map(toPlainItem);
       return {
         id: task.id,
         codigo: task.codigo,
@@ -234,8 +250,10 @@ export async function listBudgetByStage(workId: string) {
         totalOrcado: sumBudgetItems(items),
       };
     });
-    const totalOrcado = tasks.reduce((sum, t) => sum + t.totalOrcado, 0);
-    return { id: stage.id, codigo: stage.codigo, nome: stage.nome, tasks, totalOrcado };
+    const stageItems = (itemsByStage.get(stage.id) ?? []).map(toPlainItem);
+    const totalOrcado =
+      tasks.reduce((sum, t) => sum + t.totalOrcado, 0) + sumBudgetItems(stageItems);
+    return { id: stage.id, codigo: stage.codigo, nome: stage.nome, tasks, stageItems, totalOrcado };
   });
 }
 
@@ -245,7 +263,8 @@ export async function createBudgetItem(_prevState: string | undefined, formData:
 
   const parsed = budgetItemFormSchema.safeParse({
     workId: formData.get("workId"),
-    taskId: formData.get("taskId"),
+    taskId: formData.get("taskId") ?? undefined,
+    stageId: formData.get("stageId") ?? undefined,
     codigo: formData.get("codigo") ?? undefined,
     descricao: formData.get("descricao") ?? undefined,
     tipoCusto: formData.get("tipoCusto"),
@@ -268,7 +287,8 @@ export async function createBudgetItem(_prevState: string | undefined, formData:
   await prisma.budgetItem.create({
     data: {
       workId: data.workId,
-      taskId: data.taskId,
+      taskId: data.taskId ?? null,
+      stageId: data.stageId ?? null,
       codigo: data.codigo || null,
       descricao: data.descricao || null,
       tipoCusto: data.tipoCusto,

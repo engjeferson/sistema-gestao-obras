@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +97,36 @@ function batchEtapaDepth(row: BulkRow, etapaRows: BulkRow[], depthMap: Map<strin
   return batchEtapaDepth(parent, etapaRows, depthMap, guard + 1) + 1;
 }
 
+// Rascunho local das linhas NOVAS (as já existentes sempre recarregam frescas do servidor) — pra
+// não perder o que foi digitado se a aba fechar/travar antes de clicar em "Salvar planejamento".
+function draftKey(workId: string) {
+  return `bulk-planning-draft:${workId}`;
+}
+
+function loadDraftRows(workId: string): BulkRow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(draftKey(workId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as BulkRow[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDraftRows(workId: string, rows: BulkRow[]) {
+  try {
+    if (rows.length === 0) {
+      window.localStorage.removeItem(draftKey(workId));
+    } else {
+      window.localStorage.setItem(draftKey(workId), JSON.stringify(rows));
+    }
+  } catch {
+    // localStorage indisponível (aba privada, quota etc.) — autosave vira no-op, sem quebrar a tela.
+  }
+}
+
 // Etapas/atividades que a obra já tem lançado entram como linhas travadas (não editáveis aqui —
 // o "Lançamento em bloco" só CRIA itens novos) no topo da própria tabela, em vez de um resumo à
 // parte: assim o que já existe fica visível junto do que está sendo montado, e uma atividade nova
@@ -110,8 +140,8 @@ function buildExistingRows(stages: PlainStage[], parentClientId = ""): BulkRow[]
       tipo: "ETAPA",
       parentClientId,
       nome: stage.nome,
-      dataInicioPrevista: "",
-      dataFimPrevista: "",
+      dataInicioPrevista: stage.dataInicioPrevista ? toDateInputValue(stage.dataInicioPrevista) : "",
+      dataFimPrevista: stage.dataFimPrevista ? toDateInputValue(stage.dataFimPrevista) : "",
       predecessorClientIds: [],
       custoPrevisto: "",
       tipoCusto: undefined,
@@ -142,14 +172,42 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
     const existing = buildExistingRows(stages);
     return existing.length > 0 ? existing : [newRow("ETAPA")];
   });
+  const [draftRestored, setDraftRestored] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [predecessorDraft, setPredecessorDraft] = useState<{ clientId: string; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftAppliedRef = useRef(false);
 
   const isExisting = (clientId: string) => clientId.startsWith(EXISTING_PREFIX);
   const etapaRows = rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = rows.filter((r) => r.tipo === "ATIVIDADE");
+
+  // Lê o rascunho só depois de hidratar (nunca no useState inicial) — ler localStorage direto no
+  // initializer faria o primeiro render do cliente divergir do HTML vindo do servidor. O ref evita
+  // aplicar o rascunho duas vezes (React chama efeitos duas vezes em dev/StrictMode).
+  useEffect(() => {
+    if (draftAppliedRef.current) return;
+    draftAppliedRef.current = true;
+    const draft = loadDraftRows(workId);
+    if (draft.length === 0) return;
+    setRows((prev) => [...prev, ...draft]);
+    setDraftRestored(true);
+  }, [workId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveDraftRows(workId, rows.filter((r) => !isExisting(r.clientId)));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [rows, workId]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      saveDraftRows(workId, rows.filter((r) => !isExisting(r.clientId)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só precisa reagir quando o erro aparece
+  }, [errorMessage]);
 
   const existingOptions = flattenStageOptions(stages).map((o) => ({
     value: `${EXISTING_PREFIX}${o.id}`,
@@ -250,9 +308,19 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form
+      action={formAction}
+      onSubmit={() => saveDraftRows(workId, [])}
+      className="flex flex-col gap-4"
+    >
       <input type="hidden" name="workId" value={workId} />
       <input type="hidden" name="rowsJson" value={JSON.stringify(rows)} readOnly />
+
+      {draftRestored ? (
+        <p className="text-xs text-muted-foreground">
+          Rascunho anterior restaurado — as linhas novas que você ainda não tinha salvo continuam aqui.
+        </p>
+      ) : null}
 
       {rows.some((r) => isExisting(r.clientId)) ? (
         <p className="text-xs text-muted-foreground">
@@ -352,28 +420,20 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                     />
                   </td>
                   <td className="p-2">
-                    {row.tipo === "ATIVIDADE" ? (
-                      <Input
-                        type="date"
-                        value={row.dataInicioPrevista}
-                        onChange={(e) => updateRow(row.clientId, { dataInicioPrevista: e.target.value })}
-                        disabled={locked}
-                      />
-                    ) : (
-                      "—"
-                    )}
+                    <Input
+                      type="date"
+                      value={row.dataInicioPrevista}
+                      onChange={(e) => updateRow(row.clientId, { dataInicioPrevista: e.target.value })}
+                      disabled={locked}
+                    />
                   </td>
                   <td className="p-2">
-                    {row.tipo === "ATIVIDADE" ? (
-                      <Input
-                        type="date"
-                        value={row.dataFimPrevista}
-                        onChange={(e) => updateRow(row.clientId, { dataFimPrevista: e.target.value })}
-                        disabled={locked}
-                      />
-                    ) : (
-                      "—"
-                    )}
+                    <Input
+                      type="date"
+                      value={row.dataFimPrevista}
+                      onChange={(e) => updateRow(row.clientId, { dataFimPrevista: e.target.value })}
+                      disabled={locked}
+                    />
                   </td>
                   <td className="p-2">
                     {row.tipo === "ATIVIDADE" ? (
@@ -402,7 +462,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                     )}
                   </td>
                   <td className="p-2">
-                    {row.tipo === "ATIVIDADE" && !locked ? (
+                    {!locked ? (
                       <NativeSelect
                         value={row.tipoCusto ?? ""}
                         onChange={(e) => updateRow(row.clientId, { tipoCusto: (e.target.value || undefined) as TipoCusto | undefined })}
@@ -420,7 +480,7 @@ export function BulkPlanningEditor({ workId, stages }: { workId: string; stages:
                     )}
                   </td>
                   <td className="p-2">
-                    {row.tipo === "ATIVIDADE" && !locked ? (
+                    {!locked ? (
                       <Input
                         type="number"
                         min={0}

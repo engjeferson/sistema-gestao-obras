@@ -10,7 +10,15 @@ import { createBudgetItem } from "@/server/actions/orcamento";
 import { costTypeValues } from "@/lib/validations/orcamento";
 import { COST_TYPE_LABELS, UNIT_LABELS } from "@/lib/status-labels";
 
-export function AddBudgetItemForm({ workId, taskId }: { workId: string; taskId: string }) {
+export function AddBudgetItemForm({
+  workId,
+  taskId,
+  stageId,
+}: {
+  workId: string;
+  taskId?: string;
+  stageId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [errorMessage, formAction, isPending] = useActionState(createBudgetItem, undefined);
 
@@ -25,7 +33,8 @@ export function AddBudgetItemForm({ workId, taskId }: { workId: string; taskId: 
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-2 rounded-md border p-3">
       <input type="hidden" name="workId" value={workId} />
-      <input type="hidden" name="taskId" value={taskId} />
+      {taskId ? <input type="hidden" name="taskId" value={taskId} /> : null}
+      {stageId ? <input type="hidden" name="stageId" value={stageId} /> : null}
       <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Tipo de custo</label>
         <NativeSelect name="tipoCusto" defaultValue="MATERIAL" className="w-40">

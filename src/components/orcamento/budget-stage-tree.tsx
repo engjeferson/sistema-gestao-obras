@@ -1,6 +1,7 @@
 import { AddBudgetItemForm } from "@/components/orcamento/add-budget-item-form";
 import { DeleteBudgetItemButton } from "@/components/orcamento/delete-budget-item-button";
 import { COST_TYPE_LABELS, UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { sumBudgetItems } from "@/lib/budget";
 
 export type PlainBudgetItem = {
   id: string;
@@ -27,8 +28,46 @@ export type PlainBudgetStage = {
   codigo: string | null;
   nome: string;
   tasks: PlainBudgetTask[];
+  stageItems: PlainBudgetItem[];
   totalOrcado: number;
 };
+
+function BudgetItemsTable({ items, workId }: { items: PlainBudgetItem[]; workId: string }) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-muted-foreground">
+            <th className="p-2">Tipo</th>
+            <th className="p-2">Descrição</th>
+            <th className="p-2">Qtd.</th>
+            <th className="p-2">Un.</th>
+            <th className="p-2">Valor unit.</th>
+            <th className="p-2">Total</th>
+            <th className="w-10 p-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className="border-b last:border-0">
+              <td className="p-2">{COST_TYPE_LABELS[item.tipoCusto]}</td>
+              <td className="p-2">{item.descricao ?? "—"}</td>
+              <td className="p-2">{item.quantidadePrevista ?? "—"}</td>
+              <td className="p-2">{item.unidade ? UNIT_LABELS[item.unidade] : "—"}</td>
+              <td className="p-2">
+                {item.valorUnitarioPrevisto !== null ? formatCurrencyBRL(item.valorUnitarioPrevisto) : "—"}
+              </td>
+              <td className="p-2 font-medium">{formatCurrencyBRL(item.valorTotalPrevisto)}</td>
+              <td className="p-2">
+                <DeleteBudgetItemButton itemId={item.id} workId={workId} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]; workId: string }) {
   if (stages.length === 0) {
@@ -51,6 +90,23 @@ export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]
             <span>{formatCurrencyBRL(stage.totalOrcado)}</span>
           </summary>
           <div className="flex flex-col gap-4 border-t p-4">
+            <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Valor solto da etapa (sem detalhar por atividade)
+                </p>
+                {stage.stageItems.length > 0 ? (
+                  <p className="text-sm font-medium">
+                    {formatCurrencyBRL(sumBudgetItems(stage.stageItems))}
+                  </p>
+                ) : null}
+              </div>
+              {stage.stageItems.length > 0 ? (
+                <BudgetItemsTable items={stage.stageItems} workId={workId} />
+              ) : null}
+              <AddBudgetItemForm workId={workId} stageId={stage.id} />
+            </div>
+
             {stage.tasks.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nenhuma atividade nesta etapa ainda (adicione em Planejamento).
@@ -65,42 +121,7 @@ export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]
                     </p>
                     <p className="text-sm font-medium">{formatCurrencyBRL(task.totalOrcado)}</p>
                   </div>
-                  {task.items.length > 0 ? (
-                    <div className="overflow-x-auto rounded-md border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b text-left text-muted-foreground">
-                            <th className="p-2">Tipo</th>
-                            <th className="p-2">Descrição</th>
-                            <th className="p-2">Qtd.</th>
-                            <th className="p-2">Un.</th>
-                            <th className="p-2">Valor unit.</th>
-                            <th className="p-2">Total</th>
-                            <th className="w-10 p-2" />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {task.items.map((item) => (
-                            <tr key={item.id} className="border-b last:border-0">
-                              <td className="p-2">{COST_TYPE_LABELS[item.tipoCusto]}</td>
-                              <td className="p-2">{item.descricao ?? "—"}</td>
-                              <td className="p-2">{item.quantidadePrevista ?? "—"}</td>
-                              <td className="p-2">{item.unidade ? UNIT_LABELS[item.unidade] : "—"}</td>
-                              <td className="p-2">
-                                {item.valorUnitarioPrevisto !== null
-                                  ? formatCurrencyBRL(item.valorUnitarioPrevisto)
-                                  : "—"}
-                              </td>
-                              <td className="p-2 font-medium">{formatCurrencyBRL(item.valorTotalPrevisto)}</td>
-                              <td className="p-2">
-                                <DeleteBudgetItemButton itemId={item.id} workId={workId} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
+                  {task.items.length > 0 ? <BudgetItemsTable items={task.items} workId={workId} /> : null}
                   <AddBudgetItemForm workId={workId} taskId={task.id} />
                 </div>
               ))

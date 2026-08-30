@@ -539,6 +539,7 @@ model PlanningStage {
   parent                PlanningStage?          @relation("StageChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children              PlanningStage[]         @relation("StageChildren")
   tasks                 PlanningTask[]
+  budgetItems           BudgetItem[]
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   stockMovements        StockMovement[]
@@ -644,10 +645,14 @@ model PlanningTemplateDependency {
   @@index([successorTaskId])
 }
 
+// `taskId` e `stageId` são mutuamente exclusivos (garantido em código, não no schema): um item
+// de custo pertence a UMA atividade específica OU é um valor solto direto numa etapa (lançado
+// antes dela estar quebrada em atividades) — nunca os dois.
 model BudgetItem {
   id                    String    @id @default(cuid())
   workId                String
-  taskId                String
+  taskId                String?
+  stageId               String?
   codigo                String?
   descricao             String?
   tipoCusto             CostType
@@ -659,11 +664,13 @@ model BudgetItem {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  work Work         @relation(fields: [workId], references: [id], onDelete: Cascade)
-  task PlanningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  work  Work          @relation(fields: [workId], references: [id], onDelete: Cascade)
+  task  PlanningTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  stage PlanningStage? @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
   @@index([workId])
   @@index([taskId])
+  @@index([stageId])
 }
 
 model Rdo {

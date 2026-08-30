@@ -13,7 +13,9 @@ export const costTypeValues = [
 export const budgetItemFormSchema = z
   .object({
     workId: z.string().min(1),
-    taskId: z.string().min(1, "Selecione a atividade."),
+    // Um item pertence a UMA atividade OU é um valor solto direto numa etapa — nunca os dois.
+    taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
+    stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
     codigo: z.string().trim().optional(),
     descricao: z.string().trim().optional(),
     tipoCusto: z.enum(costTypeValues),
@@ -22,6 +24,10 @@ export const budgetItemFormSchema = z
     valorUnitarioPrevisto: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
     valorTotalPrevisto: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
     observacoes: z.string().trim().optional(),
+  })
+  .refine((data) => Boolean(data.taskId) !== Boolean(data.stageId), {
+    message: "Selecione a atividade ou a etapa (não os dois).",
+    path: ["taskId"],
   })
   .refine(
     (data) =>

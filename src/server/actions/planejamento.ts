@@ -650,9 +650,30 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
           ? await nextChildOrdem(tx, data.workId, resolvedParentId)
           : await nextStageOrdem(tx, data.workId, null);
         const created = await tx.planningStage.create({
-          data: { workId: data.workId, parentId: resolvedParentId, nome: row.nome, ordem },
+          data: {
+            workId: data.workId,
+            parentId: resolvedParentId,
+            nome: row.nome,
+            ordem,
+            dataInicioPrevista: row.dataInicioPrevista ? new Date(row.dataInicioPrevista) : null,
+            dataFimPrevista: row.dataFimPrevista ? new Date(row.dataFimPrevista) : null,
+          },
         });
         stageIdMap.set(row.clientId, created.id);
+
+        // Valor solto da etapa (antes dela estar quebrada em atividades) — mesma ideia do custo
+        // previsto de uma atividade, só que ligado direto na etapa em vez de numa tarefa.
+        if (row.custoPrevisto) {
+          await tx.budgetItem.create({
+            data: {
+              workId: data.workId,
+              stageId: created.id,
+              tipoCusto: row.tipoCusto ?? "OUTROS",
+              valorTotalPrevisto: row.custoPrevisto,
+            },
+          });
+        }
+
         pending.splice(i, 1);
         progressed = true;
       }
