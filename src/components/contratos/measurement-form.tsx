@@ -17,10 +17,14 @@ type MeasurementFormDefaultValues = {
   valor?: number;
   categoriaId?: string;
   bankAccountId?: string | null;
+  stageId?: string | null;
+  taskId?: string | null;
   descricao?: string | null;
   observacoes?: string | null;
   arquivoUrl?: string | null;
 };
+
+type StageOption = { id: string; codigo: string | null; nome: string; tasks: { id: string; codigo: string | null; nome: string }[] };
 
 function toDateInputValue(date: Date | string | undefined | null) {
   if (!date) return "";
@@ -34,6 +38,7 @@ export function MeasurementForm({
   contractId,
   categorias,
   bankAccounts,
+  stages,
   proximoNumero,
   direcao,
   defaultValues,
@@ -44,6 +49,7 @@ export function MeasurementForm({
   contractId: string;
   categorias: { id: string; nome: string }[];
   bankAccounts: { id: string; nome: string }[];
+  stages: StageOption[];
   proximoNumero: number;
   direcao: "PAGAR" | "RECEBER";
   defaultValues?: MeasurementFormDefaultValues;
@@ -54,7 +60,10 @@ export function MeasurementForm({
   const [confirmar, setConfirmar] = useState(false);
   const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
   const [uploading, setUploading] = useState(false);
+  const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  const tasksForStage = stages.find((s) => s.id === selectedStageId)?.tasks ?? [];
 
   async function handleFileChange(file: File | undefined) {
     if (!file) return;
@@ -112,6 +121,42 @@ export function MeasurementForm({
             {categorias.map((categoria) => (
               <option key={categoria.id} value={categoria.id}>
                 {categoria.nome}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="stageId">Etapa (opcional)</Label>
+          <NativeSelect
+            id="stageId"
+            name="stageId"
+            value={selectedStageId}
+            onChange={(e) => setSelectedStageId(e.target.value)}
+          >
+            <option value="">—</option>
+            {stages.map((stage) => (
+              <option key={stage.id} value={stage.id}>
+                {stage.codigo ? `${stage.codigo} — ` : ""}
+                {stage.nome}
+              </option>
+            ))}
+          </NativeSelect>
+          <p className="text-xs text-muted-foreground">Vincula esse custo a uma etapa do planejamento, pra comparar previsto x realizado depois.</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="taskId">Atividade (opcional)</Label>
+          <NativeSelect
+            id="taskId"
+            name="taskId"
+            key={selectedStageId}
+            defaultValue={selectedStageId === defaultValues?.stageId ? (defaultValues?.taskId ?? "") : ""}
+            disabled={!selectedStageId}
+          >
+            <option value="">—</option>
+            {tasksForStage.map((task) => (
+              <option key={task.id} value={task.id}>
+                {task.codigo ? `${task.codigo} — ` : ""}
+                {task.nome}
               </option>
             ))}
           </NativeSelect>

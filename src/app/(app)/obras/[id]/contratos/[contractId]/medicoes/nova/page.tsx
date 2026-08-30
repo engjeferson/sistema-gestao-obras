@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getContract, createMeasurement } from "@/server/actions/contratos";
 import { listFinancialCategories } from "@/server/actions/financeiro";
 import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
+import { listStagesForAllWorks } from "@/server/actions/planejamento";
 import { MeasurementForm } from "@/components/contratos/measurement-form";
 
 export default async function NovaMedicaoPage({
@@ -10,10 +11,11 @@ export default async function NovaMedicaoPage({
   params: Promise<{ id: string; contractId: string }>;
 }) {
   const { id, contractId } = await params;
-  const [contract, categorias, bankAccounts] = await Promise.all([
+  const [contract, categorias, bankAccounts, stagesByWork] = await Promise.all([
     getContract(contractId),
     listFinancialCategories(),
     listActiveBankAccounts(),
+    listStagesForAllWorks(),
   ]);
 
   if (!contract || contract.workId !== id) {
@@ -37,6 +39,7 @@ export default async function NovaMedicaoPage({
         contractId={contractId}
         categorias={categorias}
         bankAccounts={bankAccountsOptions}
+        stages={stagesByWork[id] ?? []}
         proximoNumero={proximoNumero}
         direcao={contract.direcao}
       />

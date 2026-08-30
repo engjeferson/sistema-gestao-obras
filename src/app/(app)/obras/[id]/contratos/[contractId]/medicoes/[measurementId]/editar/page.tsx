@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getMeasurement, updateMeasurement } from "@/server/actions/contratos";
 import { listFinancialCategories } from "@/server/actions/financeiro";
 import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
+import { listStagesForAllWorks } from "@/server/actions/planejamento";
 import { MeasurementForm } from "@/components/contratos/measurement-form";
 
 export default async function EditarMedicaoPage({
@@ -10,10 +11,11 @@ export default async function EditarMedicaoPage({
   params: Promise<{ id: string; contractId: string; measurementId: string }>;
 }) {
   const { id, contractId, measurementId } = await params;
-  const [measurement, categorias, bankAccounts] = await Promise.all([
+  const [measurement, categorias, bankAccounts, stagesByWork] = await Promise.all([
     getMeasurement(measurementId),
     listFinancialCategories(),
     listActiveBankAccounts(),
+    listStagesForAllWorks(),
   ]);
 
   if (!measurement || measurement.contract.workId !== id || measurement.contractId !== contractId) {
@@ -34,6 +36,7 @@ export default async function EditarMedicaoPage({
         contractId={contractId}
         categorias={categorias}
         bankAccounts={bankAccountsOptions}
+        stages={stagesByWork[id] ?? []}
         proximoNumero={measurement.numero}
         direcao={measurement.contract.direcao}
         submitLabel="Salvar alterações"
@@ -43,6 +46,8 @@ export default async function EditarMedicaoPage({
           valor: Number(measurement.valor),
           categoriaId: measurement.financialTransaction?.categoriaId,
           bankAccountId: measurement.financialTransaction?.bankAccountId,
+          stageId: measurement.financialTransaction?.stageId,
+          taskId: measurement.financialTransaction?.taskId,
           descricao: measurement.descricao,
           observacoes: measurement.observacoes,
           arquivoUrl: measurement.arquivoUrl,

@@ -35,6 +35,10 @@ export const measurementFormSchema = z.object({
   valor: z.coerce.number().positive("Informe um valor maior que zero."),
   categoriaId: z.string().min(1, "Selecione a categoria."),
   bankAccountId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  // Opcional — pra poder acompanhar depois quanto de cada etapa já foi de fato pago, não só o
+  // previsto (mesmo campo/padrão do lançamento financeiro avulso e da nota fiscal).
+  stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
   descricao: z.string().trim().optional(),
   observacoes: z.string().trim().optional(),
   arquivoUrl: z.string().optional(),
