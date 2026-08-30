@@ -33,7 +33,7 @@ import {
 } from "@/server/actions/planejamento";
 import { ROW_HEIGHT, HEADER_HEIGHT } from "@/components/gantt/gantt-canvas";
 
-const GRID = "28px 46px minmax(160px,1fr) 92px 92px 52px 52px 92px 170px 32px";
+const GRID = "28px 46px minmax(160px,1fr) 104px 104px 52px 52px 92px 170px 32px";
 
 type PendingRow = { kind: "stage" | "task"; groupId: string | null };
 type AugRow = PlanningRow | { type: "pending"; kind: "stage" | "task"; groupId: string | null };
@@ -268,6 +268,7 @@ export function PlanningTablePane({
               onGripPointerDown={() => startDrag(row)}
               onAddTask={() => startCreate("task", row.stage.id)}
               onAddSubStage={() => startCreate("stage", row.stage.id)}
+              calendar={calendar}
             />
           ) : (
             <TaskRowView
@@ -348,6 +349,7 @@ function StageRowView({
   onGripPointerDown,
   onAddTask,
   onAddSubStage,
+  calendar,
 }: {
   row: Extract<PlanningRow, { type: "stage" }>;
   workId: string;
@@ -360,6 +362,7 @@ function StageRowView({
   onGripPointerDown: () => void;
   onAddTask: () => void;
   onAddSubStage: () => void;
+  calendar: WorkCalendar;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -400,8 +403,7 @@ function StageRowView({
         {stage.codigo}
       </button>
       <EditableName value={stage.nome} bold onCommit={handleRename} />
-      <StageDateCells stage={stage} row={row} workId={workId} />
-      <span className="text-xs text-muted-foreground">—</span>
+      <StageDateCells stage={stage} row={row} workId={workId} calendar={calendar} />
       <StageProgressCells stage={stage} workId={workId} />
       <PredecessorsCell
         workId={workId}
@@ -438,10 +440,12 @@ function StageDateCells({
   stage,
   row,
   workId,
+  calendar,
 }: {
   stage: PlainStage;
   row: Extract<PlanningRow, { type: "stage" }>;
   workId: string;
+  calendar: WorkCalendar;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -458,6 +462,7 @@ function StageDateCells({
       <>
         <span className="text-xs text-muted-foreground">{formatDateBR(row.start)}</span>
         <span className="text-xs text-muted-foreground">{formatDateBR(row.end)}</span>
+        <span className="text-xs text-muted-foreground">—</span>
       </>
     );
   }
@@ -470,6 +475,18 @@ function StageDateCells({
     });
   }
 
+  // Só dá pra digitar a duração (e calcular o Fim sozinho) quando já tem um Início — sem isso não
+  // tem de onde contar os dias.
+  function handleDurationChange(value: string) {
+    const dias = Number(value);
+    if (!start || !Number.isFinite(dias) || dias < 1) return;
+    const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
+    setEnd(nextEnd);
+    commit(start, nextEnd);
+  }
+
+  const duration = start && end ? countWorkingDays(new Date(start), new Date(end), calendar) : null;
+
   return (
     <>
       <input
@@ -480,7 +497,7 @@ function StageDateCells({
           setStart(e.target.value);
           commit(e.target.value, end);
         }}
-        className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+        className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <input
         type="date"
@@ -490,7 +507,16 @@ function StageDateCells({
           setEnd(e.target.value);
           commit(start, e.target.value);
         }}
-        className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+        className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+      />
+      <input
+        type="number"
+        min={1}
+        disabled={isPending || !start}
+        value={duration ?? ""}
+        title="Dias úteis, conforme o calendário da obra"
+        onChange={(e) => handleDurationChange(e.target.value)}
+        className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
     </>
   );
@@ -635,7 +661,7 @@ function TaskRowView({
           setStart(e.target.value);
           commit(e.target.value, end);
         }}
-        className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+        className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <div className="relative">
         <input
@@ -646,7 +672,7 @@ function TaskRowView({
             setEnd(e.target.value);
             commit(start, e.target.value);
           }}
-          className="w-[86px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+          className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
         />
         {varianceDays ? (
           <span

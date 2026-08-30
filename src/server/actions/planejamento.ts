@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
 import { computeCriticalPath } from "@/lib/critical-path";
-import { toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
+import { addWorkingDays, countWorkingDays, toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
 import { stageFormSchema, taskFormSchema, bulkPlanningSchema } from "@/lib/validations/planejamento";
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -208,12 +208,25 @@ function findStageById(nodes: StageTreeNode[], id: string): StageTreeNode | null
   return null;
 }
 
+/**
+ * Término da etapa/sub: o maior término entre as atividades dela (recursivo); se ela ainda não
+ * tem nenhuma (funciona como "atividade solta"), usa a data própria dela.
+ */
+function maxFinishDate(node: StageTreeNode): Date | null {
+  const dates = [
+    ...node.tasks.map((t) => t.dataFimPrevista),
+    ...node.children.map(maxFinishDate).filter((d): d is Date => d !== null),
+  ];
+  if (dates.length > 0) return new Date(Math.max(...dates.map((d) => d.getTime())));
+  return node.dataFimPrevista;
+}
+
 /** Resolve um código digitado (de etapa/sub OU item) pros ids de item que ele representa. */
-function findEntityByCode(nodes: StageTreeNode[], code: string): { taskIds: string[] } | null {
+function findEntityByCode(nodes: StageTreeNode[], code: string): { taskIds: string[]; dataFimPrevista: Date | null } | null {
   for (const n of nodes) {
-    if (n.codigo === code) return { taskIds: leafTaskIds(n) };
+    if (n.codigo === code) return { taskIds: leafTaskIds(n), dataFimPrevista: maxFinishDate(n) };
     const task = n.tasks.find((t) => t.codigo === code);
-    if (task) return { taskIds: [task.id] };
+    if (task) return { taskIds: [task.id], dataFimPrevista: task.dataFimPrevista };
     const found = findEntityByCode(n.children, code);
     if (found) return found;
   }
@@ -261,7 +274,32 @@ export async function addPlanningDependencyByCode(
     throw new Error("Código não encontrado.");
   }
 
-  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStageId ? findStageById(roots, ownerStageId) : null);
+  const ownerStage = ownerStageId ? findStageById(roots, ownerStageId) : null;
+  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStage);
+
+  // Etapa-alvo ainda sem nenhuma atividade — funciona como uma "atividade solta", então não há
+  // atividade nenhuma pra criar um vínculo de verdade (PlanningDependency é sempre entre
+  // atividades). Em vez de vínculo, empurra a data de início dela pra depois do término da
+  // predecessora, uma vez só — mantendo a duração que ela já tinha, se tinha alguma.
+  if (ownerStage && ownerTaskIds.length === 0) {
+    if (!predecessor.dataFimPrevista) {
+      throw new Error("A predecessora ainda não tem data de término definida.");
+    }
+    const calendar = await getWorkCalendar(prisma, workId);
+    const newStart = addWorkingDays(predecessor.dataFimPrevista, 1, calendar);
+    const currentDuration =
+      ownerStage.dataInicioPrevista && ownerStage.dataFimPrevista
+        ? countWorkingDays(ownerStage.dataInicioPrevista, ownerStage.dataFimPrevista, calendar)
+        : 1;
+    const newEnd = addWorkingDays(newStart, currentDuration - 1, calendar);
+
+    await prisma.planningStage.update({
+      where: { id: ownerStage.id },
+      data: { dataInicioPrevista: newStart, dataFimPrevista: newEnd },
+    });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return;
+  }
 
   const pairs = predecessor.taskIds.flatMap((p) =>
     ownerTaskIds.filter((s) => s !== p).map((s) => ({ predecessorTaskId: p, successorTaskId: s })),
