@@ -102,7 +102,27 @@ export function RdoDetailView({
             <CardTitle>Fotos ({rdo.photos.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">{rdo.photos.length} foto(s) anexada(s) a este RDO.</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {rdo.photos.map((photo) => (
+                <a
+                  key={photo.id}
+                  href={`/api/files?key=${encodeURIComponent(photo.url)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col gap-1"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/files?key=${encodeURIComponent(photo.url)}`}
+                    alt={photo.descricao ?? "Foto do RDO"}
+                    className="aspect-square w-full rounded-md border object-cover transition-opacity hover:opacity-80"
+                  />
+                  {photo.descricao ? (
+                    <p className="truncate text-xs text-muted-foreground">{photo.descricao}</p>
+                  ) : null}
+                </a>
+              ))}
+            </div>
           </CardContent>
         </Card>
       ) : null}
