@@ -201,8 +201,14 @@ export function RdoPdfDocument({ rdo, company, logoBase64, photosBase64, origin 
                   <View key={a.id} style={styles.activityCard}>
                     <View style={styles.activityHeaderRow}>
                       <View>
-                        <Text style={styles.activityStage}>{a.planningTask.stage.nome}</Text>
-                        <Text style={styles.activityName}>{a.planningTask.nome}</Text>
+                        {a.planningTask ? (
+                          <>
+                            <Text style={styles.activityStage}>{a.planningTask.stage.nome}</Text>
+                            <Text style={styles.activityName}>{a.planningTask.nome}</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.activityName}>{a.planningStage?.nome} (etapa completa)</Text>
+                        )}
                       </View>
                       <Text style={styles.percentBadge}>{atual.toFixed(0)}%</Text>
                     </View>

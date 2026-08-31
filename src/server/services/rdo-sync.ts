@@ -28,36 +28,70 @@ export async function createRdoWithSync(data: RdoFormValues, responsavelId: stri
       },
     });
 
+    const rdoData = new Date(data.data);
+
     for (const activity of data.activities) {
-      const planningTask = await tx.planningTask.findUniqueOrThrow({ where: { id: activity.planningTaskId } });
-      const percentualAnterior = Number(planningTask.percentualExecutado);
+      if (activity.planningTaskId) {
+        const planningTask = await tx.planningTask.findUniqueOrThrow({ where: { id: activity.planningTaskId } });
+        const percentualAnterior = Number(planningTask.percentualExecutado);
 
-      await tx.rdoActivity.create({
-        data: {
-          rdoId: rdo.id,
-          planningTaskId: activity.planningTaskId,
-          descricaoServico: activity.descricaoServico ?? "",
-          percentualAnterior,
-          percentualAtual: activity.percentualAtual,
-        },
-      });
+        await tx.rdoActivity.create({
+          data: {
+            rdoId: rdo.id,
+            planningTaskId: activity.planningTaskId,
+            descricaoServico: activity.descricaoServico ?? "",
+            percentualAnterior,
+            percentualAtual: activity.percentualAtual,
+          },
+        });
 
-      const rdoData = new Date(data.data);
-      const concluiuAtrasada = activity.percentualAtual >= 100 && rdoData.getTime() > planningTask.dataFimPrevista.getTime();
-      const dataFimPrevista = concluiuAtrasada ? rdoData : planningTask.dataFimPrevista;
+        const concluiuAtrasada = activity.percentualAtual >= 100 && rdoData.getTime() > planningTask.dataFimPrevista.getTime();
+        const dataFimPrevista = concluiuAtrasada ? rdoData : planningTask.dataFimPrevista;
 
-      const status = getEffectiveStatus({
-        percentualExecutado: activity.percentualAtual,
-        dataFimPrevista,
-      });
+        const status = getEffectiveStatus({
+          percentualExecutado: activity.percentualAtual,
+          dataFimPrevista,
+        });
 
-      await tx.planningTask.update({
-        where: { id: activity.planningTaskId },
-        data: { percentualExecutado: activity.percentualAtual, status, dataFimPrevista },
-      });
+        await tx.planningTask.update({
+          where: { id: activity.planningTaskId },
+          data: { percentualExecutado: activity.percentualAtual, status, dataFimPrevista },
+        });
 
-      if (concluiuAtrasada) {
-        await applyCascadeForTask(tx, data.workId, activity.planningTaskId);
+        if (concluiuAtrasada) {
+          await applyCascadeForTask(tx, data.workId, activity.planningTaskId);
+        }
+      } else if (activity.planningStageId) {
+        const planningStage = await tx.planningStage.findUniqueOrThrow({ where: { id: activity.planningStageId } });
+        const percentualAnterior = Number(planningStage.percentualExecutado);
+
+        await tx.rdoActivity.create({
+          data: {
+            rdoId: rdo.id,
+            planningStageId: activity.planningStageId,
+            descricaoServico: activity.descricaoServico ?? "",
+            percentualAnterior,
+            percentualAtual: activity.percentualAtual,
+          },
+        });
+
+        // Etapa "atividade solta" não tem PlanningDependency de verdade, então não há cascata a
+        // disparar aqui — só atualiza os campos dela mesma.
+        const concluiuAtrasada =
+          activity.percentualAtual >= 100 &&
+          !!planningStage.dataFimPrevista &&
+          rdoData.getTime() > planningStage.dataFimPrevista.getTime();
+        const dataFimPrevista = concluiuAtrasada ? rdoData : planningStage.dataFimPrevista;
+
+        const status = getEffectiveStatus({
+          percentualExecutado: activity.percentualAtual,
+          dataFimPrevista,
+        });
+
+        await tx.planningStage.update({
+          where: { id: activity.planningStageId },
+          data: { percentualExecutado: activity.percentualAtual, status, dataFimPrevista },
+        });
       }
     }
 
@@ -102,26 +136,40 @@ export async function updateRdoWithSync(rdoId: string, data: RdoFormValues) {
       });
     }
 
-    const oldTaskIds = existing.activities.map((a) => a.planningTaskId);
+    const oldTaskIds = existing.activities.map((a) => a.planningTaskId).filter((id): id is string => !!id);
+    const oldStageIds = existing.activities.map((a) => a.planningStageId).filter((id): id is string => !!id);
     await tx.rdoActivity.deleteMany({ where: { rdoId } });
 
     for (const activity of data.activities) {
-      const planningTask = await tx.planningTask.findUniqueOrThrow({ where: { id: activity.planningTaskId } });
-      await tx.rdoActivity.create({
-        data: {
-          rdoId,
-          planningTaskId: activity.planningTaskId,
-          descricaoServico: activity.descricaoServico ?? "",
-          percentualAnterior: Number(planningTask.percentualExecutado),
-          percentualAtual: activity.percentualAtual,
-        },
-      });
+      if (activity.planningTaskId) {
+        const planningTask = await tx.planningTask.findUniqueOrThrow({ where: { id: activity.planningTaskId } });
+        await tx.rdoActivity.create({
+          data: {
+            rdoId,
+            planningTaskId: activity.planningTaskId,
+            descricaoServico: activity.descricaoServico ?? "",
+            percentualAnterior: Number(planningTask.percentualExecutado),
+            percentualAtual: activity.percentualAtual,
+          },
+        });
+      } else if (activity.planningStageId) {
+        const planningStage = await tx.planningStage.findUniqueOrThrow({ where: { id: activity.planningStageId } });
+        await tx.rdoActivity.create({
+          data: {
+            rdoId,
+            planningStageId: activity.planningStageId,
+            descricaoServico: activity.descricaoServico ?? "",
+            percentualAnterior: Number(planningStage.percentualExecutado),
+            percentualAtual: activity.percentualAtual,
+          },
+        });
+      }
     }
 
-    // Só reflete o percentual na tarefa do Planejamento se esta RDO for a mais
-    // recente a mencionar essa tarefa — evita que editar um RDO antigo sobrescreva
+    // Só reflete o percentual na tarefa/etapa do Planejamento se esta RDO for a mais
+    // recente a mencionar essa tarefa/etapa — evita que editar um RDO antigo sobrescreva
     // o progresso já atualizado por um RDO mais novo.
-    const newTaskIds = data.activities.map((a) => a.planningTaskId);
+    const newTaskIds = data.activities.map((a) => a.planningTaskId).filter((id): id is string => !!id);
     const affectedTaskIds = [...new Set([...oldTaskIds, ...newTaskIds])];
 
     for (const taskId of affectedTaskIds) {
@@ -151,6 +199,36 @@ export async function updateRdoWithSync(rdoId: string, data: RdoFormValues) {
       if (concluiuAtrasada) {
         await applyCascadeForTask(tx, existing.workId, taskId);
       }
+    }
+
+    const newStageIds = data.activities.map((a) => a.planningStageId).filter((id): id is string => !!id);
+    const affectedStageIds = [...new Set([...oldStageIds, ...newStageIds])];
+
+    for (const stageId of affectedStageIds) {
+      const latestActivity = await tx.rdoActivity.findFirst({
+        where: { planningStageId: stageId },
+        orderBy: { rdo: { numero: "desc" } },
+        include: { rdo: true },
+      });
+      if (!latestActivity || latestActivity.rdo.id !== rdoId) continue;
+
+      const planningStage = await tx.planningStage.findUniqueOrThrow({ where: { id: stageId } });
+      const rdoData = latestActivity.rdo.data;
+      const concluiuAtrasada =
+        Number(latestActivity.percentualAtual) >= 100 &&
+        !!planningStage.dataFimPrevista &&
+        rdoData.getTime() > planningStage.dataFimPrevista.getTime();
+      const dataFimPrevista = concluiuAtrasada ? rdoData : planningStage.dataFimPrevista;
+
+      const status = getEffectiveStatus({
+        percentualExecutado: Number(latestActivity.percentualAtual),
+        dataFimPrevista,
+      });
+
+      await tx.planningStage.update({
+        where: { id: stageId },
+        data: { percentualExecutado: latestActivity.percentualAtual, status, dataFimPrevista },
+      });
     }
 
     return existing;

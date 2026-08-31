@@ -82,7 +82,9 @@ export function RdoDetailView({
             {rdo.activities.map((a) => (
               <div key={a.id} className="rounded-md border p-3">
                 <p className="text-sm font-medium">
-                  {a.planningTask.stage.nome} — {a.planningTask.nome}
+                  {a.planningTask
+                    ? `${a.planningTask.stage.nome} — ${a.planningTask.nome}`
+                    : `${a.planningStage?.nome} (etapa completa)`}
                 </p>
                 {a.descricaoServico ? <p className="text-sm text-muted-foreground">{a.descricaoServico}</p> : null}
                 <p className="text-sm">

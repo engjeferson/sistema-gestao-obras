@@ -8,6 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
 import { createRdoWithSync, updateRdoWithSync } from "@/server/services/rdo-sync";
+import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 
 export async function listRdos(workId: string) {
   return prisma.rdo.findMany({
@@ -26,27 +27,50 @@ export async function getRdo(rdoId: string) {
       workers: true,
       occurrences: true,
       photos: { orderBy: { ordem: "asc" } },
-      activities: { include: { planningTask: { include: { stage: true } } } },
+      activities: {
+        include: { planningTask: { include: { stage: true } }, planningStage: true },
+      },
     },
   });
 }
 
-export async function listPlanningTasksForPicker(workId: string) {
-  const stages = await prisma.planningStage.findMany({
-    where: { workId },
-    include: { tasks: { orderBy: { ordem: "asc" } } },
-    orderBy: { ordem: "asc" },
-  });
-  return stages.map((stage) => ({
-    id: stage.id,
-    nome: stage.nome,
-    tasks: stage.tasks.map((task) => ({
-      id: task.id,
-      nome: task.nome,
-      percentualExecutado: Number(task.percentualExecutado),
-    })),
-  }));
+// Mesma regra da tela de Planejamento (`hasAnyTask`): enquanto uma etapa (ou toda a subárvore dela)
+// não tem nenhuma atividade cadastrada, ela funciona como "atividade solta" — pode ser vinculada
+// direto a um RDO, no lugar de uma PlanningTask.
+function hasAnyTaskInSubtree(stage: StageTreeNode): boolean {
+  return stage.tasks.length > 0 || stage.children.some(hasAnyTaskInSubtree);
 }
+
+export async function listPlanningTasksForPicker(workId: string) {
+  const stages = await listStagesWithTasks(workId);
+
+  function walk(nodes: StageTreeNode[]): { id: string; nome: string; tasks: PickerItem[] }[] {
+    return nodes.flatMap((stage) => {
+      const label = stage.codigo ? `${stage.codigo} — ${stage.nome}` : stage.nome;
+      const items: PickerItem[] = hasAnyTaskInSubtree(stage)
+        ? stage.tasks.map((task) => ({
+            id: task.id,
+            kind: "task" as const,
+            nome: task.codigo ? `${task.codigo} — ${task.nome}` : task.nome,
+            percentualExecutado: Number(task.percentualExecutado),
+          }))
+        : [
+            {
+              id: stage.id,
+              kind: "stage" as const,
+              nome: `${stage.nome} (etapa completa)`,
+              percentualExecutado: Number(stage.percentualExecutado),
+            },
+          ];
+
+      return [{ id: stage.id, nome: label, tasks: items }, ...walk(stage.children)];
+    });
+  }
+
+  return walk(stages);
+}
+
+type PickerItem = { id: string; kind: "task" | "stage"; nome: string; percentualExecutado: number };
 
 function parseJsonField<T>(formData: FormData, key: string, fallback: T): T {
   const raw = formData.get(key);

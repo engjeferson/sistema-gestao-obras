@@ -14,11 +14,19 @@ export const rdoWorkerSchema = z.object({
   quantidade: z.coerce.number().int().positive(),
 });
 
-export const rdoActivitySchema = z.object({
-  planningTaskId: z.string().min(1),
-  descricaoServico: z.string().trim().optional(),
-  percentualAtual: z.coerce.number().min(0).max(100),
-});
+// `planningTaskId`/`planningStageId` são mutuamente exclusivos: etapa quando ela funciona como
+// "atividade solta" (sem nenhuma atividade cadastrada), tarefa nos demais casos.
+export const rdoActivitySchema = z
+  .object({
+    planningTaskId: z.string().optional().or(z.literal("").transform(() => undefined)),
+    planningStageId: z.string().optional().or(z.literal("").transform(() => undefined)),
+    descricaoServico: z.string().trim().optional(),
+    percentualAtual: z.coerce.number().min(0).max(100),
+  })
+  .refine((data) => Boolean(data.planningTaskId) !== Boolean(data.planningStageId), {
+    message: "Selecione a atividade.",
+    path: ["planningTaskId"],
+  });
 
 export const rdoOccurrenceSchema = z.object({
   tipo: z.enum(occurrenceTypeValues),

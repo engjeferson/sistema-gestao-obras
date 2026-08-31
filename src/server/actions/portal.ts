@@ -87,7 +87,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
     where: { workId: work.id, data: new Date(`${dateStr}T00:00:00.000Z`) },
     include: {
       photos: { orderBy: { ordem: "asc" } },
-      activities: { include: { planningTask: { include: { stage: true } } } },
+      activities: { include: { planningTask: { include: { stage: true } }, planningStage: true } },
     },
   });
 
@@ -98,8 +98,8 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       clima: rdo.clima,
       observacoesGerais: rdo.observacoesGerais,
       atividades: rdo.activities.map((activity) => ({
-        etapaNome: activity.planningTask.stage.nome,
-        atividadeNome: activity.planningTask.nome,
+        etapaNome: activity.planningTask ? activity.planningTask.stage.nome : (activity.planningStage?.nome ?? ""),
+        atividadeNome: activity.planningTask ? activity.planningTask.nome : "(etapa completa)",
         percentualAtual: Number(activity.percentualAtual),
       })),
       fotos: await Promise.all(

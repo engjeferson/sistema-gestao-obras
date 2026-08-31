@@ -595,6 +595,7 @@ model PlanningStage {
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
   stockMovements        StockMovement[]
+  rdoActivities         RdoActivity[]
 
   @@index([workId])
   @@index([parentId])
@@ -758,14 +759,19 @@ model RdoWorker {
 model RdoActivity {
   id                 String   @id @default(cuid())
   rdoId              String
-  planningTaskId     String
+  // Mutuamente exclusivos (garantido em código, não no schema, mesmo padrão de `FinancialTransaction`
+  // stageId/taskId): `planningTaskId` quando vinculado a uma atividade de verdade, `planningStageId`
+  // quando a etapa em si funciona como "atividade solta" (sem nenhuma atividade cadastrada nela).
+  planningTaskId     String?
+  planningStageId    String?
   descricaoServico   String
   percentualAnterior Decimal  @db.Decimal(5, 2)
   percentualAtual    Decimal  @db.Decimal(5, 2)
   createdAt          DateTime @default(now())
 
-  rdo          Rdo          @relation(fields: [rdoId], references: [id], onDelete: Cascade)
-  planningTask PlanningTask @relation(fields: [planningTaskId], references: [id])
+  rdo           Rdo            @relation(fields: [rdoId], references: [id], onDelete: Cascade)
+  planningTask  PlanningTask?  @relation(fields: [planningTaskId], references: [id])
+  planningStage PlanningStage? @relation(fields: [planningStageId], references: [id])
 }
 
 model RdoPhoto {

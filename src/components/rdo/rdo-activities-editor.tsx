@@ -9,6 +9,7 @@ import type { RdoActivityValues } from "@/lib/validations/rdo";
 
 export type PlanningTaskOption = {
   id: string;
+  kind: "task" | "stage";
   nome: string;
   percentualExecutado: number;
 };
@@ -19,6 +20,19 @@ export type StageOption = {
   tasks: PlanningTaskOption[];
 };
 
+// O `<select>` nativo só carrega um valor por `<option>` — codifica tipo+id num valor só
+// ("task:ID" / "stage:ID") pra saber, ao selecionar, se grava em `planningTaskId` ou
+// `planningStageId` (mutuamente exclusivos, ver `rdoActivitySchema`).
+function encodeOption(item: PlanningTaskOption): string {
+  return `${item.kind}:${item.id}`;
+}
+
+function selectedValue(activity: RdoActivityValues): string {
+  if (activity.planningTaskId) return `task:${activity.planningTaskId}`;
+  if (activity.planningStageId) return `stage:${activity.planningStageId}`;
+  return "";
+}
+
 export function RdoActivitiesEditor({
   activities,
   onChange,
@@ -28,47 +42,56 @@ export function RdoActivitiesEditor({
   onChange: (activities: RdoActivityValues[]) => void;
   stages: StageOption[];
 }) {
-  const allTasks = stages.flatMap((stage) =>
-    stage.tasks.map((task) => ({ ...task, etapaNome: stage.nome })),
-  );
+  const allItems = stages.flatMap((stage) => stage.tasks.map((item) => ({ ...item, etapaNome: stage.nome })));
 
   function update(index: number, patch: Partial<RdoActivityValues>) {
     onChange(activities.map((a, i) => (i === index ? { ...a, ...patch } : a)));
   }
 
-  function findTask(id: string) {
-    return allTasks.find((t) => t.id === id);
+  function findItem(activity: RdoActivityValues) {
+    const id = activity.planningTaskId ?? activity.planningStageId;
+    return allItems.find((t) => t.id === id);
+  }
+
+  function selectItem(index: number, encoded: string) {
+    const [kind, id] = encoded.split(":");
+    const item = allItems.find((t) => t.id === id);
+    const novoAnterior = item?.percentualExecutado ?? 0;
+    update(index, {
+      planningTaskId: kind === "task" ? id : undefined,
+      planningStageId: kind === "stage" ? id : undefined,
+      percentualAtual: novoAnterior,
+    });
   }
 
   return (
     <div className="flex flex-col gap-4">
       {activities.map((activity, index) => {
-        const task = findTask(activity.planningTaskId);
-        const anterior = task ? task.percentualExecutado : 0;
+        const item = findItem(activity);
+        const anterior = item ? item.percentualExecutado : 0;
         const medicaoHoje = Math.max(0, activity.percentualAtual - anterior);
         return (
           <div key={index} className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
               <NativeSelect
-                value={activity.planningTaskId}
-                onChange={(e) => {
-                  const novoAnterior = findTask(e.target.value)?.percentualExecutado ?? 0;
-                  update(index, { planningTaskId: e.target.value, percentualAtual: novoAnterior });
-                }}
+                value={selectedValue(activity)}
+                onChange={(e) => selectItem(index, e.target.value)}
                 className="flex-1"
               >
                 <option value="" disabled>
                   Selecione a atividade
                 </option>
-                {stages.map((stage) => (
-                  <optgroup key={stage.id} label={stage.nome}>
-                    {stage.tasks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+                {stages.map((stage) =>
+                  stage.tasks.length > 0 ? (
+                    <optgroup key={stage.id} label={stage.nome}>
+                      {stage.tasks.map((t) => (
+                        <option key={t.id} value={encodeOption(t)}>
+                          {t.nome}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null,
+                )}
               </NativeSelect>
               <Button
                 type="button"
@@ -115,17 +138,18 @@ export function RdoActivitiesEditor({
           onChange([
             ...activities,
             {
-              planningTaskId: allTasks[0]?.id ?? "",
+              planningTaskId: allItems[0]?.kind === "task" ? allItems[0].id : undefined,
+              planningStageId: allItems[0]?.kind === "stage" ? allItems[0].id : undefined,
               descricaoServico: "",
-              percentualAtual: allTasks[0]?.percentualExecutado ?? 0,
+              percentualAtual: allItems[0]?.percentualExecutado ?? 0,
             },
           ])
         }
-        disabled={allTasks.length === 0}
+        disabled={allItems.length === 0}
       >
         <Plus /> Adicionar atividade executada
       </Button>
-      {allTasks.length === 0 ? (
+      {allItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Cadastre etapas e atividades no Planejamento desta obra antes de lançar o RDO.
         </p>

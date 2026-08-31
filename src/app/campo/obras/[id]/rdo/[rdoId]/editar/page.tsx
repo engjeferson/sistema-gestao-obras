@@ -26,7 +26,8 @@ export default async function CampoEditarRdoPage({ params }: { params: Promise<{
           observacoesGerais: rdo.observacoesGerais ?? "",
           workers: rdo.workers.map((w) => ({ funcao: w.funcao, quantidade: w.quantidade })),
           activities: rdo.activities.map((a) => ({
-            planningTaskId: a.planningTaskId,
+            planningTaskId: a.planningTaskId ?? undefined,
+            planningStageId: a.planningStageId ?? undefined,
             descricaoServico: a.descricaoServico,
             percentualAtual: Number(a.percentualAtual),
           })),
