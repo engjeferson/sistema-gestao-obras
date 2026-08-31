@@ -55,7 +55,6 @@ export function RdoPhotosEditor({
         <input
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           className="hidden"
           disabled={uploading}
