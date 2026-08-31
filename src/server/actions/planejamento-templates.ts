@@ -284,11 +284,15 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
   });
 
   const allTasks = stages.flatMap((s) => s.tasks);
-  if (allTasks.length === 0) {
-    return "Esta obra ainda não tem atividades para salvar como template.";
+  if (stages.length === 0) {
+    return "Esta obra ainda não tem etapas para salvar como template.";
   }
 
-  const day0 = new Date(Math.min(...allTasks.map((t) => t.dataInicioPrevista.getTime())));
+  const dates = [
+    ...allTasks.map((t) => t.dataInicioPrevista.getTime()),
+    ...stages.filter((s) => s.tasks.length === 0 && s.dataInicioPrevista).map((s) => s.dataInicioPrevista!.getTime()),
+  ];
+  const day0 = new Date(dates.length > 0 ? Math.min(...dates) : Date.now());
 
   await prisma.$transaction(async (tx) => {
     const template = await tx.planningTemplate.create({
@@ -297,8 +301,18 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
 
     const stageIdMap = new Map<string, string>();
     for (const stage of stages) {
+      // Etapa "solta" (sem nenhuma atividade) preserva seu próprio prazo no template, do mesmo
+      // jeito que uma atividade preserva offsetInicioDias/duracaoDias — ver hasAnyTaskInSubtree.
+      const isSolo = stage.tasks.length === 0 && stage.dataInicioPrevista && stage.dataFimPrevista;
       const created = await tx.planningTemplateStage.create({
-        data: { templateId: template.id, codigo: stage.codigo, nome: stage.nome, ordem: stage.ordem },
+        data: {
+          templateId: template.id,
+          codigo: stage.codigo,
+          nome: stage.nome,
+          ordem: stage.ordem,
+          offsetInicioDias: isSolo ? differenceInCalendarDays(stage.dataInicioPrevista!, day0) : null,
+          duracaoDias: isSolo ? differenceInCalendarDays(stage.dataFimPrevista!, stage.dataInicioPrevista!) + 1 : null,
+        },
       });
       stageIdMap.set(stage.id, created.id);
     }
@@ -375,8 +389,18 @@ export async function applyPlanningTemplate(_prevState: string | undefined, form
   await prisma.$transaction(async (tx) => {
     const stageIdMap = new Map<string, string>();
     for (const stage of template.stages) {
+      const hasTiming = stage.offsetInicioDias !== null && stage.duracaoDias !== null;
+      const dataInicioPrevista = hasTiming ? addDays(startDate, stage.offsetInicioDias!) : undefined;
+      const dataFimPrevista = hasTiming ? addDays(dataInicioPrevista!, stage.duracaoDias! - 1) : undefined;
       const created = await tx.planningStage.create({
-        data: { workId: data.workId, codigo: stage.codigo, nome: stage.nome, ordem: stage.ordem },
+        data: {
+          workId: data.workId,
+          codigo: stage.codigo,
+          nome: stage.nome,
+          ordem: stage.ordem,
+          dataInicioPrevista,
+          dataFimPrevista,
+        },
       });
       stageIdMap.set(stage.id, created.id);
     }

@@ -657,11 +657,15 @@ model PlanningTemplate {
 }
 
 model PlanningTemplateStage {
-  id         String  @id @default(cuid())
-  templateId String
-  codigo     String?
-  nome       String
-  ordem      Int     @default(0)
+  id               String  @id @default(cuid())
+  templateId       String
+  codigo           String?
+  nome             String
+  ordem            Int     @default(0)
+  // Só preenchidos quando a etapa foi salva como "atividade solta" (sem nenhuma atividade nela) —
+  // mesma ideia de PlanningTemplateTask.offsetInicioDias/duracaoDias, só que no nível da etapa.
+  offsetInicioDias Int?
+  duracaoDias      Int?
 
   template PlanningTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
   tasks    PlanningTemplateTask[]
