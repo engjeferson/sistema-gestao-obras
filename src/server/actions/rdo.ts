@@ -9,6 +9,7 @@ import { assertModuleWrite } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
 import { createRdoWithSync, updateRdoWithSync } from "@/server/services/rdo-sync";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
+import { hasAnyTaskInSubtree } from "@/lib/planning";
 
 export async function listRdos(workId: string) {
   return prisma.rdo.findMany({
@@ -32,13 +33,6 @@ export async function getRdo(rdoId: string) {
       },
     },
   });
-}
-
-// Mesma regra da tela de Planejamento (`hasAnyTask`): enquanto uma etapa (ou toda a subárvore dela)
-// não tem nenhuma atividade cadastrada, ela funciona como "atividade solta" — pode ser vinculada
-// direto a um RDO, no lugar de uma PlanningTask.
-function hasAnyTaskInSubtree(stage: StageTreeNode): boolean {
-  return stage.tasks.length > 0 || stage.children.some(hasAnyTaskInSubtree);
 }
 
 export async function listPlanningTasksForPicker(workId: string) {

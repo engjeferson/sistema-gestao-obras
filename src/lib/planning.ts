@@ -18,6 +18,13 @@ export function getEffectiveStatus(entity: { percentualExecutado: number; dataFi
   return "NAO_INICIADA";
 }
 
+// Enquanto uma etapa (ou toda a subárvore dela) não tem nenhuma atividade cadastrada, ela funciona
+// como "atividade solta" — mesma regra usada na tela de Planejamento, no RDO e no portal do cliente
+// pra decidir se mostra o percentual da própria etapa ou agrega o das atividades.
+export function hasAnyTaskInSubtree<T extends { tasks: unknown[]; children: T[] }>(stage: T): boolean {
+  return stage.tasks.length > 0 || stage.children.some(hasAnyTaskInSubtree);
+}
+
 export type TaskForCascade = {
   id: string;
   dataInicioPrevista: Date;

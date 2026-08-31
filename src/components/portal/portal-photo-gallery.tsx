@@ -5,9 +5,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-type Photo = { id: string; url: string; descricao: string | null };
+type Photo = { url: string; descricao: string | null };
 
-export function RdoPhotosGallery({ photos }: { photos: Photo[] }) {
+export function PortalPhotoGallery({ photos }: { photos: Photo[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const current = openIndex !== null ? photos[openIndex] : null;
 
@@ -30,30 +30,22 @@ export function RdoPhotosGallery({ photos }: { photos: Photo[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-        {photos.map((photo, index) => (
-          <button
-            key={photo.id}
-            type="button"
-            onClick={() => setOpenIndex(index)}
-            className="flex flex-col gap-1 text-left"
-          >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {photos.map((foto, index) => (
+          <button key={index} type="button" onClick={() => setOpenIndex(index)} className="block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`/api/files?key=${encodeURIComponent(photo.url)}`}
-              alt={photo.descricao ?? "Foto do RDO"}
+              src={foto.url}
+              alt={foto.descricao ?? "Foto da obra"}
               className="aspect-square w-full rounded-md border object-cover transition-opacity hover:opacity-80"
             />
-            {photo.descricao ? (
-              <p className="truncate text-xs text-muted-foreground">{photo.descricao}</p>
-            ) : null}
           </button>
         ))}
       </div>
 
       <Dialog open={current !== null} onOpenChange={(open) => !open && setOpenIndex(null)}>
-        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
-          <DialogTitle className="sr-only">{current?.descricao ?? "Foto do RDO"}</DialogTitle>
+        <DialogContent>
+          <DialogTitle className="sr-only">{current?.descricao ?? "Foto da obra"}</DialogTitle>
           {current ? (
             <div className="flex flex-col gap-2">
               <div className="relative flex items-center justify-center">
@@ -70,9 +62,9 @@ export function RdoPhotosGallery({ photos }: { photos: Photo[] }) {
                 ) : null}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/files?key=${encodeURIComponent(current.url)}`}
-                  alt={current.descricao ?? "Foto do RDO"}
-                  className="max-h-[80vh] w-full rounded-md object-contain"
+                  src={current.url}
+                  alt={current.descricao ?? "Foto da obra"}
+                  className="max-h-[50vh] w-full rounded-md object-contain"
                 />
                 {photos.length > 1 ? (
                   <Button

@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { ChevronLeft, ChevronRight, CloudSun } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PortalPhotoGallery } from "@/components/portal/portal-photo-gallery";
 import { getPortalDayDetails } from "@/server/actions/portal";
 import { formatDateBR } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
@@ -137,33 +139,38 @@ export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: s
                     ) : null}
                   </div>
                   {rdo.atividades.length > 0 ? (
-                    <ul className="flex flex-col gap-1 text-sm">
+                    <ul className="flex flex-col gap-2 text-sm">
                       {rdo.atividades.map((atividade, index) => (
-                        <li key={index} className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 truncate">{atividade.atividadeNome}</span>
-                          <span className="shrink-0 text-muted-foreground">
-                            {atividade.percentualAtual.toFixed(0)}%
-                          </span>
+                        <li key={index} className="flex flex-col gap-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate font-medium">{atividade.atividadeNome}</span>
+                            <span className="shrink-0 text-muted-foreground">
+                              {atividade.percentualAtual.toFixed(0)}%
+                            </span>
+                          </div>
+                          {atividade.descricaoServico ? (
+                            <p className="text-xs text-muted-foreground">{atividade.descricaoServico}</p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
                   ) : null}
-                  {rdo.observacoesGerais ? (
-                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{rdo.observacoesGerais}</p>
-                  ) : null}
-                  {rdo.fotos.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {rdo.fotos.map((foto, index) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={index}
-                          src={foto.url}
-                          alt={foto.descricao ?? "Foto da obra"}
-                          className="aspect-square w-full rounded-md border object-cover"
-                        />
+                  {rdo.ocorrencias.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      {rdo.ocorrencias.map((ocorrencia, index) => (
+                        <div key={index} className="text-sm">
+                          <Badge variant="warning" className="mr-2">
+                            {ocorrencia.tipoLabel}
+                          </Badge>
+                          {ocorrencia.descricao}
+                        </div>
                       ))}
                     </div>
                   ) : null}
+                  {rdo.observacoesGerais ? (
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{rdo.observacoesGerais}</p>
+                  ) : null}
+                  {rdo.fotos.length > 0 ? <PortalPhotoGallery photos={rdo.fotos} /> : null}
                 </div>
               ))
             ) : (

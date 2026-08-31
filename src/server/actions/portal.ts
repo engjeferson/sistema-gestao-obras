@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { presignGet } from "@/lib/r2";
+import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
+import { hasAnyTaskInSubtree } from "@/lib/planning";
 
 function average(values: number[]) {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
@@ -13,6 +15,24 @@ function average(values: number[]) {
 
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+// Percentuais "folha" dentro da subárvore de uma etapa: quando ela mesma funciona como "atividade
+// solta" (sem nenhuma tarefa nela ou em qualquer sub dela), conta o percentual da própria etapa;
+// senão, agrega o das tarefas diretas + o que vier recursivamente das sub-etapas. Mesma regra do
+// RDO (`listPlanningTasksForPicker`), aplicada aqui pra não zerar o progresso de etapas soltas.
+function collectLeafPercentages(stage: StageTreeNode): number[] {
+  if (!hasAnyTaskInSubtree(stage)) {
+    return [Number(stage.percentualExecutado)];
+  }
+  return [
+    ...stage.tasks.map((task) => Number(task.percentualExecutado)),
+    ...stage.children.flatMap(collectLeafPercentages),
+  ];
+}
+
+function flattenStages(nodes: StageTreeNode[]): StageTreeNode[] {
+  return nodes.flatMap((stage) => [stage, ...flattenStages(stage.children)]);
 }
 
 // Rota publica (sem autenticacao) — nunca retornar dado financeiro aqui.
@@ -32,12 +52,8 @@ export async function getPortalData(token: string) {
   });
   if (!work) return null;
 
-  const [stages, rdoRows] = await Promise.all([
-    prisma.planningStage.findMany({
-      where: { workId: work.id },
-      include: { tasks: { select: { percentualExecutado: true } } },
-      orderBy: { ordem: "asc" },
-    }),
+  const [stageTree, rdoRows] = await Promise.all([
+    listStagesWithTasks(work.id),
     prisma.rdo.findMany({
       where: { workId: work.id },
       select: { data: true },
@@ -45,14 +61,12 @@ export async function getPortalData(token: string) {
     }),
   ]);
 
-  const percentualExecutado = average(
-    stages.flatMap((stage) => stage.tasks.map((task) => Number(task.percentualExecutado))),
-  );
+  const percentualExecutado = average(stageTree.flatMap(collectLeafPercentages));
 
-  const etapas = stages.map((stage) => ({
+  const etapas = flattenStages(stageTree).map((stage) => ({
     id: stage.id,
     nome: stage.nome,
-    percentualExecutado: average(stage.tasks.map((task) => Number(task.percentualExecutado))),
+    percentualExecutado: average(collectLeafPercentages(stage)),
   }));
 
   const hoje = new Date();
@@ -79,6 +93,15 @@ export async function getPortalData(token: string) {
 }
 
 // Rota publica — chamada quando o cliente clica num dia do calendario.
+const OCCURRENCE_LABELS: Record<string, string> = {
+  PROBLEMA: "Problema",
+  ATRASO: "Atraso",
+  FALTA_MATERIAL: "Falta de material",
+  ALTERACAO: "Alteração",
+  VISITA: "Visita",
+  OBSERVACAO: "Observação",
+};
+
 export async function getPortalDayDetails(token: string, dateStr: string) {
   const work = await prisma.work.findUnique({ where: { portalToken: token }, select: { id: true } });
   if (!work) return [];
@@ -87,6 +110,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
     where: { workId: work.id, data: new Date(`${dateStr}T00:00:00.000Z`) },
     include: {
       photos: { orderBy: { ordem: "asc" } },
+      occurrences: true,
       activities: { include: { planningTask: { include: { stage: true } }, planningStage: true } },
     },
   });
@@ -98,9 +122,15 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       clima: rdo.clima,
       observacoesGerais: rdo.observacoesGerais,
       atividades: rdo.activities.map((activity) => ({
-        etapaNome: activity.planningTask ? activity.planningTask.stage.nome : (activity.planningStage?.nome ?? ""),
-        atividadeNome: activity.planningTask ? activity.planningTask.nome : "(etapa completa)",
+        atividadeNome: activity.planningTask
+          ? `${activity.planningTask.stage.nome} — ${activity.planningTask.nome}`
+          : `${activity.planningStage?.nome ?? ""} (etapa completa)`,
+        descricaoServico: activity.descricaoServico,
         percentualAtual: Number(activity.percentualAtual),
+      })),
+      ocorrencias: rdo.occurrences.map((o) => ({
+        tipoLabel: OCCURRENCE_LABELS[o.tipo] ?? o.tipo,
+        descricao: o.descricao,
       })),
       fotos: await Promise.all(
         rdo.photos.map(async (photo) => ({
