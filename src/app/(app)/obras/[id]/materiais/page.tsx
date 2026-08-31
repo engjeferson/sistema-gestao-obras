@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listInvoices } from "@/server/actions/notas-fiscais";
+import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
 import { InvoicesTable } from "@/components/notas-fiscais/invoices-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -15,7 +16,12 @@ export default async function MateriaisPage({
   const { id } = await params;
   const { page: pageParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
-  const result = await listInvoices(id, page);
+  const [result, canSeeValues, modulePermissions] = await Promise.all([
+    listInvoices(id, page),
+    getCurrentSensitiveValuesAccess(),
+    getCurrentModulePermissions(),
+  ]);
+  const canEdit = !modulePermissions.notasFiscaisSomenteLeitura;
   const invoices = result.items.map((invoice) => ({
     id: invoice.id,
     workId: invoice.workId,
@@ -30,12 +36,14 @@ export default async function MateriaisPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end">
-        <Button size="sm" render={<Link href={`/notas-fiscais/nova?workId=${id}`} />} nativeButton={false}>
-          <Plus /> Nova nota fiscal
-        </Button>
-      </div>
-      <InvoicesTable invoices={invoices} showObraColumn={false} />
+      {canEdit ? (
+        <div className="flex items-center justify-end">
+          <Button size="sm" render={<Link href={`/notas-fiscais/nova?workId=${id}`} />} nativeButton={false}>
+            <Plus /> Nova nota fiscal
+          </Button>
+        </div>
+      ) : null}
+      <InvoicesTable invoices={invoices} showObraColumn={false} canSeeValues={canSeeValues} canEdit={canEdit} />
       <PaginationControls page={result.page} totalPages={result.totalPages} />
     </div>
   );

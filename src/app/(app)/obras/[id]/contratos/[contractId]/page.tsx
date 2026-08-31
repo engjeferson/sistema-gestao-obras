@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus, Pencil, FileSignature, Wallet, PiggyBank, Percent } from "lucide-react";
 import { getContract } from "@/server/actions/contratos";
+import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { MeasurementsTable } from "@/components/contratos/measurements-table";
 import { ContractAddendumsTable } from "@/components/contratos/contract-addendums-table";
 import { AddAddendumDialog } from "@/components/contratos/add-addendum-dialog";
-import { CONTRACT_TYPE_LABELS, formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { CONTRACT_TYPE_LABELS, formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 
 export default async function ContractDetailPage({
   params,
@@ -16,10 +17,15 @@ export default async function ContractDetailPage({
   params: Promise<{ id: string; contractId: string }>;
 }) {
   const { id, contractId } = await params;
-  const contract = await getContract(contractId);
+  const [contract, canSeeValues, modulePermissions] = await Promise.all([
+    getContract(contractId),
+    getCurrentSensitiveValuesAccess(),
+    getCurrentModulePermissions(),
+  ]);
   if (!contract || contract.workId !== id) {
     notFound();
   }
+  const canEdit = !modulePermissions.contratosSomenteLeitura;
 
   const valorPago = contract.measurements.reduce((sum, m) => {
     const paid = m.financialTransaction?.status === "PAGO" ? Number(m.financialTransaction.valor) : 0;
@@ -77,42 +83,44 @@ export default async function ContractDetailPage({
             · {formatDateBR(contract.data)}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={`/obras/${id}/contratos/${contractId}/editar`} />}
-            nativeButton={false}
-          >
-            <Pencil /> Editar
-          </Button>
-          <AddAddendumDialog contractId={contractId} workId={id} />
-          <Button
-            size="sm"
-            render={<Link href={`/obras/${id}/contratos/${contractId}/medicoes/nova`} />}
-            nativeButton={false}
-          >
-            <Plus /> Nova medição
-          </Button>
-        </div>
+        {canEdit ? (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              render={<Link href={`/obras/${id}/contratos/${contractId}/editar`} />}
+              nativeButton={false}
+            >
+              <Pencil /> Editar
+            </Button>
+            <AddAddendumDialog contractId={contractId} workId={id} />
+            <Button
+              size="sm"
+              render={<Link href={`/obras/${id}/contratos/${contractId}/medicoes/nova`} />}
+              nativeButton={false}
+            >
+              <Plus /> Nova medição
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={FileSignature}
           label="Valor total"
-          value={valorTotal !== null ? formatCurrencyBRL(valorTotal) : "—"}
+          value={valorTotal !== null ? formatCurrencyOrHidden(valorTotal, canSeeValues) : "—"}
         />
         <KpiCard
           icon={Wallet}
           label={contract.direcao === "PAGAR" ? "Pago" : "Recebido"}
-          value={formatCurrencyBRL(valorPago)}
+          value={formatCurrencyOrHidden(valorPago, canSeeValues)}
           tone="success"
         />
         <KpiCard
           icon={PiggyBank}
           label={`Saldo ${contract.direcao === "PAGAR" ? "a pagar" : "a receber"}`}
-          value={saldo !== null ? formatCurrencyBRL(saldo) : "—"}
+          value={saldo !== null ? formatCurrencyOrHidden(saldo, canSeeValues) : "—"}
           tone={saldo !== null && saldo < 0 ? "destructive" : "default"}
         />
         <KpiCard icon={Percent} label="Progresso" value={`${percentual.toFixed(2)}%`} />
@@ -120,12 +128,12 @@ export default async function ContractDetailPage({
 
       <div className="flex flex-col gap-2">
         <h3 className="font-medium">Medições</h3>
-        <MeasurementsTable measurements={measurements} workId={id} contractId={contractId} />
+        <MeasurementsTable measurements={measurements} workId={id} contractId={contractId} canEdit={canEdit} />
       </div>
 
       <div className="flex flex-col gap-2">
         <h3 className="font-medium">Aditivos</h3>
-        <ContractAddendumsTable addendums={addendums} workId={id} contractId={contractId} />
+        <ContractAddendumsTable addendums={addendums} workId={id} contractId={contractId} canEdit={canEdit} />
       </div>
     </div>
   );

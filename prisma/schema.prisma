@@ -117,19 +117,30 @@ enum StockMovementType {
 }
 
 model User {
-  id                 String   @id @default(cuid())
-  name               String
-  email              String   @unique
-  passwordHash       String
-  role               Role
-  active             Boolean  @default(true)
-  financePermissions Json?
+  id                  String   @id @default(cuid())
+  name                String
+  email               String   @unique
+  passwordHash        String
+  role                Role
+  active              Boolean  @default(true)
+  financePermissions  Json?
   // Quando true, o usuário só enxerga/atua nas obras listadas em `assignedWorks` — abaixo disso
   // continua vendo tudo, igual hoje (opt-in, não quebra usuário existente). Administrador sempre
   // tem acesso total, independente deste campo.
-  restringirObras    Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  restringirObras     Boolean  @default(false)
+  // Editar vs. só visualizar por módulo (Planejamento/RDO/Contratos/Notas Fiscais/Cadastros) —
+  // default é tudo `false` (continua podendo editar, igual hoje). Ver `ModulePermissions`.
+  modulePermissions   Json?
+  // Esconde valor de contrato, custo de material e valor de nota fiscal — default `true` (continua
+  // vendo, igual hoje).
+  verValoresSensiveis Boolean  @default(true)
+  // Acesso a relatórios financeiros vs. operacionais — default é os dois `true` (igual hoje).
+  reportPermissions   Json?
+  // Enxergar a aba/seção de Contratos da obra (mostrar ou não, diferente de somente-leitura, que já
+  // deixa ver mas não editar) — default `true` (continua vendo, igual hoje).
+  verContratos        Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   rdosResponsavel       Rdo[]                  @relation("RdoResponsavel")
   financialTransactions FinancialTransaction[] @relation("FinancialCreatedBy")

@@ -8,7 +8,7 @@ import { Trash2, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteInvoice } from "@/server/actions/notas-fiscais";
-import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 
 type InvoiceRow = {
   id: string;
@@ -62,9 +62,13 @@ function DeleteInvoiceButton({ invoiceId, workId }: { invoiceId: string; workId:
 export function InvoicesTable({
   invoices,
   showObraColumn = true,
+  canSeeValues = true,
+  canEdit = true,
 }: {
   invoices: InvoiceRow[];
   showObraColumn?: boolean;
+  canSeeValues?: boolean;
+  canEdit?: boolean;
 }) {
   if (invoices.length === 0) {
     return (
@@ -98,7 +102,7 @@ export function InvoicesTable({
               <TableCell>{invoice.supplier.nome}</TableCell>
               <TableCell>{invoice.categoria.nome}</TableCell>
               <TableCell>{formatDateBR(invoice.dataEmissao)}</TableCell>
-              <TableCell>{formatCurrencyBRL(invoice.valorTotal)}</TableCell>
+              <TableCell>{formatCurrencyOrHidden(invoice.valorTotal, canSeeValues)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
                   <Button
@@ -120,7 +124,7 @@ export function InvoicesTable({
                       <ExternalLink /> {invoice.workId ? "Ver na obra" : "Ver estoque"}
                     </Button>
                   ) : null}
-                  <DeleteInvoiceButton invoiceId={invoice.id} workId={invoice.workId} />
+                  {canEdit ? <DeleteInvoiceButton invoiceId={invoice.id} workId={invoice.workId} /> : null}
                 </div>
               </TableCell>
             </TableRow>

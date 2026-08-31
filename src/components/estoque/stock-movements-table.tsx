@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 
 const TIPO_LABELS: Record<string, string> = {
   ENTRADA: "Entrada",
@@ -35,9 +35,11 @@ function localLabel(work: { nome: string; codigo: string } | null) {
 export function StockMovementsTable({
   movements,
   showMaterialColumn = true,
+  canSeeValues = true,
 }: {
   movements: MovementRow[];
   showMaterialColumn?: boolean;
+  canSeeValues?: boolean;
 }) {
   if (movements.length === 0) {
     return (
@@ -79,7 +81,7 @@ export function StockMovementsTable({
               </TableCell>
               <TableCell>{m.quantidade}</TableCell>
               <TableCell>
-                {m.valorUnitario !== null ? formatCurrencyBRL(m.valorUnitario * m.quantidade) : "—"}
+                {m.valorUnitario !== null ? formatCurrencyOrHidden(m.valorUnitario * m.quantidade, canSeeValues) : "—"}
               </TableCell>
               <TableCell>{m.motivo ?? "—"}</TableCell>
               <TableCell>{m.createdBy.name}</TableCell>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
 
@@ -96,6 +97,7 @@ export async function getContract(contractId: string) {
 export async function createContract(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const parsed = parseContractForm(formData);
   if (!parsed.success) {
@@ -130,6 +132,7 @@ export async function createContract(_prevState: string | undefined, formData: F
 export async function reorderContracts(workId: string, orderedIds: string[]) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   await prisma.$transaction(
     orderedIds.map((id, index) => prisma.contract.updateMany({ where: { id, workId }, data: { ordem: index } })),
@@ -141,6 +144,7 @@ export async function reorderContracts(workId: string, orderedIds: string[]) {
 export async function updateContract(contractId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const parsed = parseContractForm(formData);
   if (!parsed.success) {
@@ -172,6 +176,7 @@ export async function updateContract(contractId: string, _prevState: string | un
 export async function deleteContract(contractId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   await prisma.contract.delete({ where: { id: contractId } });
   revalidatePath(`/obras/${workId}/contratos`);
@@ -199,6 +204,7 @@ function parseMeasurementForm(formData: FormData) {
 export async function createMeasurement(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const parsed = parseMeasurementForm(formData);
   if (!parsed.success) {
@@ -277,6 +283,7 @@ export async function updateMeasurement(
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const parsed = parseMeasurementForm(formData);
   if (!parsed.success) {
@@ -329,6 +336,7 @@ export async function updateMeasurement(
 export async function deleteMeasurement(measurementId: string, workId: string, contractId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const measurement = await prisma.contractMeasurement.findUnique({
     where: { id: measurementId },
@@ -366,6 +374,7 @@ function parseContractAddendumForm(formData: FormData) {
 export async function createContractAddendum(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   const parsed = parseContractAddendumForm(formData);
   if (!parsed.success) {
@@ -392,6 +401,7 @@ export async function createContractAddendum(_prevState: string | undefined, for
 export async function deleteContractAddendum(addendumId: string, workId: string, contractId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
+  await assertModuleWrite("contratosSomenteLeitura");
 
   await prisma.contractAddendum.delete({ where: { id: addendumId } });
 

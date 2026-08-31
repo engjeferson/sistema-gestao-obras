@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Radar } from "lucide-react";
 import { listInvoices } from "@/server/actions/notas-fiscais";
 import { countPendingIncomingNFes } from "@/server/actions/sefaz-radar";
+import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InvoicesTable } from "@/components/notas-fiscais/invoices-table";
@@ -15,10 +16,13 @@ export default async function NotasFiscaisPage({
   const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
   const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
-  const [result, pendentesRadar] = await Promise.all([
+  const [result, pendentesRadar, canSeeValues, modulePermissions] = await Promise.all([
     listInvoices(undefined, page, pageSize),
     countPendingIncomingNFes(),
+    getCurrentSensitiveValuesAccess(),
+    getCurrentModulePermissions(),
   ]);
+  const canEdit = !modulePermissions.notasFiscaisSomenteLeitura;
   const invoices = result.items.map((invoice) => ({
     id: invoice.id,
     workId: invoice.workId,
@@ -43,14 +47,16 @@ export default async function NotasFiscaisPage({
             <Radar /> Radar de NF-e
             {pendentesRadar > 0 ? <Badge variant="warning">{pendentesRadar}</Badge> : null}
           </Button>
-          <Button render={<Link href="/notas-fiscais/nova" />} nativeButton={false}>
-            <Plus /> Nova nota fiscal
-          </Button>
+          {canEdit ? (
+            <Button render={<Link href="/notas-fiscais/nova" />} nativeButton={false}>
+              <Plus /> Nova nota fiscal
+            </Button>
+          ) : null}
         </div>
       </div>
 
       <div className="p-4 md:p-6">
-        <InvoicesTable invoices={invoices} />
+        <InvoicesTable invoices={invoices} canSeeValues={canSeeValues} canEdit={canEdit} />
       </div>
 
       <div className="sticky bottom-0 z-10 border-t bg-background p-4 md:p-6">

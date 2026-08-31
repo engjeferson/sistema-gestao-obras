@@ -3,11 +3,18 @@
 import { useState } from "react";
 import type { FinancePermissions } from "@/lib/finance-permissions";
 
-const TOGGLE_FIELDS: { name: keyof Pick<FinancePermissions, "verEntradas" | "verSaidas" | "verSaldo" | "verSaudeFinanceira">; label: string }[] = [
+const TOGGLE_FIELDS: {
+  name: keyof Pick<
+    FinancePermissions,
+    "verEntradas" | "verSaidas" | "verSaldo" | "verSaudeFinanceira" | "verSaudeFinanceiraObra"
+  >;
+  label: string;
+}[] = [
   { name: "verEntradas", label: "Ver entradas (contas a receber)" },
   { name: "verSaidas", label: "Ver saídas (contas a pagar)" },
   { name: "verSaldo", label: "Ver saldo" },
-  { name: "verSaudeFinanceira", label: "Ver saúde financeira da empresa" },
+  { name: "verSaudeFinanceira", label: "Ver saúde financeira da empresa (total)" },
+  { name: "verSaudeFinanceiraObra", label: "Ver saúde financeira de cada obra" },
 ];
 
 export function FinancePermissionsFields({

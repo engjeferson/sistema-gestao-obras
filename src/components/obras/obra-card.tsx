@@ -37,7 +37,13 @@ function PersonMini({ label, person }: { label: string; person: { nome: string }
   );
 }
 
-export function ObraCard({ obra }: { obra: ObraDashboardRow }) {
+export function ObraCard({
+  obra,
+  canSeeSaudeFinanceira = true,
+}: {
+  obra: ObraDashboardRow;
+  canSeeSaudeFinanceira?: boolean;
+}) {
   const percent = Math.min(100, Math.max(0, obra.percentualExecutado));
   const saudePositiva = obra.saudeFinanceira >= 0;
 
@@ -75,12 +81,14 @@ export function ObraCard({ obra }: { obra: ObraDashboardRow }) {
         </div>
 
         <div className="flex flex-col gap-1.5 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Saúde financeira</span>
-            <span className={saudePositiva ? "font-medium text-success" : "font-medium text-destructive"}>
-              {formatCurrencyBRL(obra.saudeFinanceira)}
-            </span>
-          </div>
+          {canSeeSaudeFinanceira ? (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Saúde financeira</span>
+              <span className={saudePositiva ? "font-medium text-success" : "font-medium text-destructive"}>
+                {formatCurrencyBRL(obra.saudeFinanceira)}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Custo total da obra</span>
             <span>{formatCurrencyBRL(obra.custoTotal)}</span>

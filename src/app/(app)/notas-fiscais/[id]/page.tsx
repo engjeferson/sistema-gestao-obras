@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, FileText, Paperclip, Receipt, Wallet, PiggyBank, Milestone } from "lucide-react";
 import { getInvoice } from "@/server/actions/notas-fiscais";
+import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import {
-  formatCurrencyBRL,
+  formatCurrencyOrHidden,
   formatDateBR,
   UNIT_LABELS,
   TRANSACTION_STATUS_LABELS,
@@ -17,7 +18,7 @@ import {
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const invoice = await getInvoice(id);
+  const [invoice, canSeeValues] = await Promise.all([getInvoice(id), getCurrentSensitiveValuesAccess()]);
   if (!invoice) {
     notFound();
   }
@@ -80,12 +81,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={Receipt} label="Valor total" value={formatCurrencyBRL(valorTotal)} />
-        <KpiCard icon={Wallet} label="Pago" value={formatCurrencyBRL(valorPago)} tone="success" />
+        <KpiCard icon={Receipt} label="Valor total" value={formatCurrencyOrHidden(valorTotal, canSeeValues)} />
+        <KpiCard icon={Wallet} label="Pago" value={formatCurrencyOrHidden(valorPago, canSeeValues)} tone="success" />
         <KpiCard
           icon={PiggyBank}
           label="Saldo"
-          value={formatCurrencyBRL(saldo)}
+          value={formatCurrencyOrHidden(saldo, canSeeValues)}
           tone={saldo > 0 ? "warning" : "default"}
         />
         {etapaVinculada && invoice.workId ? (
@@ -114,8 +115,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TableCell className="font-medium">{item.material}</TableCell>
                   <TableCell>{Number(item.quantidade)}</TableCell>
                   <TableCell>{UNIT_LABELS[item.unidade] ?? item.unidade}</TableCell>
-                  <TableCell>{formatCurrencyBRL(Number(item.valorUnitario))}</TableCell>
-                  <TableCell>{formatCurrencyBRL(Number(item.valorTotal))}</TableCell>
+                  <TableCell>{formatCurrencyOrHidden(Number(item.valorUnitario), canSeeValues)}</TableCell>
+                  <TableCell>{formatCurrencyOrHidden(Number(item.valorTotal), canSeeValues)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -147,7 +148,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                         : "Única"}
                     </TableCell>
                     <TableCell>{formatDateBR(transaction.dataVencimento)}</TableCell>
-                    <TableCell>{formatCurrencyBRL(Number(transaction.valor))}</TableCell>
+                    <TableCell>{formatCurrencyOrHidden(Number(transaction.valor), canSeeValues)}</TableCell>
                     <TableCell>
                       {transaction.formaPagamento ? PAYMENT_METHOD_LABELS[transaction.formaPagamento] : "—"}
                     </TableCell>

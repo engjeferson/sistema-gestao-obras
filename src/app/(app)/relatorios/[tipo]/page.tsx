@@ -13,6 +13,7 @@ import {
   getReportContasAPagarPorObra,
 } from "@/server/actions/relatorios";
 import { REPORT_DEFINITIONS, type ReportTable } from "@/lib/reports";
+import { getCurrentReportPermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +44,12 @@ export default async function RelatorioPage({
   const definition = REPORT_DEFINITIONS.find((r) => r.slug === tipo);
   const fetcher = REPORT_FETCHERS[tipo];
   if (!definition || !fetcher) {
+    notFound();
+  }
+
+  const permissions = await getCurrentReportPermissions();
+  const allowed = definition.categoria === "financeiro" ? permissions.verRelatoriosFinanceiros : permissions.verRelatoriosOperacionais;
+  if (!allowed) {
     notFound();
   }
 

@@ -5,6 +5,7 @@ export type FinancePermissions = {
   verSaidas: boolean;
   verSaldo: boolean;
   verSaudeFinanceira: boolean;
+  verSaudeFinanceiraObra: boolean;
   categoriasPermitidasIds: string[] | null;
 };
 
@@ -13,6 +14,7 @@ export const DEFAULT_FINANCE_PERMISSIONS: FinancePermissions = {
   verSaidas: true,
   verSaldo: true,
   verSaudeFinanceira: true,
+  verSaudeFinanceiraObra: true,
   categoriasPermitidasIds: null,
 };
 
@@ -26,6 +28,7 @@ export function resolveFinancePermissions(role: Role, raw: unknown): FinancePerm
     verSaidas: typeof fin.verSaidas === "boolean" ? fin.verSaidas : true,
     verSaldo: typeof fin.verSaldo === "boolean" ? fin.verSaldo : true,
     verSaudeFinanceira: typeof fin.verSaudeFinanceira === "boolean" ? fin.verSaudeFinanceira : true,
+    verSaudeFinanceiraObra: typeof fin.verSaudeFinanceiraObra === "boolean" ? fin.verSaudeFinanceiraObra : true,
     categoriasPermitidasIds: Array.isArray(fin.categoriasPermitidasIds)
       ? (fin.categoriasPermitidasIds as string[])
       : null,

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Wallet, Package } from "lucide-react";
 import { getMaterialStockDetail } from "@/server/actions/estoque";
+import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
-import { UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { UNIT_LABELS, formatCurrencyOrHidden } from "@/lib/status-labels";
 
 export default async function MaterialStockDetailPage({
   params,
@@ -12,7 +13,10 @@ export default async function MaterialStockDetailPage({
   params: Promise<{ materialId: string }>;
 }) {
   const { materialId } = await params;
-  const detail = await getMaterialStockDetail(materialId);
+  const [detail, canSeeValues] = await Promise.all([
+    getMaterialStockDetail(materialId),
+    getCurrentSensitiveValuesAccess(),
+  ]);
   if (!detail) {
     notFound();
   }
@@ -43,7 +47,7 @@ export default async function MaterialStockDetailPage({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <KpiCard icon={Package} label="Saldo total (todos os locais)" value={String(saldoTotal)} />
-        <KpiCard icon={Wallet} label="Valor total em estoque" value={formatCurrencyBRL(valorTotalGeral)} />
+        <KpiCard icon={Wallet} label="Valor total em estoque" value={formatCurrencyOrHidden(valorTotalGeral, canSeeValues)} />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -60,7 +64,7 @@ export default async function MaterialStockDetailPage({
                 <span className={`text-lg font-semibold ${s.quantidade < 0 ? "text-destructive" : ""}`}>
                   {s.quantidade}
                 </span>
-                <span className="text-sm text-muted-foreground">{formatCurrencyBRL(s.valorTotal)}</span>
+                <span className="text-sm text-muted-foreground">{formatCurrencyOrHidden(s.valorTotal, canSeeValues)}</span>
               </div>
             ))}
           </div>
@@ -69,7 +73,7 @@ export default async function MaterialStockDetailPage({
 
       <div className="flex flex-col gap-2">
         <h2 className="font-medium">Log de movimentações</h2>
-        <StockMovementsTable movements={movementsOptions} showMaterialColumn={false} />
+        <StockMovementsTable movements={movementsOptions} showMaterialColumn={false} canSeeValues={canSeeValues} />
       </div>
     </div>
   );

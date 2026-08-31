@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import { listCostHistory } from "@/server/actions/relatorios";
+import { getCurrentReportPermissions } from "@/server/actions/permissions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +12,11 @@ export default async function HistoricoCustosPage({
 }: {
   searchParams: Promise<{ search?: string }>;
 }) {
+  const permissions = await getCurrentReportPermissions();
+  if (!permissions.verRelatoriosOperacionais) {
+    notFound();
+  }
+
   const { search } = await searchParams;
   const items = await listCostHistory(search);
 

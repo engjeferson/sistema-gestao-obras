@@ -14,6 +14,7 @@ function parseFinancePermissionFields(formData: FormData) {
     verSaidas: formData.get("verSaidas") === "on",
     verSaldo: formData.get("verSaldo") === "on",
     verSaudeFinanceira: formData.get("verSaudeFinanceira") === "on",
+    verSaudeFinanceiraObra: formData.get("verSaudeFinanceiraObra") === "on",
     todasCategorias: formData.get("todasCategorias") === "on",
     categoriasPermitidasIds: formData.getAll("categoriasPermitidasIds").map(String),
   };
@@ -25,6 +26,7 @@ function buildFinancePermissions(data: ReturnType<typeof parseFinancePermissionF
     verSaidas: data.verSaidas,
     verSaldo: data.verSaldo,
     verSaudeFinanceira: data.verSaudeFinanceira,
+    verSaudeFinanceiraObra: data.verSaudeFinanceiraObra,
     categoriasPermitidasIds: data.todasCategorias ? null : data.categoriasPermitidasIds,
   };
 }
@@ -33,6 +35,25 @@ function parseWorkAccessFields(formData: FormData) {
   return {
     restringirObras: formData.get("restringirObras") === "on",
     assignedWorkIds: formData.getAll("assignedWorkIds").map(String),
+  };
+}
+
+function parseModulePermissionFields(formData: FormData) {
+  return {
+    planejamentoSomenteLeitura: formData.get("planejamentoSomenteLeitura") === "on",
+    rdoSomenteLeitura: formData.get("rdoSomenteLeitura") === "on",
+    contratosSomenteLeitura: formData.get("contratosSomenteLeitura") === "on",
+    notasFiscaisSomenteLeitura: formData.get("notasFiscaisSomenteLeitura") === "on",
+    cadastrosSomenteLeitura: formData.get("cadastrosSomenteLeitura") === "on",
+  };
+}
+
+function parseVisibilityFields(formData: FormData) {
+  return {
+    verValoresSensiveis: formData.get("verValoresSensiveis") === "on",
+    verContratos: formData.get("verContratos") === "on",
+    verRelatoriosFinanceiros: formData.get("verRelatoriosFinanceiros") === "on",
+    verRelatoriosOperacionais: formData.get("verRelatoriosOperacionais") === "on",
   };
 }
 
@@ -57,6 +78,8 @@ export async function createUser(_prevState: string | undefined, formData: FormD
 
   const permissionFields = parseFinancePermissionFields(formData);
   const workAccessFields = parseWorkAccessFields(formData);
+  const moduleFields = parseModulePermissionFields(formData);
+  const visibilityFields = parseVisibilityFields(formData);
   const parsed = userFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -64,6 +87,8 @@ export async function createUser(_prevState: string | undefined, formData: FormD
     role: formData.get("role"),
     ...permissionFields,
     ...workAccessFields,
+    ...moduleFields,
+    ...visibilityFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -87,6 +112,13 @@ export async function createUser(_prevState: string | undefined, formData: FormD
       assignedWorks: {
         create: workAccessFields.assignedWorkIds.map((workId) => ({ workId })),
       },
+      modulePermissions: moduleFields,
+      verValoresSensiveis: visibilityFields.verValoresSensiveis,
+      verContratos: visibilityFields.verContratos,
+      reportPermissions: {
+        verRelatoriosFinanceiros: visibilityFields.verRelatoriosFinanceiros,
+        verRelatoriosOperacionais: visibilityFields.verRelatoriosOperacionais,
+      },
     },
   });
 
@@ -100,6 +132,8 @@ export async function updateUser(userId: string, _prevState: string | undefined,
 
   const permissionFields = parseFinancePermissionFields(formData);
   const workAccessFields = parseWorkAccessFields(formData);
+  const moduleFields = parseModulePermissionFields(formData);
+  const visibilityFields = parseVisibilityFields(formData);
   const parsed = userEditFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -107,6 +141,8 @@ export async function updateUser(userId: string, _prevState: string | undefined,
     role: formData.get("role"),
     ...permissionFields,
     ...workAccessFields,
+    ...moduleFields,
+    ...visibilityFields,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -130,6 +166,13 @@ export async function updateUser(userId: string, _prevState: string | undefined,
         restringirObras: workAccessFields.restringirObras,
         assignedWorks: {
           create: workAccessFields.assignedWorkIds.map((workId) => ({ workId })),
+        },
+        modulePermissions: moduleFields,
+        verValoresSensiveis: visibilityFields.verValoresSensiveis,
+        verContratos: visibilityFields.verContratos,
+        reportPermissions: {
+          verRelatoriosFinanceiros: visibilityFields.verRelatoriosFinanceiros,
+          verRelatoriosOperacionais: visibilityFields.verRelatoriosOperacionais,
         },
         ...(data.password ? { passwordHash: await bcrypt.hash(data.password, 10) } : {}),
       },

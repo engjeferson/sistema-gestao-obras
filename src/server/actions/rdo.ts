@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
 import { createRdoWithSync, updateRdoWithSync } from "@/server/services/rdo-sync";
 
@@ -60,6 +61,7 @@ function parseJsonField<T>(formData: FormData, key: string, fallback: T): T {
 export async function createRdo(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+  await assertModuleWrite("rdoSomenteLeitura");
 
   const parsed = rdoFormSchema.safeParse({
     workId: formData.get("workId"),
@@ -90,6 +92,7 @@ export async function createRdo(_prevState: string | undefined, formData: FormDa
 export async function updateRdo(rdoId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+  await assertModuleWrite("rdoSomenteLeitura");
 
   const parsed = rdoFormSchema.safeParse({
     workId: formData.get("workId"),

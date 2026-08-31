@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
 import { computeCriticalPath } from "@/lib/critical-path";
 import { addWorkingDays, countWorkingDays, toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
@@ -115,6 +116,7 @@ export async function getCriticalPathForWork(workId: string) {
 export async function setPlanningBaseline(workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const tasks = await prisma.planningTask.findMany({
     where: { workId },
@@ -268,6 +270,7 @@ export async function addPlanningDependencyByCode(
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const roots = await listStagesWithTasks(workId);
   const predecessor = findEntityByCode(roots, predecessorCode.trim());
@@ -331,6 +334,7 @@ export async function removeGroupedDependency(
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const roots = await listStagesWithTasks(workId);
   const predecessorTaskIds = predecessorTaskId
@@ -538,6 +542,7 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
 export async function createStage(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const parsed = stageFormSchema.safeParse({
     workId: formData.get("workId"),
@@ -562,6 +567,7 @@ export async function createStage(_prevState: string | undefined, formData: Form
 export async function updateStageName(stageId: string, workId: string, nome: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const trimmed = nome.trim();
   if (!trimmed) return;
@@ -577,6 +583,7 @@ export async function updateStageName(stageId: string, workId: string, nome: str
 export async function updateStageDates(stageId: string, workId: string, start: string, end: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.planningStage.update({
     where: { id: stageId },
@@ -594,6 +601,7 @@ export async function updateStageDates(stageId: string, workId: string, start: s
 export async function updateStageProgress(stageId: string, workId: string, percentual: number) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const clamped = Math.min(100, Math.max(0, percentual));
   await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
@@ -605,6 +613,7 @@ export async function updateStageProgress(stageId: string, workId: string, perce
 export async function clearStagePredecessorRef(stageId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.planningStage.update({ where: { id: stageId }, data: { predecessorRef: null } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -613,6 +622,7 @@ export async function clearStagePredecessorRef(stageId: string, workId: string) 
 export async function deleteStage(stageId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.planningStage.delete({ where: { id: stageId } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -630,6 +640,7 @@ export async function reorderChildren(
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.$transaction(
     orderedItems.map((item, index) =>
@@ -649,6 +660,7 @@ export async function reorderChildren(
 export async function moveTaskToStage(taskId: string, workId: string, newStageId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const ordem = await nextChildOrdem(prisma, workId, newStageId);
   await prisma.planningTask.update({
@@ -662,6 +674,7 @@ export async function moveTaskToStage(taskId: string, workId: string, newStageId
 export async function createTask(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const parsed = taskFormSchema.safeParse({
     workId: formData.get("workId"),
@@ -694,6 +707,7 @@ export async function createTask(_prevState: string | undefined, formData: FormD
 export async function updateTaskName(taskId: string, workId: string, nome: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const trimmed = nome.trim();
   if (!trimmed) return;
@@ -705,6 +719,7 @@ export async function updateTaskName(taskId: string, workId: string, nome: strin
 export async function deleteTask(taskId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.planningTask.delete({ where: { id: taskId } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -713,6 +728,7 @@ export async function deleteTask(taskId: string, workId: string) {
 export async function updatePlanningTaskDates(taskId: string, workId: string, start: string, end: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.$transaction(async (tx) => {
     await tx.planningTask.update({
@@ -728,6 +744,7 @@ export async function updatePlanningTaskDates(taskId: string, workId: string, st
 export async function importPlanningBulk(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   let rowsParsed: unknown;
   try {

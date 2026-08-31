@@ -88,10 +88,12 @@ export function MeasurementsTable({
   measurements,
   workId,
   contractId,
+  canEdit = true,
 }: {
   measurements: MeasurementRow[];
   workId: string;
   contractId: string;
+  canEdit?: boolean;
 }) {
   if (measurements.length === 0) {
     return (
@@ -156,18 +158,22 @@ export function MeasurementsTable({
                   {measurement.status && measurement.status !== "PAGO" && measurement.financialTransactionId ? (
                     <FinalizeButton transactionId={measurement.financialTransactionId} workId={workId} />
                   ) : null}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Editar"
-                    render={
-                      <Link href={`/obras/${workId}/contratos/${contractId}/medicoes/${measurement.id}/editar`} />
-                    }
-                    nativeButton={false}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <DeleteButton measurementId={measurement.id} workId={workId} contractId={contractId} />
+                  {canEdit ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Editar"
+                        render={
+                          <Link href={`/obras/${workId}/contratos/${contractId}/medicoes/${measurement.id}/editar`} />
+                        }
+                        nativeButton={false}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <DeleteButton measurementId={measurement.id} workId={workId} contractId={contractId} />
+                    </>
+                  ) : null}
                 </div>
               </TableCell>
             </TableRow>

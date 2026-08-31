@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { clientFormSchema } from "@/lib/validations/clientes";
 
 export async function listClients() {
@@ -35,6 +36,7 @@ function parseClientForm(formData: FormData) {
 export async function createClient(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseClientForm(formData);
   if (!parsed.success) {
@@ -66,6 +68,7 @@ export async function createClient(_prevState: string | undefined, formData: For
 export async function updateClient(clientId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseClientForm(formData);
   if (!parsed.success) {
@@ -98,6 +101,7 @@ export async function updateClient(clientId: string, _prevState: string | undefi
 export async function toggleClientActive(clientId: string, ativo: boolean) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   await prisma.client.update({ where: { id: clientId }, data: { ativo } });
   revalidatePath("/cadastros/clientes");

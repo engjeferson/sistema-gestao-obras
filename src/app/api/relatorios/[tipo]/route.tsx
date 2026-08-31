@@ -16,7 +16,8 @@ import {
   getReportNotasFiscaisPorObra,
   getReportContasAPagarPorObra,
 } from "@/server/actions/relatorios";
-import type { ReportTable } from "@/lib/reports";
+import { getCurrentReportPermissions } from "@/server/actions/permissions";
+import { REPORT_DEFINITIONS, type ReportTable } from "@/lib/reports";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ tipo
   const getReport = REPORTS[tipo];
   if (!getReport) {
     return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
+  }
+
+  const definition = REPORT_DEFINITIONS.find((r) => r.slug === tipo);
+  const reportPermissions = await getCurrentReportPermissions();
+  const allowed = definition?.categoria === "financeiro"
+    ? reportPermissions.verRelatoriosFinanceiros
+    : reportPermissions.verRelatoriosOperacionais;
+  if (!allowed) {
+    return NextResponse.json({ error: "Acesso não autorizado." }, { status: 403 });
   }
 
   const url = new URL(request.url);

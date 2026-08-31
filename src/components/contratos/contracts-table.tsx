@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { deleteContract, reorderContracts } from "@/server/actions/contratos";
-import { CONTRACT_TYPE_LABELS, formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { CONTRACT_TYPE_LABELS, formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
 
 type ContractRow = {
@@ -58,7 +58,17 @@ function DeleteContractButton({ contractId, workId }: { contractId: string; work
   );
 }
 
-export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]; workId: string }) {
+export function ContractsTable({
+  contracts,
+  workId,
+  canSeeValues,
+  canEdit = true,
+}: {
+  contracts: ContractRow[];
+  workId: string;
+  canSeeValues: boolean;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [displayOrder, setDisplayOrder] = useState<string[] | null>(null);
@@ -144,16 +154,18 @@ export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
-                <span
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    startDrag(contract.id);
-                  }}
-                  title="Arrastar para reordenar"
-                  className="flex touch-none cursor-grab items-center justify-center text-muted-foreground active:cursor-grabbing"
-                >
-                  <GripVertical className="size-4" />
-                </span>
+                {canEdit ? (
+                  <span
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      startDrag(contract.id);
+                    }}
+                    title="Arrastar para reordenar"
+                    className="flex touch-none cursor-grab items-center justify-center text-muted-foreground active:cursor-grabbing"
+                  >
+                    <GripVertical className="size-4" />
+                  </span>
+                ) : null}
                 <Link
                   href={`/obras/${workId}/contratos/${contract.id}`}
                   className="flex items-center gap-1 font-medium hover:underline"
@@ -174,7 +186,7 @@ export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]
                     <FileText className="size-4" />
                   </Button>
                 ) : null}
-                <DeleteContractButton contractId={contract.id} workId={workId} />
+                {canEdit ? <DeleteContractButton contractId={contract.id} workId={workId} /> : null}
               </div>
             </div>
 
@@ -188,10 +200,11 @@ export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
-                    {contract.direcao === "PAGAR" ? "Pago" : "Recebido"}: {formatCurrencyBRL(contract.valorPago)}
+                    {contract.direcao === "PAGAR" ? "Pago" : "Recebido"}:{" "}
+                    {formatCurrencyOrHidden(contract.valorPago, canSeeValues)}
                   </span>
                   <span>{contract.percentual.toFixed(2)}%</span>
-                  <span>Total: {formatCurrencyBRL(contract.valor)}</span>
+                  <span>Total: {formatCurrencyOrHidden(contract.valor, canSeeValues)}</span>
                 </div>
               </div>
             ) : null}
@@ -204,7 +217,8 @@ export function ContractsTable({ contracts, workId }: { contracts: ContractRow[]
               <span className="text-muted-foreground">Início: {formatDateBR(contract.data)}</span>
               {contract.saldo !== null ? (
                 <span className="text-muted-foreground">
-                  Saldo {contract.direcao === "PAGAR" ? "a pagar" : "a receber"}: {formatCurrencyBRL(contract.saldo)}
+                  Saldo {contract.direcao === "PAGAR" ? "a pagar" : "a receber"}:{" "}
+                  {formatCurrencyOrHidden(contract.saldo, canSeeValues)}
                 </span>
               ) : null}
               <span className="text-muted-foreground">

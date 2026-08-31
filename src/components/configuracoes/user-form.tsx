@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { FinancePermissionsFields } from "@/components/configuracoes/finance-permissions-fields";
 import { WorkAccessFields } from "@/components/configuracoes/work-access-fields";
+import { ModulePermissionsFields } from "@/components/configuracoes/module-permissions-fields";
+import { VisibilityPermissionsFields } from "@/components/configuracoes/visibility-permissions-fields";
 import { createUser } from "@/server/actions/usuarios";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -53,6 +55,8 @@ export function UserForm({
       </div>
       <FinancePermissionsFields categorias={categorias} />
       <WorkAccessFields works={works} />
+      <ModulePermissionsFields />
+      <VisibilityPermissionsFields />
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       <div>
         <Button type="submit" disabled={isPending}>

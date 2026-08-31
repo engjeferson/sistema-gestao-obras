@@ -6,6 +6,7 @@ import { addDays, differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { createTemplateSchema, applyTemplateSchema, saveAsTemplateSchema } from "@/lib/validations/planejamento-templates";
 
 export async function listPlanningTemplates() {
@@ -71,6 +72,7 @@ export async function getPlanningTemplateForEdit(templateId: string) {
 export async function deletePlanningTemplate(templateId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   await prisma.planningTemplate.delete({ where: { id: templateId } });
   revalidatePath("/planejamento-templates");
@@ -79,6 +81,7 @@ export async function deletePlanningTemplate(templateId: string) {
 export async function createPlanningTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   let rowsParsed: unknown;
   try {
@@ -167,6 +170,7 @@ export async function createPlanningTemplate(_prevState: string | undefined, for
 export async function updatePlanningTemplate(templateId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   let rowsParsed: unknown;
   try {
@@ -261,6 +265,7 @@ export async function updatePlanningTemplate(templateId: string, _prevState: str
 export async function saveWorkPlanningAsTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const parsed = saveAsTemplateSchema.safeParse({
     workId: formData.get("workId"),
@@ -340,6 +345,7 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
 export async function applyPlanningTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
 
   const parsed = applyTemplateSchema.safeParse({
     workId: formData.get("workId"),

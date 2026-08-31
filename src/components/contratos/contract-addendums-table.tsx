@@ -59,10 +59,12 @@ export function ContractAddendumsTable({
   addendums,
   workId,
   contractId,
+  canEdit = true,
 }: {
   addendums: AddendumRow[];
   workId: string;
   contractId: string;
+  canEdit?: boolean;
 }) {
   if (addendums.length === 0) {
     return (
@@ -114,7 +116,7 @@ export function ContractAddendumsTable({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <DeleteButton addendumId={addendum.id} workId={workId} contractId={contractId} />
+                {canEdit ? <DeleteButton addendumId={addendum.id} workId={workId} contractId={contractId} /> : null}
               </TableCell>
             </TableRow>
           ))}

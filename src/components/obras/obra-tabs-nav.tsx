@@ -15,13 +15,14 @@ const TABS = [
   { slug: "contratos", label: "Contratos" },
 ];
 
-export function ObraTabsNav({ workId }: { workId: string }) {
+export function ObraTabsNav({ workId, showContratos = true }: { workId: string; showContratos?: boolean }) {
   const pathname = usePathname();
+  const tabs = showContratos ? TABS : TABS.filter((tab) => tab.slug !== "contratos");
 
   return (
     <div className="w-fit max-w-full overflow-x-auto rounded-full bg-muted p-1">
       <div className="flex gap-1">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const href = `/obras/${workId}/${tab.slug}`;
           const isActive = pathname.startsWith(href);
           return (

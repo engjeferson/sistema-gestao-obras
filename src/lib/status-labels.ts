@@ -124,6 +124,11 @@ export function formatCurrencyBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
+/** Mesma formatação, mas esconde o valor de quem não tem permissão pra ver valores sensíveis. */
+export function formatCurrencyOrHidden(value: number, canSeeValues: boolean) {
+  return canSeeValues ? formatCurrencyBRL(value) : "—";
+}
+
 export function formatDateBR(date: Date | string) {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);

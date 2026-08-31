@@ -2,6 +2,7 @@ import { listStockMovements } from "@/server/actions/estoque";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listWorks } from "@/server/actions/obras";
 import { listStagesForAllWorks } from "@/server/actions/planejamento";
+import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
 import { EstoqueTabsNav } from "@/components/estoque/estoque-tabs-nav";
 import { StockMovementsFilters } from "@/components/estoque/stock-movements-filters";
 import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
@@ -26,11 +27,12 @@ export default async function EstoqueMovimentacoesPage({
     dataFim: params.dataFim || undefined,
   };
 
-  const [suppliers, works, stagesByWork, movements] = await Promise.all([
+  const [suppliers, works, stagesByWork, movements, canSeeValues] = await Promise.all([
     listSuppliers(),
     listWorks(),
     listStagesForAllWorks(),
     listStockMovements(filters),
+    getCurrentSensitiveValuesAccess(),
   ]);
   const movementsOptions = movements.map((m) => ({
     ...m,
@@ -57,7 +59,7 @@ export default async function EstoqueMovimentacoesPage({
 
       <StockMovementsFilters suppliers={suppliers.map((s) => ({ id: s.id, nome: s.nome }))} stages={stageOptions} />
 
-      <StockMovementsTable movements={movementsOptions} />
+      <StockMovementsTable movements={movementsOptions} canSeeValues={canSeeValues} />
     </div>
   );
 }

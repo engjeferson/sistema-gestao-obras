@@ -7,7 +7,11 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { FinancePermissionsFields } from "@/components/configuracoes/finance-permissions-fields";
 import { WorkAccessFields } from "@/components/configuracoes/work-access-fields";
+import { ModulePermissionsFields } from "@/components/configuracoes/module-permissions-fields";
+import { VisibilityPermissionsFields } from "@/components/configuracoes/visibility-permissions-fields";
 import type { FinancePermissions } from "@/lib/finance-permissions";
+import type { ModulePermissions } from "@/lib/module-permissions";
+import type { ReportPermissions } from "@/lib/report-permissions";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR: "Administrador",
@@ -23,6 +27,10 @@ export function UserEditForm({
   financePermissions,
   works,
   workAccess,
+  modulePermissions,
+  verValoresSensiveis,
+  verContratos,
+  reportPermissions,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues: { name: string; email: string; role: string };
@@ -30,6 +38,10 @@ export function UserEditForm({
   financePermissions: FinancePermissions;
   works: { id: string; nome: string; codigo: string }[];
   workAccess: { restringirObras: boolean; assignedWorkIds: string[] };
+  modulePermissions: ModulePermissions;
+  verValoresSensiveis: boolean;
+  verContratos: boolean;
+  reportPermissions: ReportPermissions;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
@@ -67,6 +79,12 @@ export function UserEditForm({
       </div>
       <FinancePermissionsFields categorias={categorias} defaultValues={financePermissions} />
       <WorkAccessFields works={works} defaultValues={workAccess} />
+      <ModulePermissionsFields defaultValues={modulePermissions} />
+      <VisibilityPermissionsFields
+        verValoresSensiveis={verValoresSensiveis}
+        verContratos={verContratos}
+        reportPermissions={reportPermissions}
+      />
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       <div>
         <Button type="submit" disabled={isPending}>

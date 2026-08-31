@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { supplierFormSchema } from "@/lib/validations/fornecedores";
 
 export async function listSuppliers() {
@@ -32,6 +33,7 @@ function parseSupplierForm(formData: FormData) {
 export async function createSupplier(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseSupplierForm(formData);
   if (!parsed.success) {
@@ -60,6 +62,7 @@ export async function createSupplier(_prevState: string | undefined, formData: F
 export async function updateSupplier(supplierId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseSupplierForm(formData);
   if (!parsed.success) {
@@ -89,6 +92,7 @@ export async function updateSupplier(supplierId: string, _prevState: string | un
 export async function toggleSupplierActive(supplierId: string, ativo: boolean) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   await prisma.supplier.update({ where: { id: supplierId }, data: { ativo } });
   revalidatePath("/cadastros/fornecedores");

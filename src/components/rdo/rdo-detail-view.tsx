@@ -17,7 +17,15 @@ const OCCURRENCE_LABELS: Record<string, string> = {
 
 type RdoWithRelations = NonNullable<Awaited<ReturnType<typeof getRdo>>>;
 
-export function RdoDetailView({ rdo, basePath }: { rdo: RdoWithRelations; basePath: string }) {
+export function RdoDetailView({
+  rdo,
+  basePath,
+  canEdit = true,
+}: {
+  rdo: RdoWithRelations;
+  basePath: string;
+  canEdit?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -29,14 +37,16 @@ export function RdoDetailView({ rdo, basePath }: { rdo: RdoWithRelations; basePa
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link href={`${basePath}/rdo/${rdo.id}/editar`} />}
-            nativeButton={false}
-          >
-            <Pencil /> Editar
-          </Button>
+          {canEdit ? (
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`${basePath}/rdo/${rdo.id}/editar`} />}
+              nativeButton={false}
+            >
+              <Pencil /> Editar
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"

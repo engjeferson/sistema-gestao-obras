@@ -8,6 +8,7 @@ import {
   type StageTreeNode,
 } from "@/server/actions/planejamento";
 import { listPlanningTemplates } from "@/server/actions/planejamento-templates";
+import { getCurrentModulePermissions } from "@/server/actions/permissions";
 import { PlanningEditor } from "@/components/planejamento/planning-editor";
 import { ApplyTemplatePicker } from "@/components/planejamento/apply-template-picker";
 import { SaveAsTemplateButton } from "@/components/planejamento/save-as-template-dialog";
@@ -44,10 +45,18 @@ function mapStage(stage: StageTreeNode): PlainStage {
 
 export default async function PlanejamentoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const stagesRaw = await listStagesWithTasks(id);
+  const [stagesRaw, modulePermissions] = await Promise.all([listStagesWithTasks(id), getCurrentModulePermissions()]);
   const stages = stagesRaw.map(mapStage);
+  const canEdit = !modulePermissions.planejamentoSomenteLeitura;
 
   if (stages.length === 0) {
+    if (!canEdit) {
+      return (
+        <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          Nenhuma etapa cadastrada ainda.
+        </p>
+      );
+    }
     const templates = await listPlanningTemplates();
     return (
       <div className="flex flex-col gap-6">
@@ -58,17 +67,19 @@ export default async function PlanejamentoPage({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <SaveAsTemplateButton workId={id} />
-        <Button
-          variant="outline"
-          size="sm"
-          render={<Link href={`/obras/${id}/planejamento/importar`} />}
-          nativeButton={false}
-        >
-          <Import /> Lançamento em bloco
-        </Button>
-      </div>
+      {canEdit ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <SaveAsTemplateButton workId={id} />
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link href={`/obras/${id}/planejamento/importar`} />}
+            nativeButton={false}
+          >
+            <Import /> Lançamento em bloco
+          </Button>
+        </div>
+      ) : null}
       <PlanningEditor
         stages={stages}
         workId={id}

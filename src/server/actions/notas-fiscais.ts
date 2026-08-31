@@ -8,7 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
 import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
-import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { getCurrentWorkAccess, assertModuleWrite } from "@/server/actions/permissions";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -51,6 +51,7 @@ export async function getInvoice(invoiceId: string) {
 export async function createInvoice(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("notasFiscaisSomenteLeitura");
 
   let itemsParsed: unknown;
   try {
@@ -148,6 +149,7 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
 export async function deleteInvoice(invoiceId: string, workId: string | null) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  await assertModuleWrite("notasFiscaisSomenteLeitura");
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },

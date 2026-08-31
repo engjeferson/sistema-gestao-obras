@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
+import { assertModuleWrite } from "@/server/actions/permissions";
 import { professionalFormSchema } from "@/lib/validations/profissionais";
 
 export async function listProfessionals() {
@@ -37,6 +38,7 @@ function parseProfessionalForm(formData: FormData) {
 export async function createProfessional(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseProfessionalForm(formData);
   if (!parsed.success) {
@@ -66,6 +68,7 @@ export async function updateProfessional(
 ) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   const parsed = parseProfessionalForm(formData);
   if (!parsed.success) {
@@ -92,6 +95,7 @@ export async function updateProfessional(
 export async function toggleProfessionalActive(professionalId: string, ativo: boolean) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
 
   await prisma.professional.update({ where: { id: professionalId }, data: { ativo } });
   revalidatePath("/cadastros/profissionais");

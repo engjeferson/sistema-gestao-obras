@@ -210,7 +210,7 @@ export function ObrasDashboard({
       ) : view === "grade" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((obra) => (
-            <ObraCard key={obra.id} obra={obra} />
+            <ObraCard key={obra.id} obra={obra} canSeeSaudeFinanceira={financePermissions.verSaudeFinanceiraObra} />
           ))}
         </div>
       ) : (

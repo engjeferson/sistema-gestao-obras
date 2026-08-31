@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listRdos } from "@/server/actions/rdo";
+import { getCurrentModulePermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDateBR } from "@/lib/status-labels";
 
 export default async function CampoRdoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const rdos = await listRdos(id);
+  const [rdos, modulePermissions] = await Promise.all([listRdos(id), getCurrentModulePermissions()]);
 
   return (
     <div className="flex flex-col gap-4">
-      <Button size="lg" className="w-full" render={<Link href={`/campo/obras/${id}/rdo/novo`} />} nativeButton={false}>
-        <Plus /> Novo RDO
-      </Button>
+      {!modulePermissions.rdoSomenteLeitura ? (
+        <Button size="lg" className="w-full" render={<Link href={`/campo/obras/${id}/rdo/novo`} />} nativeButton={false}>
+          <Plus /> Novo RDO
+        </Button>
+      ) : null}
 
       {rdos.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { getWork } from "@/server/actions/obras";
-import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { getCurrentWorkAccess, getCurrentContratosVisibility } from "@/server/actions/permissions";
 import { canAccessWork } from "@/lib/work-access";
 import { ObraTabsNav } from "@/components/obras/obra-tabs-nav";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,11 @@ export default async function ObraLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [work, workAccess] = await Promise.all([getWork(id), getCurrentWorkAccess()]);
+  const [work, workAccess, verContratos] = await Promise.all([
+    getWork(id),
+    getCurrentWorkAccess(),
+    getCurrentContratosVisibility(),
+  ]);
   if (!work || !canAccessWork(workAccess, id)) {
     notFound();
   }
@@ -39,7 +43,7 @@ export default async function ObraLayout({
           <Pencil /> Editar
         </Button>
       </div>
-      <ObraTabsNav workId={work.id} />
+      <ObraTabsNav workId={work.id} showContratos={verContratos} />
       {children}
     </div>
   );
