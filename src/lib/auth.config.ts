@@ -28,7 +28,7 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
 
-      if (pathname.startsWith("/login") || pathname.startsWith("/portal")) {
+      if (pathname.startsWith("/login") || pathname.startsWith("/portal") || pathname.startsWith("/instalar")) {
         return true;
       }
       if (!isLoggedIn) {

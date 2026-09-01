@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Download, Share, SquarePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -76,11 +77,17 @@ export function InstallAppHint() {
             <p className="mt-0.5 text-muted-foreground">
               Toque em <Share className="inline size-3.5 align-text-bottom" /> Compartilhar e depois em &quot;Adicionar à Tela de Início&quot;.
             </p>
+            <Link href="/instalar" className="mt-1 inline-block text-brand-teal-deep underline underline-offset-2">
+              Ver passo a passo
+            </Link>
           </>
         ) : (
           <>
             <p className="font-medium text-foreground">Instale o app do RDO neste celular</p>
             <p className="mt-0.5 text-muted-foreground">Use o menu do navegador e toque em &quot;Adicionar à tela inicial&quot;.</p>
+            <Link href="/instalar" className="mt-1 inline-block text-brand-teal-deep underline underline-offset-2">
+              Ver passo a passo
+            </Link>
           </>
         )}
       </div>
