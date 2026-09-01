@@ -204,11 +204,17 @@ export async function syncIncomingNFes(): Promise<string | undefined> {
  * Disparada automaticamente ao abrir a tela do Radar, para que a lista
  * fique em dia sem depender de clique manual. Silenciosa: erros e o
  * cooldown local são apenas ignorados, já que é uma tentativa de fundo.
+ *
+ * Chamada pelo cliente depois que a página já carregou (ver RadarAutoSync) —
+ * nunca pelo próprio carregamento da página. A consulta à SEFAZ pode levar
+ * bem mais que o timeout de uma função serverless, e travar o render nisso
+ * derrubava a tela inteira com erro na primeira visita do cooldown.
  */
-export async function autoSyncIncomingNFesIfDue(): Promise<void> {
+export async function autoSyncIncomingNFesIfDue(): Promise<boolean> {
   const session = await auth();
-  if (!session?.user) return;
-  await runIncomingNFeSync();
+  if (!session?.user) return false;
+  const result = await runIncomingNFeSync();
+  return result.status === "ok" && result.novos > 0;
 }
 
 export async function ignoreIncomingNFe(id: string) {

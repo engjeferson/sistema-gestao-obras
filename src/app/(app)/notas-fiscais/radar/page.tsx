@@ -1,10 +1,10 @@
 import {
   listIncomingNFes,
   countPendingIncomingNFes,
-  autoSyncIncomingNFesIfDue,
   type IncomingNFeFiltros,
 } from "@/server/actions/sefaz-radar";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
+import { RadarAutoSync } from "@/components/notas-fiscais/radar-auto-sync";
 import { IncomingNFeTable } from "@/components/notas-fiscais/incoming-nfe-table";
 import { RadarFilters } from "@/components/notas-fiscais/radar-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -35,8 +35,6 @@ export default async function RadarNFePage({
     nfeCompleta: nfeCompleta === "sim" || nfeCompleta === "nao" ? nfeCompleta : undefined,
   };
 
-  await autoSyncIncomingNFesIfDue();
-
   const [result, pendentes] = await Promise.all([
     listIncomingNFes(page, pageSize, filtros),
     countPendingIncomingNFes(),
@@ -66,6 +64,7 @@ export default async function RadarNFePage({
 
   return (
     <div className="flex flex-col">
+      <RadarAutoSync />
       <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Radar de NF-e</h1>
