@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, QrCode } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { InstallAppHint } from "@/components/campo/install-app-hint";
@@ -23,7 +23,16 @@ export default async function CampoLayout({ children }: { children: React.ReactN
           ) : null}
           <Image src="/brand/reis-logo-white.png" alt="Reis Engenharia" width={140} height={65} className="h-8 w-auto" priority />
         </div>
-        <LogoutButton className="text-white/70 hover:bg-white/10 hover:text-white" />
+        <div className="flex items-center gap-1">
+          <Link
+            href="/instalar"
+            className="flex size-8 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            title="Instalar app do RDO"
+          >
+            <QrCode className="size-4" />
+          </Link>
+          <LogoutButton className="text-white/70 hover:bg-white/10 hover:text-white" />
+        </div>
       </header>
       <main className="flex-1 p-4">
         <InstallAppHint />
