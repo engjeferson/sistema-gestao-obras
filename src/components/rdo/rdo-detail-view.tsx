@@ -85,7 +85,7 @@ export function RdoDetailView({
                 <p className="text-sm font-medium">
                   {a.planningTask
                     ? `${a.planningTask.stage.nome} — ${a.planningTask.nome}`
-                    : `${a.planningStage?.nome} (etapa completa)`}
+                    : a.planningStage?.nome}
                 </p>
                 {a.descricaoServico ? <p className="text-sm text-muted-foreground">{a.descricaoServico}</p> : null}
                 <p className="text-sm">

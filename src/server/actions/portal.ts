@@ -124,7 +124,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       atividades: rdo.activities.map((activity) => ({
         atividadeNome: activity.planningTask
           ? `${activity.planningTask.stage.nome} — ${activity.planningTask.nome}`
-          : `${activity.planningStage?.nome ?? ""} (etapa completa)`,
+          : (activity.planningStage?.nome ?? ""),
         descricaoServico: activity.descricaoServico,
         percentualAtual: Number(activity.percentualAtual),
       })),
