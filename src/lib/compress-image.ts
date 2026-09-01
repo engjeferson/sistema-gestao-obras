@@ -1,32 +1,28 @@
-const MAX_DIMENSION = 1920;
-const QUALITY = 0.8;
+import imageCompression from "browser-image-compression";
+
+const MAX_SIZE_MB = 0.5;
+const MAX_DIMENSION = 1600;
 
 // Redimensiona/recomprime fotos antes do upload (fotos de câmera de celular
 // costumam vir com vários MB e resoluções muito acima do que a tela mostra).
+// A biblioteca itera a qualidade até caber em MAX_SIZE_MB, mantendo a melhor
+// qualidade possível dentro desse limite.
 export async function compressImage(file: File): Promise<File> {
   if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
     return file;
   }
+  if (file.size <= MAX_SIZE_MB * 1024 * 1024) {
+    return file;
+  }
 
   try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
-    const width = Math.round(bitmap.width * scale);
-    const height = Math.round(bitmap.height * scale);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close();
-
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", QUALITY));
-    if (!blob || blob.size >= file.size) return file;
-
-    const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
-    return new File([blob], newName, { type: "image/jpeg" });
+    const compressed = await imageCompression(file, {
+      maxSizeMB: MAX_SIZE_MB,
+      maxWidthOrHeight: MAX_DIMENSION,
+      initialQuality: 0.8,
+      useWebWorker: true,
+    });
+    return compressed.size < file.size ? compressed : file;
   } catch {
     // Formato que o navegador não consegue decodificar (ex: alguns HEIC) — envia o original.
     return file;
