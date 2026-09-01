@@ -52,7 +52,7 @@ export async function listPlanningTasksForPicker(workId: string) {
             {
               id: stage.id,
               kind: "stage" as const,
-              nome: `${stage.nome} (etapa completa)`,
+              nome: stage.nome,
               percentualExecutado: Number(stage.percentualExecutado),
             },
           ];
