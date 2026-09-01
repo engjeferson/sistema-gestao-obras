@@ -207,7 +207,7 @@ export function RdoPdfDocument({ rdo, company, logoBase64, photosBase64, origin 
                             <Text style={styles.activityName}>{a.planningTask.nome}</Text>
                           </>
                         ) : (
-                          <Text style={styles.activityName}>{a.planningStage?.nome} (etapa completa)</Text>
+                          <Text style={styles.activityName}>{a.planningStage?.nome}</Text>
                         )}
                       </View>
                       <Text style={styles.percentBadge}>{atual.toFixed(0)}%</Text>
