@@ -217,7 +217,7 @@ export function PlanningTablePane({
   const augmented = withPendingRow(orderedRows, pending);
 
   return (
-    <div className="flex h-full flex-col text-sm">
+    <div className="flex flex-col text-sm">
       <div className="mb-1">
         <Button variant="outline" size="sm" onClick={() => startCreate("stage", null)} disabled={!!pending}>
           <Plus /> Etapa
@@ -240,7 +240,7 @@ export function PlanningTablePane({
         <span />
       </div>
 
-      <div className="flex-1 overflow-y-hidden">
+      <div>
         {augmented.map((row) =>
           row.type === "pending" ? (
             <PendingRowView
