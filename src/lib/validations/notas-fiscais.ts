@@ -1,13 +1,11 @@
 import { z } from "zod";
 
-export const unitOfMeasureValues = ["UN", "KG", "M", "M2", "M3", "SACO", "CAIXA", "LITRO"] as const;
-
 export const ESTOQUE_GERAL_VALUE = "__estoque_geral__";
 
 export const invoiceItemSchema = z.object({
   material: z.string().trim().min(1, "Informe o material."),
   quantidade: z.coerce.number().positive("Quantidade deve ser maior que zero."),
-  unidade: z.enum(unitOfMeasureValues),
+  unidade: z.string().trim().min(1, "Informe a unidade."),
   valorUnitario: z.coerce.number().nonnegative(),
 });
 

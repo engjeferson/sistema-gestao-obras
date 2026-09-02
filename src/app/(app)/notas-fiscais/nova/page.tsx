@@ -4,6 +4,7 @@ import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
 import { listStagesForAllWorks } from "@/server/actions/planejamento";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listActiveMaterials } from "@/server/actions/materiais";
+import { listActiveUnits } from "@/server/actions/unidades";
 import { createInvoice } from "@/server/actions/notas-fiscais";
 import { getIncomingNFeXml } from "@/server/actions/sefaz-radar";
 import { InvoiceForm } from "@/components/notas-fiscais/invoice-form";
@@ -14,19 +15,24 @@ export default async function NovaNotaFiscalPage({
   searchParams: Promise<{ workId?: string; radarId?: string }>;
 }) {
   const { workId, radarId } = await searchParams;
-  const [works, categorias, bankAccounts, stagesByWork, suppliers, materials, radarXml] = await Promise.all([
+  const [works, categorias, bankAccounts, stagesByWork, suppliers, materials, units, radarXml] = await Promise.all([
     listWorks(),
     listFinancialCategories(),
     listActiveBankAccounts(),
     listStagesForAllWorks(),
     listSuppliers(),
     listActiveMaterials(),
+    listActiveUnits(),
     radarId ? getIncomingNFeXml(radarId) : Promise.resolve(null),
   ]);
   const worksOptions = works.map((work) => ({ id: work.id, nome: work.nome, codigo: work.codigo }));
   const bankAccountsOptions = bankAccounts.map((account) => ({ id: account.id, nome: account.nome }));
   const supplierNames = suppliers.map((s) => s.nome);
-  const materialsOptions = materials.map((m) => ({ nome: m.nome, unidadePadrao: m.unidadePadrao }));
+  const materialsOptions = materials.map((m) => ({
+    nome: m.nome,
+    unidadePadrao: m.unidadePadrao,
+    precoUnitario: m.precoUnitario !== null ? Number(m.precoUnitario) : null,
+  }));
   const initialXml = radarXml && "xml" in radarXml ? radarXml.xml : undefined;
   const radarError = radarXml && "error" in radarXml ? radarXml.error : undefined;
   const initialSummary = radarXml && !initialXml ? (radarXml.resumo ?? undefined) : undefined;
@@ -45,6 +51,7 @@ export default async function NovaNotaFiscalPage({
         stagesByWork={stagesByWork}
         supplierNames={supplierNames}
         materials={materialsOptions}
+        units={units}
         defaultWorkId={workId}
         initialXml={initialXml}
         initialSummary={initialSummary}

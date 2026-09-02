@@ -2,31 +2,23 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { MaterialModel } from "@/generated/prisma/models";
 
-const UNIT_LABELS: Record<string, string> = {
-  UN: "un",
-  KG: "kg",
-  M: "m",
-  M2: "m²",
-  M3: "m³",
-  SACO: "saco",
-  CAIXA: "caixa",
-  LITRO: "litro",
-};
-
 export function MaterialForm({
   action,
   defaultValues,
   submitLabel,
+  units,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: Partial<MaterialModel>;
   submitLabel: string;
+  units: { sigla: string; nome: string | null }[];
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
 
@@ -41,12 +33,20 @@ export function MaterialForm({
           <Label htmlFor="unidadePadrao">Unidade padrão</Label>
           <NativeSelect id="unidadePadrao" name="unidadePadrao" defaultValue={defaultValues?.unidadePadrao ?? ""}>
             <option value="">—</option>
-            {Object.entries(UNIT_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {units.map((unit) => (
+              <option key={unit.sigla} value={unit.sigla}>
+                {unit.sigla}
               </option>
             ))}
           </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="precoUnitario">Preço unitário</Label>
+          <CurrencyInput
+            id="precoUnitario"
+            name="precoUnitario"
+            defaultValue={defaultValues?.precoUnitario !== null && defaultValues?.precoUnitario !== undefined ? Number(defaultValues.precoUnitario) : undefined}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="categoria">Categoria</Label>

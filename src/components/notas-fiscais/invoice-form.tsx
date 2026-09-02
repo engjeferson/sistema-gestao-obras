@@ -25,7 +25,8 @@ type InvoiceFormProps = {
   bankAccounts: { id: string; nome: string }[];
   stagesByWork: Record<string, StageOption[]>;
   supplierNames: string[];
-  materials: { nome: string; unidadePadrao: string | null }[];
+  materials: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
+  units: { sigla: string; nome: string | null }[];
   defaultWorkId?: string;
   initialXml?: string;
   initialSummary?: { numero: string | null; dataEmissao: string | null; fornecedorNome: string | null };
@@ -40,6 +41,7 @@ export function InvoiceForm({
   stagesByWork,
   supplierNames,
   materials,
+  units,
   defaultWorkId,
   initialXml,
   initialSummary,
@@ -47,7 +49,7 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [items, setItems] = useState<InvoiceItemValues[]>([
-    { material: "", quantidade: 1, unidade: "UN", valorUnitario: 0 },
+    { material: "", quantidade: 1, unidade: units[0]?.sigla ?? "", valorUnitario: 0 },
   ]);
   const [gerarContaPagar, setGerarContaPagar] = useState(false);
   const [parcelar, setParcelar] = useState(false);
@@ -304,7 +306,7 @@ export function InvoiceForm({
 
       <div className="flex flex-col gap-2">
         <Label>Itens da nota</Label>
-        <InvoiceItemsEditor items={items} onChange={setItems} materials={materials} />
+        <InvoiceItemsEditor items={items} onChange={setItems} materials={materials} units={units} />
 
         <div className="flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
           <div className="flex flex-col gap-1">
@@ -467,6 +469,7 @@ export function InvoiceForm({
       open={pendingXmlItems !== null}
       items={pendingXmlItems ?? []}
       materials={materials}
+      units={units}
       onCancel={() => setPendingXmlItems(null)}
       onConfirm={(resolved) => {
         setItems(resolved);

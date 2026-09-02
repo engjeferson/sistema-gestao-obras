@@ -23,6 +23,7 @@ function parseMaterialForm(formData: FormData) {
   return materialFormSchema.safeParse({
     nome: formData.get("nome"),
     unidadePadrao: formData.get("unidadePadrao") ?? "",
+    precoUnitario: formData.get("precoUnitario") || undefined,
     categoria: formData.get("categoria") ?? undefined,
     observacoes: formData.get("observacoes") ?? undefined,
   });
@@ -47,6 +48,7 @@ export async function createMaterial(_prevState: string | undefined, formData: F
     data: {
       nome: data.nome,
       unidadePadrao: data.unidadePadrao,
+      precoUnitario: data.precoUnitario ?? null,
       categoria: data.categoria || null,
       observacoes: data.observacoes || null,
     },
@@ -71,6 +73,7 @@ export async function updateMaterial(materialId: string, _prevState: string | un
     data: {
       nome: data.nome,
       unidadePadrao: data.unidadePadrao,
+      precoUnitario: data.precoUnitario ?? null,
       categoria: data.categoria || null,
       observacoes: data.observacoes || null,
     },

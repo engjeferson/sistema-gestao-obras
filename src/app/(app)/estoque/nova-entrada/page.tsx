@@ -14,7 +14,11 @@ export default async function NovaEntradaPage({
     listWorks(),
     listStagesForAllWorks(),
   ]);
-  const materialsOptions = materials.map((m) => ({ id: m.id, nome: m.nome }));
+  const materialsOptions = materials.map((m) => ({
+    id: m.id,
+    nome: m.nome,
+    precoUnitario: m.precoUnitario !== null ? Number(m.precoUnitario) : null,
+  }));
   const worksOptions = works.map((w) => ({ id: w.id, nome: w.nome, codigo: w.codigo }));
 
   return (

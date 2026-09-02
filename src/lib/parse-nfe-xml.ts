@@ -15,40 +15,40 @@ export type ParsedNFe = {
   valorFrete: number;
 };
 
-const UNIT_MAP: Record<string, InvoiceItemValues["unidade"]> = {
-  UN: "UN",
-  UND: "UN",
-  UNID: "UN",
-  UNIDADE: "UN",
-  PC: "UN",
-  PCT: "UN",
-  PECA: "UN",
-  CJ: "UN",
-  PAR: "UN",
-  ROL: "UN",
-  KG: "KG",
-  KGM: "KG",
-  G: "KG",
-  GR: "KG",
-  M: "M",
-  MT: "M",
-  MTS: "M",
-  M2: "M2",
-  M3: "M3",
-  CX: "CAIXA",
-  CXA: "CAIXA",
-  CAIXA: "CAIXA",
-  SC: "SACO",
-  SAC: "SACO",
-  SACO: "SACO",
-  L: "LITRO",
-  LT: "LITRO",
-  LITRO: "LITRO",
+const UNIT_MAP: Record<string, string> = {
+  UN: "un",
+  UND: "un",
+  UNID: "un",
+  UNIDADE: "un",
+  PC: "un",
+  PCT: "un",
+  PECA: "un",
+  CJ: "un",
+  PAR: "un",
+  ROL: "un",
+  KG: "kg",
+  KGM: "kg",
+  G: "kg",
+  GR: "kg",
+  M: "m",
+  MT: "m",
+  MTS: "m",
+  M2: "m²",
+  M3: "m³",
+  CX: "caixa",
+  CXA: "caixa",
+  CAIXA: "caixa",
+  SC: "saco",
+  SAC: "saco",
+  SACO: "saco",
+  L: "litro",
+  LT: "litro",
+  LITRO: "litro",
 };
 
-function mapUnidade(uCom: string | null): InvoiceItemValues["unidade"] {
-  if (!uCom) return "UN";
-  return UNIT_MAP[uCom.trim().toUpperCase()] ?? "UN";
+function mapUnidade(uCom: string | null): string {
+  if (!uCom) return "un";
+  return UNIT_MAP[uCom.trim().toUpperCase()] ?? "un";
 }
 
 function text(el: Element | null): string | null {
