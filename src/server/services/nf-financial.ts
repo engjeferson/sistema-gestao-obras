@@ -10,11 +10,17 @@ async function findOrCreateSupplierId(nome: string) {
   return created.id;
 }
 
-async function findOrCreateMaterialId(nome: string, unidadePadrao: InvoiceFormValues["items"][number]["unidade"]) {
+async function findOrCreateMaterialId(
+  nome: string,
+  unidadePadrao: InvoiceFormValues["items"][number]["unidade"],
+  precoUnitario: number,
+) {
   const trimmed = nome.trim();
   const existing = await prisma.material.findUnique({ where: { nome: trimmed } });
   if (existing) return existing.id;
-  const created = await prisma.material.create({ data: { nome: trimmed, unidadePadrao } });
+  const created = await prisma.material.create({
+    data: { nome: trimmed, unidadePadrao, precoUnitario: precoUnitario > 0 ? precoUnitario : null },
+  });
   return created.id;
 }
 
@@ -36,7 +42,7 @@ export async function createInvoiceWithFinancialEntry(
   // interativa estourava o timeout padrão de 5s em notas com vários itens.
   const materialIds: string[] = [];
   for (const item of data.items) {
-    materialIds.push(await findOrCreateMaterialId(item.material, item.unidade));
+    materialIds.push(await findOrCreateMaterialId(item.material, item.unidade, item.valorUnitario));
   }
 
   return prisma.$transaction(async (tx) => {

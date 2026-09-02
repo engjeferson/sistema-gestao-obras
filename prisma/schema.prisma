@@ -255,6 +255,7 @@ model Material {
   id            String         @id @default(cuid())
   nome          String
   unidadePadrao UnitOfMeasure?
+  precoUnitario Decimal?       @db.Decimal(12, 2)
   categoria     String?
   observacoes   String?
   ativo         Boolean        @default(true)

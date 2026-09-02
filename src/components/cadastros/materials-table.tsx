@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toggleMaterialActive } from "@/server/actions/materiais";
+import { formatCurrencyOrHidden } from "@/lib/status-labels";
 
 const UNIT_LABELS: Record<string, string> = {
   UN: "un",
@@ -23,6 +24,7 @@ type MaterialRow = {
   id: string;
   nome: string;
   unidadePadrao: string | null;
+  precoUnitario: number | null;
   categoria: string | null;
   ativo: boolean;
 };
@@ -48,7 +50,7 @@ function ToggleButton({ material }: { material: MaterialRow }) {
   );
 }
 
-export function MaterialsTable({ materials }: { materials: MaterialRow[] }) {
+export function MaterialsTable({ materials, canSeeValues }: { materials: MaterialRow[]; canSeeValues: boolean }) {
   if (materials.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -64,6 +66,7 @@ export function MaterialsTable({ materials }: { materials: MaterialRow[] }) {
           <TableRow>
             <TableHead>Nome</TableHead>
             <TableHead>Unidade padrão</TableHead>
+            <TableHead>Preço unitário</TableHead>
             <TableHead>Categoria</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Ações</TableHead>
@@ -78,9 +81,12 @@ export function MaterialsTable({ materials }: { materials: MaterialRow[] }) {
                 </Link>
               </TableCell>
               <TableCell>{material.unidadePadrao ? UNIT_LABELS[material.unidadePadrao] : "—"}</TableCell>
+              <TableCell>
+                {material.precoUnitario !== null ? formatCurrencyOrHidden(material.precoUnitario, canSeeValues) : "—"}
+              </TableCell>
               <TableCell>{material.categoria ?? "—"}</TableCell>
               <TableCell>
-                <Badge variant={material.ativo ? "success" : "secondary"}>
+                <Badge variant={material.ativo ? "success" : "destructive"}>
                   {material.ativo ? "Ativo" : "Inativo"}
                 </Badge>
               </TableCell>

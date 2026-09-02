@@ -30,7 +30,7 @@ export function InvoiceItemsEditor({
 }: {
   items: InvoiceItemValues[];
   onChange: (items: InvoiceItemValues[]) => void;
-  materials?: { nome: string; unidadePadrao: string | null }[];
+  materials?: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
 }) {
   const materialByName = new Map(materials.map((m) => [m.nome, m]));
   const materialByNormalized = new Map(materials.map((m) => [normalizeSearch(m.nome), m]));
@@ -44,17 +44,20 @@ export function InvoiceItemsEditor({
 
   function handleMaterialChange(index: number, nome: string) {
     const known = materialByName.get(nome);
-    if (known?.unidadePadrao) {
-      updateItem(index, { material: nome, unidade: known.unidadePadrao as InvoiceItemValues["unidade"] });
-    } else {
-      updateItem(index, { material: nome });
-    }
+    const current = items[index];
+    updateItem(index, {
+      material: nome,
+      ...(known?.unidadePadrao ? { unidade: known.unidadePadrao as InvoiceItemValues["unidade"] } : {}),
+      ...(known?.precoUnitario && !current.valorUnitario ? { valorUnitario: known.precoUnitario } : {}),
+    });
   }
 
-  function acceptSuggestion(index: number, material: { nome: string; unidadePadrao: string | null }) {
+  function acceptSuggestion(index: number, material: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }) {
+    const current = items[index];
     updateItem(index, {
       material: material.nome,
       ...(material.unidadePadrao ? { unidade: material.unidadePadrao as InvoiceItemValues["unidade"] } : {}),
+      ...(material.precoUnitario && !current.valorUnitario ? { valorUnitario: material.precoUnitario } : {}),
     });
   }
 

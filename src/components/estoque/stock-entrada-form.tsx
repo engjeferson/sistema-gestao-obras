@@ -17,7 +17,7 @@ export function StockEntradaForm({
   stagesByWork,
   defaultWorkId,
 }: {
-  materials: { id: string; nome: string }[];
+  materials: { id: string; nome: string; precoUnitario: number | null }[];
   works: { id: string; nome: string; codigo: string }[];
   stagesByWork: Record<string, StageOption[]>;
   defaultWorkId?: string;
@@ -25,15 +25,29 @@ export function StockEntradaForm({
   const [errorMessage, formAction, isPending] = useActionState(createStockEntrada, undefined);
   const [destinoWorkId, setDestinoWorkId] = useState(defaultWorkId ?? "");
   const [stageId, setStageId] = useState("");
+  const [materialId, setMaterialId] = useState("");
+  const [valorUnitario, setValorUnitario] = useState(0);
   const stagesForWork = stagesByWork[destinoWorkId] ?? [];
   const tasksForStage = stagesForWork.find((s) => s.id === stageId)?.tasks ?? [];
+
+  function handleMaterialChange(id: string) {
+    setMaterialId(id);
+    const material = materials.find((m) => m.id === id);
+    setValorUnitario(material?.precoUnitario ?? 0);
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="materialId">Material</Label>
-          <NativeSelect id="materialId" name="materialId" defaultValue="" required>
+          <NativeSelect
+            id="materialId"
+            name="materialId"
+            value={materialId}
+            onChange={(e) => handleMaterialChange(e.target.value)}
+            required
+          >
             <option value="" disabled>
               Selecione o material
             </option>
@@ -100,7 +114,12 @@ export function StockEntradaForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="valorUnitario">Valor unitário</Label>
-          <CurrencyInput id="valorUnitario" name="valorUnitario" />
+          <CurrencyInput
+            id="valorUnitario"
+            name="valorUnitario"
+            value={valorUnitario}
+            onValueChange={setValorUnitario}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="data">Data</Label>

@@ -26,7 +26,11 @@ export default async function NovaNotaFiscalPage({
   const worksOptions = works.map((work) => ({ id: work.id, nome: work.nome, codigo: work.codigo }));
   const bankAccountsOptions = bankAccounts.map((account) => ({ id: account.id, nome: account.nome }));
   const supplierNames = suppliers.map((s) => s.nome);
-  const materialsOptions = materials.map((m) => ({ nome: m.nome, unidadePadrao: m.unidadePadrao }));
+  const materialsOptions = materials.map((m) => ({
+    nome: m.nome,
+    unidadePadrao: m.unidadePadrao,
+    precoUnitario: m.precoUnitario !== null ? Number(m.precoUnitario) : null,
+  }));
   const initialXml = radarXml && "xml" in radarXml ? radarXml.xml : undefined;
   const radarError = radarXml && "error" in radarXml ? radarXml.error : undefined;
   const initialSummary = radarXml && !initialXml ? (radarXml.resumo ?? undefined) : undefined;

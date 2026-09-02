@@ -25,7 +25,7 @@ type InvoiceFormProps = {
   bankAccounts: { id: string; nome: string }[];
   stagesByWork: Record<string, StageOption[]>;
   supplierNames: string[];
-  materials: { nome: string; unidadePadrao: string | null }[];
+  materials: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
   defaultWorkId?: string;
   initialXml?: string;
   initialSummary?: { numero: string | null; dataEmissao: string | null; fornecedorNome: string | null };

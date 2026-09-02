@@ -9,11 +9,12 @@ type MaterialRow = {
   id: string;
   nome: string;
   unidadePadrao: string | null;
+  precoUnitario: number | null;
   categoria: string | null;
   ativo: boolean;
 };
 
-export function MaterialsSearchList({ materials }: { materials: MaterialRow[] }) {
+export function MaterialsSearchList({ materials, canSeeValues }: { materials: MaterialRow[]; canSeeValues: boolean }) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -33,7 +34,7 @@ export function MaterialsSearchList({ materials }: { materials: MaterialRow[] })
         resultCount={filtered.length}
         totalCount={materials.length}
       />
-      <MaterialsTable materials={filtered} />
+      <MaterialsTable materials={filtered} canSeeValues={canSeeValues} />
     </div>
   );
 }

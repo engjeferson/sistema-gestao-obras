@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,14 @@ export function MaterialForm({
               </option>
             ))}
           </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="precoUnitario">Preço unitário</Label>
+          <CurrencyInput
+            id="precoUnitario"
+            name="precoUnitario"
+            defaultValue={defaultValues?.precoUnitario !== null && defaultValues?.precoUnitario !== undefined ? Number(defaultValues.precoUnitario) : undefined}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="categoria">Categoria</Label>
