@@ -10,27 +10,16 @@ import { formatCurrencyBRL } from "@/lib/status-labels";
 import { findSimilarMaterial, normalizeSearch } from "@/lib/text";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
-const UNIT_LABELS: Record<string, string> = {
-  UN: "un",
-  KG: "kg",
-  M: "m",
-  M2: "m²",
-  M3: "m³",
-  SACO: "saco",
-  CAIXA: "caixa",
-  LITRO: "litro",
-};
-
-const EMPTY_ITEM: InvoiceItemValues = { material: "", quantidade: 0, unidade: "UN", valorUnitario: 0 };
-
 export function InvoiceItemsEditor({
   items,
   onChange,
   materials = [],
+  units,
 }: {
   items: InvoiceItemValues[];
   onChange: (items: InvoiceItemValues[]) => void;
   materials?: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
+  units: { sigla: string; nome: string | null }[];
 }) {
   const materialByName = new Map(materials.map((m) => [m.nome, m]));
   const materialByNormalized = new Map(materials.map((m) => [normalizeSearch(m.nome), m]));
@@ -70,7 +59,7 @@ export function InvoiceItemsEditor({
   }
 
   function addItem() {
-    onChange([...items, { ...EMPTY_ITEM }]);
+    onChange([...items, { material: "", quantidade: 0, unidade: units[0]?.sigla ?? "", valorUnitario: 0 }]);
   }
 
   const total = items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
@@ -157,11 +146,11 @@ export function InvoiceItemsEditor({
                 <td className="p-2">
                   <NativeSelect
                     value={item.unidade}
-                    onChange={(e) => updateItem(index, { unidade: e.target.value as InvoiceItemValues["unidade"] })}
+                    onChange={(e) => updateItem(index, { unidade: e.target.value })}
                   >
-                    {Object.entries(UNIT_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
+                    {units.map((unit) => (
+                      <option key={unit.sigla} value={unit.sigla}>
+                        {unit.sigla}
                       </option>
                     ))}
                   </NativeSelect>

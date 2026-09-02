@@ -8,16 +8,18 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createBudgetItem } from "@/server/actions/orcamento";
 import { costTypeValues } from "@/lib/validations/orcamento";
-import { COST_TYPE_LABELS, UNIT_LABELS } from "@/lib/status-labels";
+import { COST_TYPE_LABELS } from "@/lib/status-labels";
 
 export function AddBudgetItemForm({
   workId,
   taskId,
   stageId,
+  units,
 }: {
   workId: string;
   taskId?: string;
   stageId?: string;
+  units: { sigla: string; nome: string | null }[];
 }) {
   const [open, setOpen] = useState(false);
   const [errorMessage, formAction, isPending] = useActionState(createBudgetItem, undefined);
@@ -53,9 +55,9 @@ export function AddBudgetItemForm({
         <label className="text-xs text-muted-foreground">Unidade</label>
         <NativeSelect name="unidade" defaultValue="" className="w-24">
           <option value="">—</option>
-          {Object.entries(UNIT_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
+          {units.map((unit) => (
+            <option key={unit.sigla} value={unit.sigla}>
+              {unit.sigla}
             </option>
           ))}
         </NativeSelect>

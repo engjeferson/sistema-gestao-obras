@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { unitOfMeasureValues } from "@/lib/validations/notas-fiscais";
 
 export const costTypeValues = [
   "MATERIAL",
@@ -19,7 +18,7 @@ export const budgetItemFormSchema = z
     codigo: z.string().trim().optional(),
     descricao: z.string().trim().optional(),
     tipoCusto: z.enum(costTypeValues),
-    unidade: z.enum(unitOfMeasureValues).optional().or(z.literal("").transform(() => undefined)),
+    unidade: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
     quantidadePrevista: z.coerce.number().positive().optional().or(z.literal("").transform(() => undefined)),
     valorUnitarioPrevisto: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),
     valorTotalPrevisto: z.coerce.number().nonnegative().optional().or(z.literal("").transform(() => undefined)),

@@ -6,24 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { UNIT_LABELS } from "@/lib/status-labels";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
 export function XmlItemsReviewDialog({
   open,
   items,
   materials,
+  units,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
   items: InvoiceItemValues[];
   materials: { nome: string; unidadePadrao: string | null }[];
+  units: { sigla: string; nome: string | null }[];
   onCancel: () => void;
   onConfirm: (items: InvoiceItemValues[]) => void;
 }) {
   const [overrides, setOverrides] = useState<Record<number, string>>({});
-  const [unidades, setUnidades] = useState<Record<number, InvoiceItemValues["unidade"]>>({});
+  const [unidades, setUnidades] = useState<Record<number, string>>({});
   const [filtro, setFiltro] = useState("");
 
   useEffect(() => {
@@ -107,13 +108,13 @@ export function XmlItemsReviewDialog({
                           onChange={(e) =>
                             setUnidades((prev) => ({
                               ...prev,
-                              [index]: e.target.value as InvoiceItemValues["unidade"],
+                              [index]: e.target.value,
                             }))
                           }
                         >
-                          {Object.entries(UNIT_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
+                          {units.map((unit) => (
+                            <option key={unit.sigla} value={unit.sigla}>
+                              {unit.sigla}
                             </option>
                           ))}
                         </NativeSelect>

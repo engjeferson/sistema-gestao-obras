@@ -9,17 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toggleMaterialActive } from "@/server/actions/materiais";
 import { formatCurrencyOrHidden } from "@/lib/status-labels";
 
-const UNIT_LABELS: Record<string, string> = {
-  UN: "un",
-  KG: "kg",
-  M: "m",
-  M2: "m²",
-  M3: "m³",
-  SACO: "saco",
-  CAIXA: "caixa",
-  LITRO: "litro",
-};
-
 type MaterialRow = {
   id: string;
   nome: string;
@@ -80,7 +69,7 @@ export function MaterialsTable({ materials, canSeeValues }: { materials: Materia
                   {material.nome}
                 </Link>
               </TableCell>
-              <TableCell>{material.unidadePadrao ? UNIT_LABELS[material.unidadePadrao] : "—"}</TableCell>
+              <TableCell>{material.unidadePadrao ?? "—"}</TableCell>
               <TableCell>
                 {material.precoUnitario !== null ? formatCurrencyOrHidden(material.precoUnitario, canSeeValues) : "—"}
               </TableCell>

@@ -5,7 +5,7 @@ import { getMaterialStockDetail } from "@/server/actions/estoque";
 import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { StockMovementsTable } from "@/components/estoque/stock-movements-table";
-import { UNIT_LABELS, formatCurrencyOrHidden } from "@/lib/status-labels";
+import { formatCurrencyOrHidden } from "@/lib/status-labels";
 
 export default async function MaterialStockDetailPage({
   params,
@@ -41,7 +41,7 @@ export default async function MaterialStockDetailPage({
         </Link>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{material.nome}</h1>
         <p className="text-muted-foreground">
-          {material.unidadePadrao ? UNIT_LABELS[material.unidadePadrao] : "—"} · Histórico completo de movimentações
+          {material.unidadePadrao ?? "—"} · Histórico completo de movimentações
         </p>
       </div>
 

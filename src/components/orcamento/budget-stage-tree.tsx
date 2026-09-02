@@ -1,6 +1,6 @@
 import { AddBudgetItemForm } from "@/components/orcamento/add-budget-item-form";
 import { DeleteBudgetItemButton } from "@/components/orcamento/delete-budget-item-button";
-import { COST_TYPE_LABELS, UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { COST_TYPE_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 import { sumBudgetItems } from "@/lib/budget";
 
 export type PlainBudgetItem = {
@@ -53,7 +53,7 @@ function BudgetItemsTable({ items, workId }: { items: PlainBudgetItem[]; workId:
               <td className="p-2">{COST_TYPE_LABELS[item.tipoCusto]}</td>
               <td className="p-2">{item.descricao ?? "—"}</td>
               <td className="p-2">{item.quantidadePrevista ?? "—"}</td>
-              <td className="p-2">{item.unidade ? UNIT_LABELS[item.unidade] : "—"}</td>
+              <td className="p-2">{item.unidade ?? "—"}</td>
               <td className="p-2">
                 {item.valorUnitarioPrevisto !== null ? formatCurrencyBRL(item.valorUnitarioPrevisto) : "—"}
               </td>
@@ -69,7 +69,15 @@ function BudgetItemsTable({ items, workId }: { items: PlainBudgetItem[]; workId:
   );
 }
 
-export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]; workId: string }) {
+export function BudgetStageTree({
+  stages,
+  workId,
+  units,
+}: {
+  stages: PlainBudgetStage[];
+  workId: string;
+  units: { sigla: string; nome: string | null }[];
+}) {
   if (stages.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
@@ -104,7 +112,7 @@ export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]
               {stage.stageItems.length > 0 ? (
                 <BudgetItemsTable items={stage.stageItems} workId={workId} />
               ) : null}
-              <AddBudgetItemForm workId={workId} stageId={stage.id} />
+              <AddBudgetItemForm workId={workId} stageId={stage.id} units={units} />
             </div>
 
             {stage.tasks.length === 0 ? (
@@ -122,7 +130,7 @@ export function BudgetStageTree({ stages, workId }: { stages: PlainBudgetStage[]
                     <p className="text-sm font-medium">{formatCurrencyBRL(task.totalOrcado)}</p>
                   </div>
                   {task.items.length > 0 ? <BudgetItemsTable items={task.items} workId={workId} /> : null}
-                  <AddBudgetItemForm workId={workId} taskId={task.id} />
+                  <AddBudgetItemForm workId={workId} taskId={task.id} units={units} />
                 </div>
               ))
             )}

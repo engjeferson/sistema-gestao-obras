@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UNIT_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { formatCurrencyBRL } from "@/lib/status-labels";
 
 export type BalanceRow = {
   materialId: string;
@@ -41,7 +41,7 @@ export function StockBalanceTable({ balances }: { balances: BalanceRow[] }) {
                   {row.materialNome}
                 </Link>
               </TableCell>
-              <TableCell>{row.unidade ? UNIT_LABELS[row.unidade] : "—"}</TableCell>
+              <TableCell>{row.unidade ?? "—"}</TableCell>
               <TableCell className={row.saldo < 0 ? "text-destructive" : ""}>{row.saldo}</TableCell>
               <TableCell>{formatCurrencyBRL(row.valorTotal)}</TableCell>
             </TableRow>

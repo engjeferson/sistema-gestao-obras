@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Tags, Building2, HardHat } from "lucide-react";
+import { Users, Tags, Building2, HardHat, Ruler } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ConfiguracoesPage() {
@@ -36,6 +36,17 @@ export default function ConfiguracoesPage() {
               <div>
                 <CardTitle>Tipos de profissional</CardTitle>
                 <CardDescription>Engenheiro, empreiteiro, encarregado etc.</CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/configuracoes/unidades">
+          <Card className="transition-colors hover:bg-accent/50">
+            <CardHeader className="flex flex-row items-center gap-3">
+              <Ruler className="size-5" />
+              <div>
+                <CardTitle>Unidades de medida</CardTitle>
+                <CardDescription>un, kg, m³, saco... usadas em Materiais, NF e Orçamento</CardDescription>
               </div>
             </CardHeader>
           </Card>

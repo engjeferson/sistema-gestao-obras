@@ -42,17 +42,6 @@ enum PaymentMethod {
   OUTROS
 }
 
-enum UnitOfMeasure {
-  UN
-  KG
-  M
-  M2
-  M3
-  SACO
-  CAIXA
-  LITRO
-}
-
 enum ContractType {
   CONTRATO_CLIENTE
   EMPREITADA
@@ -254,7 +243,7 @@ model Supplier {
 model Material {
   id            String         @id @default(cuid())
   nome          String
-  unidadePadrao UnitOfMeasure?
+  unidadePadrao String?
   precoUnitario Decimal?       @db.Decimal(12, 2)
   categoria     String?
   observacoes   String?
@@ -293,6 +282,20 @@ model ProfessionalType {
   ativo Boolean @default(true)
 
   professionals Professional[]
+}
+
+// Catálogo de unidades de medida (un, kg, m³...), editável em Configurações.
+// `unidadePadrao`/`unidade` em Material/InvoiceItem/BudgetItem guardam o texto
+// (`sigla`) diretamente, não uma chave estrangeira — mesmo padrão já usado em
+// `Material.categoria` e `InvoiceItem.material`: livre, mas alimentado por este
+// catálogo nos formulários.
+model Unit {
+  id        String   @id @default(cuid())
+  sigla     String   @unique
+  nome      String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model FinancialCategory {
@@ -458,7 +461,7 @@ model InvoiceItem {
   materialId    String?
   material      String
   quantidade    Decimal       @db.Decimal(12, 3)
-  unidade       UnitOfMeasure
+  unidade       String
   valorUnitario Decimal       @db.Decimal(14, 2)
   valorTotal    Decimal       @db.Decimal(14, 2)
 
@@ -714,7 +717,7 @@ model BudgetItem {
   codigo                String?
   descricao             String?
   tipoCusto             CostType
-  unidade               UnitOfMeasure?
+  unidade               String?
   quantidadePrevista    Decimal?       @db.Decimal(12, 3)
   valorUnitarioPrevisto Decimal?       @db.Decimal(14, 2)
   valorTotalPrevisto    Decimal        @db.Decimal(14, 2)
