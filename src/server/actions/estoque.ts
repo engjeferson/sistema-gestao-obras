@@ -404,6 +404,53 @@ export async function getStockTransferByGrupoId(grupoId: string) {
   };
 }
 
+export type MaterialCostBreakdown = {
+  totalByWork: Map<string, number>;
+  totalByStage: Map<string, number>;
+  totalByTask: Map<string, number>;
+};
+
+/**
+ * Custo de material por obra/etapa/atividade a partir do estoque (mesma
+ * lógica de valorização da Apropriação: soma quantidade × valorUnitario de
+ * toda movimentação — entrada, saída ou transferência — que toca aquela
+ * obra, sem líquido entre elas). Usado como fonte única do "custo de
+ * material" em todo lugar que mostra custo/realizado de obra, pra não
+ * depender só do lançamento financeiro (que não existe numa transferência,
+ * já que ela não representa dinheiro novo saindo).
+ */
+export async function getMaterialCostBreakdown(workIds: string[]): Promise<MaterialCostBreakdown> {
+  const totalByWork = new Map<string, number>();
+  const totalByStage = new Map<string, number>();
+  const totalByTask = new Map<string, number>();
+  if (workIds.length === 0) {
+    return { totalByWork, totalByStage, totalByTask };
+  }
+
+  const movements = await prisma.stockMovement.findMany({
+    where: { OR: [{ origemWorkId: { in: workIds } }, { destinoWorkId: { in: workIds } }] },
+    select: { origemWorkId: true, destinoWorkId: true, stageId: true, taskId: true, quantidade: true, valorUnitario: true },
+  });
+
+  const workIdSet = new Set(workIds);
+  for (const m of movements) {
+    const valor = Number(m.quantidade) * Number(m.valorUnitario ?? 0);
+    const workIdsTocados = new Set(
+      [m.origemWorkId, m.destinoWorkId].filter((id): id is string => !!id && workIdSet.has(id)),
+    );
+    for (const workId of workIdsTocados) {
+      totalByWork.set(workId, (totalByWork.get(workId) ?? 0) + valor);
+    }
+    if (m.taskId) {
+      totalByTask.set(m.taskId, (totalByTask.get(m.taskId) ?? 0) + valor);
+    } else if (m.stageId) {
+      totalByStage.set(m.stageId, (totalByStage.get(m.stageId) ?? 0) + valor);
+    }
+  }
+
+  return { totalByWork, totalByStage, totalByTask };
+}
+
 export type AppropriationMaterial = {
   materialId: string;
   nome: string;

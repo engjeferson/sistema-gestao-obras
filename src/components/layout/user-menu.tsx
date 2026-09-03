@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -35,12 +36,14 @@ export function UserMenu({ name, role }: { name: string; role: Role }) {
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>
-          <div className="flex flex-col">
-            <span className="font-medium text-foreground">{name}</span>
-            <span className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>
-          </div>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <div className="flex flex-col">
+              <span className="font-medium text-foreground">{name}</span>
+              <span className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => logout()}>
           <LogOut className="size-4" />

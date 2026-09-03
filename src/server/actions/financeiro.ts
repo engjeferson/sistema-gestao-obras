@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { getMaterialCostBreakdown } from "@/server/actions/estoque";
 import { calcularVencimentoFatura } from "@/lib/fatura-cartao";
 import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
@@ -287,16 +288,31 @@ export async function getWorkFinancialSummary(workId: string) {
   const work = await prisma.work.findUnique({ where: { id: workId } });
   if (!work) return null;
 
-  const [gastoAgg, recebidoAgg] = await Promise.all([
-    prisma.financialTransaction.aggregate({ where: { workId, tipo: "PAGAR" }, _sum: { valor: true } }),
+  const materialCategoria = await prisma.financialCategory.findFirst({
+    where: { nome: "Material" },
+    select: { id: true },
+  });
+
+  const [gastoNaoMaterialAgg, recebidoAgg, materialCosts] = await Promise.all([
+    prisma.financialTransaction.aggregate({
+      where: {
+        workId,
+        tipo: "PAGAR",
+        ...(materialCategoria ? { categoriaId: { not: materialCategoria.id } } : {}),
+      },
+      _sum: { valor: true },
+    }),
     prisma.financialTransaction.aggregate({
       where: { workId, tipo: "RECEBER", status: "PAGO" },
       _sum: { valor: true },
     }),
+    getMaterialCostBreakdown([workId]),
   ]);
 
   const contrato = Number(work.valorContrato);
-  const gasto = Number(gastoAgg._sum.valor ?? 0);
+  // Igual custoTotal do dashboard: lançamentos não-material + material via estoque, pra
+  // uma transferência de material entre obras entrar no gasto mesmo sem gerar conta nova.
+  const gasto = Number(gastoNaoMaterialAgg._sum.valor ?? 0) + (materialCosts.totalByWork.get(workId) ?? 0);
   const recebido = Number(recebidoAgg._sum.valor ?? 0);
   const saldo = contrato - gasto;
 
