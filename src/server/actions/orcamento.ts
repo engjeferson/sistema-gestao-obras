@@ -20,9 +20,10 @@ import {
 } from "@/lib/budget";
 import { budgetItemFormSchema } from "@/lib/validations/orcamento";
 import { formatCurrencyBRL } from "@/lib/status-labels";
+import { getMaterialCostBreakdown } from "@/server/actions/estoque";
 
 export async function getBudgetVsActualByStage(workId: string) {
-  const [stages, budgetItems, transactions, categorias] = await Promise.all([
+  const [stages, budgetItems, transactions, categorias, materialCosts] = await Promise.all([
     prisma.planningStage.findMany({
       where: { workId },
       include: { tasks: { orderBy: { ordem: "asc" } } },
@@ -34,6 +35,7 @@ export async function getBudgetVsActualByStage(workId: string) {
       select: { valor: true, status: true, stageId: true, taskId: true, categoriaId: true },
     }),
     prisma.financialCategory.findMany({ where: { nome: { in: ["Mão de obra", "Material"] } }, select: { id: true, nome: true } }),
+    getMaterialCostBreakdown([workId]),
   ]);
 
   const orcadoByTask = new Map<string, number>();
@@ -55,6 +57,11 @@ export async function getBudgetVsActualByStage(workId: string) {
       .reduce((sum, t) => sum + Number(t.valor), 0);
   }
 
+  // Material não entra mais nessas somas de lançamento financeiro — o custo
+  // de material vem do estoque (materialCosts, mesma fonte da Apropriação),
+  // que já reflete transferências entre obras, não só compras diretas.
+  const naoMaterial = (t: (typeof transactions)[number]) => t.categoriaId !== materialCategoriaId;
+
   // Comprometido (qualquer status) por categoria — "quanto dessa categoria já
   // está alocado" nessa etapa/atividade, seguindo a mesma ideia de "projetado".
   function sumTxCategoria(filter: (t: (typeof transactions)[number]) => boolean, categoriaId: string | undefined) {
@@ -65,12 +72,16 @@ export async function getBudgetVsActualByStage(workId: string) {
   return stages.map((stage) => {
     const tasks = stage.tasks.map((task) => {
       const orcado = orcadoByTask.get(task.id) ?? 0;
-      const realizado = sumTx((t) => t.taskId === task.id, ["PAGO"]);
+      const material = materialCosts.totalByTask.get(task.id) ?? 0;
+      const realizado = sumTx((t) => t.taskId === task.id && naoMaterial(t), ["PAGO"]) + material;
+      // Exibido pro usuário (o quanto ainda falta pagar, incluindo material) — mas o
+      // "projetado"/comprometido usa só a parte não-material, pra não contar o custo do
+      // material duas vezes (uma já via estoque em `realizado`, outra aqui).
       const aPagar = sumTx((t) => t.taskId === task.id, ["PENDENTE", "VENCIDO"]);
-      const projetado = computeProjetado({ realizado, aPagar });
+      const aPagarNaoMaterial = sumTx((t) => t.taskId === task.id && naoMaterial(t), ["PENDENTE", "VENCIDO"]);
+      const projetado = computeProjetado({ realizado, aPagar: aPagarNaoMaterial });
       const saldo = computeSaldo({ orcado, projetado });
       const maoDeObra = sumTxCategoria((t) => t.taskId === task.id, maoDeObraCategoriaId);
-      const material = sumTxCategoria((t) => t.taskId === task.id, materialCategoriaId);
       const avancoFisico = Number(task.percentualExecutado);
       const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
       const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
@@ -81,6 +92,7 @@ export async function getBudgetVsActualByStage(workId: string) {
         orcado,
         realizado,
         aPagar,
+        aPagarNaoMaterial,
         projetado,
         saldo,
         maoDeObra,
@@ -93,12 +105,13 @@ export async function getBudgetVsActualByStage(workId: string) {
     });
 
     const orcado = tasks.reduce((sum, t) => sum + t.orcado, 0) + (orcadoByStage.get(stage.id) ?? 0);
-    const realizado = sumTx((t) => t.stageId === stage.id, ["PAGO"]);
+    const material = materialCosts.totalByStage.get(stage.id) ?? 0;
+    const realizado = sumTx((t) => t.stageId === stage.id && naoMaterial(t), ["PAGO"]) + material;
     const aPagar = sumTx((t) => t.stageId === stage.id, ["PENDENTE", "VENCIDO"]);
-    const projetado = computeProjetado({ realizado, aPagar });
+    const aPagarNaoMaterial = sumTx((t) => t.stageId === stage.id && naoMaterial(t), ["PENDENTE", "VENCIDO"]);
+    const projetado = computeProjetado({ realizado, aPagar: aPagarNaoMaterial });
     const saldo = computeSaldo({ orcado, projetado });
     const maoDeObra = sumTxCategoria((t) => t.stageId === stage.id, maoDeObraCategoriaId);
-    const material = sumTxCategoria((t) => t.stageId === stage.id, materialCategoriaId);
     // Sem atividade nenhuma, a etapa funciona como uma "atividade solta" — usa o % próprio dela
     // em vez de zerar o avanço físico da obra.
     const avancoFisico =
@@ -113,6 +126,7 @@ export async function getBudgetVsActualByStage(workId: string) {
       orcado,
       realizado,
       aPagar,
+      aPagarNaoMaterial,
       projetado,
       saldo,
       maoDeObra,
@@ -134,8 +148,10 @@ export async function getWorkCostSummary(workId: string) {
 
   const orcado = stages.reduce((sum, s) => sum + s.orcado, 0);
   const realizado = stages.reduce((sum, s) => sum + s.realizado, 0);
+  // `aPagar` (exibido, ex: KPI "Contas a pagar") inclui material; o comprometido usa só a
+  // parte não-material pra não somar de novo o que já entrou em `realizado` via estoque.
   const aPagar = stages.reduce((sum, s) => sum + s.aPagar, 0);
-  const comprometido = realizado + aPagar;
+  const comprometido = realizado + stages.reduce((sum, s) => sum + s.aPagarNaoMaterial, 0);
   const saldoOrcamento = orcado - comprometido;
 
   const contrato = Number(work.valorContrato);
@@ -146,7 +162,7 @@ export async function getWorkCostSummary(workId: string) {
   });
 
   const custoFinalEstimado = computeCustoFinalEstimado(
-    stages.map((s) => ({ orcado: s.orcado, comprometido: s.realizado + s.aPagar })),
+    stages.map((s) => ({ orcado: s.orcado, comprometido: s.realizado + s.aPagarNaoMaterial })),
   );
   const margemProjetada = computeMargemProjetada({ contrato, custoFinalEstimado });
   const diferencaMargem = margemProjetada - margemPrevista;
@@ -178,7 +194,9 @@ export async function getWorkCostSummary(workId: string) {
 
 export async function getWorkAlerts(workId: string) {
   const stages = await getBudgetVsActualByStage(workId);
-  const alerts = buildStageAlerts(stages);
+  // `aPagarNaoMaterial` no lugar de `aPagar` pro mesmo motivo do comprometido em
+  // getWorkCostSummary: não contar de novo o material já refletido em `realizado`.
+  const alerts = buildStageAlerts(stages.map((s) => ({ ...s, aPagar: s.aPagarNaoMaterial })));
 
   const hoje = new Date();
   hoje.setUTCHours(0, 0, 0, 0);

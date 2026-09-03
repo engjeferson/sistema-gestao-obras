@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { getMaterialCostBreakdown } from "@/server/actions/estoque";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
 /**
@@ -178,10 +179,16 @@ export async function getObrasDashboard() {
   const inicioHoje = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()));
   const fimHoje = new Date(inicioHoje.getTime() + 24 * 60 * 60 * 1000);
 
+  const materialCategoria = await prisma.financialCategory.findFirst({
+    where: { nome: "Material" },
+    select: { id: true },
+  });
+
   const [
     progressoAgg,
     atrasadasAgg,
-    custoTotalAgg,
+    custoTotalNaoMaterialAgg,
+    materialCosts,
     despesasPagasAgg,
     receitasRecebidasAgg,
     rdosRecentes,
@@ -204,9 +211,14 @@ export async function getObrasDashboard() {
     }),
     prisma.financialTransaction.groupBy({
       by: ["workId"],
-      where: { workId: { in: workIds }, tipo: "PAGAR" },
+      where: {
+        workId: { in: workIds },
+        tipo: "PAGAR",
+        ...(materialCategoria ? { categoriaId: { not: materialCategoria.id } } : {}),
+      },
       _sum: { valor: true },
     }),
+    getMaterialCostBreakdown(workIds),
     prisma.financialTransaction.groupBy({
       by: ["workId"],
       where: { workId: { in: workIds }, tipo: "PAGAR", status: "PAGO" },
@@ -250,7 +262,18 @@ export async function getObrasDashboard() {
 
   const progressoByWork = new Map(progressoAgg.map((p) => [p.workId, Number(p._avg.percentualExecutado ?? 0)]));
   const atrasadasByWork = new Map(atrasadasAgg.map((a) => [a.workId, a._count._all]));
-  const custoTotalByWork = new Map(custoTotalAgg.map((c) => [c.workId, Number(c._sum.valor ?? 0)]));
+  // Custo total = lançamentos financeiros não-material (qualquer categoria, qualquer status) +
+  // material via estoque (materialCosts) — mesma fonte usada pela Apropriação, então uma
+  // transferência de material entre obras já entra aqui, mesmo sem gerar conta nova a pagar.
+  const custoTotalByWork = new Map(
+    workIds.map((workId) => {
+      const naoMaterial = Number(
+        custoTotalNaoMaterialAgg.find((c) => c.workId === workId)?._sum.valor ?? 0,
+      );
+      const material = materialCosts.totalByWork.get(workId) ?? 0;
+      return [workId, naoMaterial + material] as const;
+    }),
+  );
   const despesasPagasByWork = new Map(despesasPagasAgg.map((d) => [d.workId, Number(d._sum.valor ?? 0)]));
   const receitasRecebidasByWork = new Map(receitasRecebidasAgg.map((r) => [r.workId, Number(r._sum.valor ?? 0)]));
 
