@@ -486,6 +486,7 @@ model StockMovement {
   motivo          String?
   invoiceItemId   String?           @unique
   transferGrupoId String?
+  numeroOS        Int?
   createdById     String
   createdAt       DateTime          @default(now())
 

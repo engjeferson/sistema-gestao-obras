@@ -1,3 +1,4 @@
+import { FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
@@ -26,6 +27,7 @@ type MovementRow = {
   destinoWork: { nome: string; codigo: string } | null;
   stage: { nome: string; codigo: string | null } | null;
   createdBy: { name: string };
+  transferGrupoId: string | null;
 };
 
 function localLabel(work: { nome: string; codigo: string } | null) {
@@ -64,6 +66,7 @@ export function StockMovementsTable({
             <TableHead>Valor</TableHead>
             <TableHead>Motivo</TableHead>
             <TableHead>Lançado por</TableHead>
+            <TableHead className="text-right">OS</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -85,6 +88,19 @@ export function StockMovementsTable({
               </TableCell>
               <TableCell>{m.motivo ?? "—"}</TableCell>
               <TableCell>{m.createdBy.name}</TableCell>
+              <TableCell className="text-right">
+                {m.tipo === "TRANSFERENCIA" && m.transferGrupoId ? (
+                  <a
+                    href={`/api/estoque/transferencias/${m.transferGrupoId}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Gerar OS (PDF)"
+                    className="inline-flex text-muted-foreground hover:text-primary"
+                  >
+                    <FileDown className="size-4" />
+                  </a>
+                ) : null}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
