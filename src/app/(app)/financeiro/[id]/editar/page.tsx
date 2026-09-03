@@ -25,7 +25,13 @@ export default async function EditarLancamentoPage({ params }: { params: Promise
 
   const updateTransactionWithId = updateTransaction.bind(null, transaction.id);
   const worksOptions = works.map((work) => ({ id: work.id, nome: work.nome, codigo: work.codigo }));
-  const bankAccountsOptions = bankAccounts.map((account) => ({ id: account.id, nome: account.nome }));
+  const bankAccountsOptions = bankAccounts.map((account) => ({
+    id: account.id,
+    nome: account.nome,
+    tipo: account.tipo,
+    diaFechamento: account.diaFechamento,
+    diaVencimento: account.diaVencimento,
+  }));
   const favorecidosOptions = [...new Set([...suppliers.map((s) => s.nome), ...clients.map((c) => c.nome)])];
 
   return (

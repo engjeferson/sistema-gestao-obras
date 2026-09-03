@@ -9,6 +9,8 @@ export const bankAccountFormSchema = z.object({
   conta: z.string().trim().optional(),
   tipo: z.enum(bankAccountTypeValues),
   saldoInicial: z.coerce.number().optional().or(z.literal("").transform(() => undefined)),
+  diaFechamento: z.coerce.number().int().min(1).max(28).optional().or(z.literal("").transform(() => undefined)),
+  diaVencimento: z.coerce.number().int().min(1).max(28).optional().or(z.literal("").transform(() => undefined)),
   observacoes: z.string().trim().optional(),
 });
 

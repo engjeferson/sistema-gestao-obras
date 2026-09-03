@@ -9,7 +9,26 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { calcularVencimentoFatura } from "@/lib/fatura-cartao";
 import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
+
+async function calcularVencimentoCartao(
+  formaPagamento: PaymentMethod | undefined,
+  bankAccountId: string | undefined,
+  dataCompra: Date,
+): Promise<Date | null> {
+  if (formaPagamento !== "CARTAO" || !bankAccountId) return null;
+
+  const conta = await prisma.bankAccount.findUnique({
+    where: { id: bankAccountId },
+    select: { tipo: true, diaFechamento: true, diaVencimento: true },
+  });
+  if (!conta || conta.tipo !== "CARTAO_CREDITO" || !conta.diaFechamento || !conta.diaVencimento) {
+    return null;
+  }
+
+  return calcularVencimentoFatura(dataCompra, conta.diaFechamento, conta.diaVencimento);
+}
 
 export type TransactionFilters = {
   workId?: string;
@@ -294,13 +313,18 @@ export async function createTransaction(_prevState: string | undefined, formData
   }
   const data = parsed.data;
   const { supplierId, clientId } = await resolveFavorecidoIds(data.tipo, data.favorecidoNome);
+  const dataVencimentoCalculada = await calcularVencimentoCartao(
+    data.formaPagamento,
+    data.bankAccountId,
+    new Date(data.dataEmissao),
+  );
 
   if (data.parcelar && data.numeroParcelas && data.numeroParcelas >= 2) {
     const n = data.numeroParcelas;
     const baseValor = Math.floor((data.valor / n) * 100) / 100;
     const remainder = Math.round((data.valor - baseValor * n) * 100) / 100;
     const grupoId = randomUUID();
-    const baseVencimento = new Date(data.dataVencimento);
+    const baseVencimento = dataVencimentoCalculada ?? new Date(data.dataVencimento);
 
     await prisma.$transaction(
       Array.from({ length: n }, (_, i) =>
@@ -346,7 +370,7 @@ export async function createTransaction(_prevState: string | undefined, formData
         taskId: data.taskId || null,
         valor: data.valor,
         dataEmissao: new Date(data.dataEmissao),
-        dataVencimento: new Date(data.dataVencimento),
+        dataVencimento: dataVencimentoCalculada ?? new Date(data.dataVencimento),
         dataPagamento: data.dataPagamento ? new Date(data.dataPagamento) : null,
         formaPagamento: data.formaPagamento,
         status: data.status,

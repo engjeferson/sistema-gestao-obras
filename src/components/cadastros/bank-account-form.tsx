@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ export function BankAccountForm({
   submitLabel: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [tipo, setTipo] = useState<string>(defaultValues?.tipo ?? "CORRENTE");
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -41,7 +42,7 @@ export function BankAccountForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="tipo">Tipo</Label>
-          <NativeSelect id="tipo" name="tipo" defaultValue={defaultValues?.tipo ?? "CORRENTE"}>
+          <NativeSelect id="tipo" name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             {Object.entries(TIPO_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -65,6 +66,38 @@ export function BankAccountForm({
           <Label htmlFor="saldoInicial">Saldo inicial (R$)</Label>
           <CurrencyInput id="saldoInicial" name="saldoInicial" defaultValue={defaultValues?.saldoInicial ?? undefined} />
         </div>
+        {tipo === "CARTAO_CREDITO" ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="diaFechamento">Dia de fechamento da fatura</Label>
+              <Input
+                id="diaFechamento"
+                name="diaFechamento"
+                type="number"
+                min="1"
+                max="28"
+                defaultValue={defaultValues?.diaFechamento ?? ""}
+                placeholder="Ex: 3"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="diaVencimento">Dia de vencimento da fatura</Label>
+              <Input
+                id="diaVencimento"
+                name="diaVencimento"
+                type="number"
+                min="1"
+                max="28"
+                defaultValue={defaultValues?.diaVencimento ?? ""}
+                placeholder="Ex: 10"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Preenchendo os dois, toda compra lançada neste cartão calcula sozinha em qual fatura ela cai — sem
+              precisar digitar o vencimento manualmente.
+            </p>
+          </>
+        ) : null}
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacoes">Observações</Label>
           <Textarea id="observacoes" name="observacoes" defaultValue={defaultValues?.observacoes ?? ""} />

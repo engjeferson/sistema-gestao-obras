@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { TRANSACTION_STATUS_LABELS, TRANSACTION_TYPE_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { calcularVencimentoFatura } from "@/lib/fatura-cartao";
 import type { FinancialTransactionModel } from "@/generated/prisma/models";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -30,7 +31,7 @@ type TransactionFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   works: { id: string; nome: string; codigo: string }[];
   categorias: { id: string; nome: string }[];
-  bankAccounts: { id: string; nome: string }[];
+  bankAccounts: { id: string; nome: string; tipo: string; diaFechamento: number | null; diaVencimento: number | null }[];
   stagesByWork: Record<string, StageOption[]>;
   favorecidosOptions: string[];
   defaultValues?: TransactionFormDefaultValues;
@@ -63,10 +64,29 @@ export function TransactionForm({
   const [valor, setValor] = useState<number>(defaultValues?.valor ?? 0);
   const [selectedWorkId, setSelectedWorkId] = useState(defaultValues?.workId ?? defaultWorkId ?? "");
   const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
+  const [formaPagamento, setFormaPagamento] = useState<string>(defaultValues?.formaPagamento ?? "");
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState(defaultValues?.bankAccountId ?? "");
+  const [dataEmissao, setDataEmissao] = useState(toDateInputValue(defaultValues?.dataEmissao));
+  const [dataVencimento, setDataVencimento] = useState(toDateInputValue(defaultValues?.dataVencimento));
 
   const valorParcela = numeroParcelas > 0 ? valor / numeroParcelas : 0;
   const stagesForWork = stagesByWork[selectedWorkId] ?? [];
   const tasksForStage = stagesForWork.find((s) => s.id === selectedStageId)?.tasks ?? [];
+  function getCartaoComFatura(bankAccountId: string, forma: string) {
+    if (forma !== "CARTAO") return null;
+    const conta = bankAccounts.find((a) => a.id === bankAccountId);
+    if (!conta || conta.tipo !== "CARTAO_CREDITO" || !conta.diaFechamento || !conta.diaVencimento) return null;
+    return conta as { diaFechamento: number; diaVencimento: number };
+  }
+
+  const cartaoComFatura = getCartaoComFatura(selectedBankAccountId, formaPagamento);
+
+  function recalcularVencimentoCartao(novaDataEmissao: string, bankAccountId: string, forma: string) {
+    const conta = getCartaoComFatura(bankAccountId, forma);
+    if (!conta || !novaDataEmissao) return;
+    const vencimento = calcularVencimentoFatura(new Date(novaDataEmissao), conta.diaFechamento, conta.diaVencimento);
+    setDataVencimento(vencimento.toISOString().slice(0, 10));
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -173,7 +193,15 @@ export function TransactionForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="bankAccountId">Conta bancária</Label>
-          <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue={defaultValues?.bankAccountId ?? ""}>
+          <NativeSelect
+            id="bankAccountId"
+            name="bankAccountId"
+            value={selectedBankAccountId}
+            onChange={(e) => {
+              setSelectedBankAccountId(e.target.value);
+              recalcularVencimentoCartao(dataEmissao, e.target.value, formaPagamento);
+            }}
+          >
             <option value="">—</option>
             {bankAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -202,7 +230,11 @@ export function TransactionForm({
             id="dataEmissao"
             name="dataEmissao"
             type="date"
-            defaultValue={toDateInputValue(defaultValues?.dataEmissao)}
+            value={dataEmissao}
+            onChange={(e) => {
+              setDataEmissao(e.target.value);
+              recalcularVencimentoCartao(e.target.value, selectedBankAccountId, formaPagamento);
+            }}
             required
           />
         </div>
@@ -214,9 +246,15 @@ export function TransactionForm({
             id="dataVencimento"
             name="dataVencimento"
             type="date"
-            defaultValue={toDateInputValue(defaultValues?.dataVencimento)}
+            value={dataVencimento}
+            onChange={(e) => setDataVencimento(e.target.value)}
             required
           />
+          {cartaoComFatura ? (
+            <p className="text-xs text-muted-foreground">
+              Calculado automaticamente pela fatura deste cartão — pode ajustar se precisar.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="dataPagamento">Data de pagamento</Label>
@@ -229,7 +267,15 @@ export function TransactionForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="formaPagamento">Forma de pagamento</Label>
-          <NativeSelect id="formaPagamento" name="formaPagamento" defaultValue={defaultValues?.formaPagamento ?? ""}>
+          <NativeSelect
+            id="formaPagamento"
+            name="formaPagamento"
+            value={formaPagamento}
+            onChange={(e) => {
+              setFormaPagamento(e.target.value);
+              recalcularVencimentoCartao(dataEmissao, selectedBankAccountId, e.target.value);
+            }}
+          >
             <option value="">—</option>
             {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
