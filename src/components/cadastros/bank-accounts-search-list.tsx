@@ -10,6 +10,8 @@ type BankAccountRow = {
   nome: string;
   banco: string | null;
   tipo: string;
+  diaFechamento: number | null;
+  diaVencimento: number | null;
   ativo: boolean;
 };
 

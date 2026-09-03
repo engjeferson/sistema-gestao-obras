@@ -21,6 +21,8 @@ type BankAccountRow = {
   nome: string;
   banco: string | null;
   tipo: string;
+  diaFechamento: number | null;
+  diaVencimento: number | null;
   ativo: boolean;
 };
 
@@ -62,6 +64,7 @@ export function BankAccountsTable({ bankAccounts }: { bankAccounts: BankAccountR
             <TableHead>Nome</TableHead>
             <TableHead>Banco</TableHead>
             <TableHead>Tipo</TableHead>
+            <TableHead>Fatura</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
@@ -76,6 +79,11 @@ export function BankAccountsTable({ bankAccounts }: { bankAccounts: BankAccountR
               </TableCell>
               <TableCell>{bankAccount.banco ?? "—"}</TableCell>
               <TableCell>{TIPO_LABELS[bankAccount.tipo]}</TableCell>
+              <TableCell>
+                {bankAccount.tipo === "CARTAO_CREDITO" && bankAccount.diaFechamento && bankAccount.diaVencimento
+                  ? `Fecha dia ${bankAccount.diaFechamento}, vence dia ${bankAccount.diaVencimento}`
+                  : "—"}
+              </TableCell>
               <TableCell>
                 <Badge variant={bankAccount.ativo ? "success" : "secondary"}>
                   {bankAccount.ativo ? "Ativa" : "Inativa"}

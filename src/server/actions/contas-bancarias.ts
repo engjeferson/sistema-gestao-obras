@@ -27,6 +27,8 @@ function parseBankAccountForm(formData: FormData) {
     conta: formData.get("conta") ?? undefined,
     tipo: formData.get("tipo"),
     saldoInicial: formData.get("saldoInicial") ?? "",
+    diaFechamento: formData.get("diaFechamento") ?? "",
+    diaVencimento: formData.get("diaVencimento") ?? "",
     observacoes: formData.get("observacoes") ?? undefined,
   });
 }
@@ -49,6 +51,8 @@ export async function createBankAccount(_prevState: string | undefined, formData
       conta: data.conta || null,
       tipo: data.tipo,
       saldoInicial: data.saldoInicial ?? null,
+      diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
+      diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
       observacoes: data.observacoes || null,
     },
   });
@@ -80,6 +84,8 @@ export async function updateBankAccount(
       conta: data.conta || null,
       tipo: data.tipo,
       saldoInicial: data.saldoInicial ?? null,
+      diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
+      diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
       observacoes: data.observacoes || null,
     },
   });
