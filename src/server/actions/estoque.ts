@@ -332,6 +332,12 @@ export async function createStockTransferencia(_prevState: string | undefined, f
   }
 
   const grupoId = randomUUID();
+  const ultimaOS = await prisma.stockMovement.aggregate({
+    where: { tipo: "TRANSFERENCIA" },
+    _max: { numeroOS: true },
+  });
+  const numeroOS = (ultimaOS._max.numeroOS ?? 0) + 1;
+
   await prisma.$transaction(
     data.itens.map((item) =>
       prisma.stockMovement.create({
@@ -348,6 +354,7 @@ export async function createStockTransferencia(_prevState: string | undefined, f
           data: new Date(data.data),
           motivo: data.motivo || null,
           transferGrupoId: grupoId,
+          numeroOS,
           createdById: session.user.id,
         },
       }),
@@ -355,7 +362,46 @@ export async function createStockTransferencia(_prevState: string | undefined, f
   );
 
   revalidatePath("/estoque");
-  redirect("/estoque");
+  redirect(`/estoque/transferencias/${grupoId}`);
+}
+
+export async function getStockTransferByGrupoId(grupoId: string) {
+  const workAccess = await getCurrentWorkAccess();
+
+  const movements = await prisma.stockMovement.findMany({
+    where: { transferGrupoId: grupoId, tipo: "TRANSFERENCIA" },
+    include: { material: true, origemWork: true, destinoWork: true, stage: true, task: true, createdBy: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (movements.length === 0) {
+    return null;
+  }
+
+  const [first] = movements;
+  if (
+    workAccess !== null &&
+    !(first.origemWorkId && workAccess.includes(first.origemWorkId)) &&
+    !(first.destinoWorkId && workAccess.includes(first.destinoWorkId))
+  ) {
+    return null;
+  }
+
+  return {
+    grupoId,
+    numeroOS: first.numeroOS,
+    data: first.data,
+    motivo: first.motivo,
+    origemWork: first.origemWork,
+    destinoWork: first.destinoWork,
+    stage: first.stage,
+    task: first.task,
+    createdBy: first.createdBy,
+    itens: movements.map((m) => ({
+      material: m.material,
+      quantidade: Number(m.quantidade),
+      valorUnitario: m.valorUnitario !== null ? Number(m.valorUnitario) : null,
+    })),
+  };
 }
 
 export type AppropriationMaterial = {

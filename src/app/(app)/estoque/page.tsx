@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Wallet, Package } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 import { getStockBalances } from "@/server/actions/estoque";
 import { listWorks } from "@/server/actions/obras";
 import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
@@ -55,13 +55,12 @@ export default async function EstoquePage({
 
       <StockLocationFilter works={worksOptions} selected={workId ?? ""} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="max-w-sm">
         <KpiCard
           icon={Wallet}
           label="Valor total em estoque neste local"
           value={formatCurrencyOrHidden(valorTotalEstoque, canSeeValues)}
         />
-        <KpiCard icon={Package} label="Materiais com saldo neste local" value={String(balances.length)} />
       </div>
 
       <div className="flex flex-col gap-2">
