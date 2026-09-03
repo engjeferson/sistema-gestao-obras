@@ -5,6 +5,7 @@ import { listTransactions, listFinancialCategories, getTransactionsSummary } fro
 import { getWork } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
+import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
 import { getCurrentFinancePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export default async function FinanceiroPage({
     tipo?: string;
     categoriaId?: string;
     favorecido?: string;
+    bankAccountId?: string;
     dataInicio?: string;
     dataFim?: string;
     dataPagamentoInicio?: string;
@@ -38,18 +40,20 @@ export default async function FinanceiroPage({
     tipo: params.tipo as TransactionType | undefined,
     categoriaId: params.categoriaId || undefined,
     favorecido: params.favorecido || undefined,
+    bankAccountId: params.bankAccountId || undefined,
     dataInicio: params.dataInicio || undefined,
     dataFim: params.dataFim || undefined,
     dataPagamentoInicio: params.dataPagamentoInicio || undefined,
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
 
-  const [session, perms, allCategorias, suppliers, clients] = await Promise.all([
+  const [session, perms, allCategorias, suppliers, clients, bankAccounts] = await Promise.all([
     auth(),
     getCurrentFinancePermissions(),
     listFinancialCategories(),
     listSuppliers(),
     listClients(),
+    listActiveBankAccounts(),
   ]);
   const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
   const hasAccess = perms.verEntradas || perms.verSaidas;
@@ -96,7 +100,11 @@ export default async function FinanceiroPage({
           ) : null}
         </div>
 
-        <TransactionFilters categorias={categorias} favorecidos={favorecidos} />
+        <TransactionFilters
+          categorias={categorias}
+          favorecidos={favorecidos}
+          bankAccounts={bankAccounts.map((b) => ({ id: b.id, nome: b.nome, banco: b.banco, tipo: b.tipo }))}
+        />
 
         {work ? (
           <div className="flex items-center gap-2 text-sm">

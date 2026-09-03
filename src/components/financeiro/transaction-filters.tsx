@@ -7,12 +7,22 @@ import { Input } from "@/components/ui/input";
 import { PeriodoFilter } from "@/components/ui/periodo-filter";
 import { TRANSACTION_STATUS_LABELS } from "@/lib/status-labels";
 
+const BANK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  CORRENTE: "Conta corrente",
+  POUPANCA: "Poupança",
+  CAIXA: "Caixa (dinheiro)",
+  CARTAO_CREDITO: "Cartão de crédito",
+  OUTRA: "Outra",
+};
+
 export function TransactionFilters({
   categorias,
   favorecidos = [],
+  bankAccounts = [],
 }: {
   categorias: { id: string; nome: string }[];
   favorecidos?: string[];
+  bankAccounts?: { id: string; nome: string; banco: string | null; tipo: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -100,6 +110,19 @@ export function TransactionFilters({
           </div>
         ) : null}
       </div>
+      <NativeSelect
+        className="w-auto"
+        defaultValue={searchParams.get("bankAccountId") ?? ""}
+        onChange={(e) => setParam("bankAccountId", e.target.value)}
+      >
+        <option value="">Todas as contas/cartões</option>
+        {bankAccounts.map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.nome}
+            {account.banco ? ` — ${account.banco}` : ""} ({BANK_ACCOUNT_TYPE_LABELS[account.tipo] ?? account.tipo})
+          </option>
+        ))}
+      </NativeSelect>
       <PeriodoFilter inicioLabel="Vencimento de" fimLabel="Vencimento até" />
     </div>
   );

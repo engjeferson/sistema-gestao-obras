@@ -19,6 +19,7 @@ export type TransactionFilters = {
   status?: TransactionStatus | "EM_ABERTO";
   favorecido?: string;
   supplierId?: string;
+  bankAccountId?: string;
   dataInicio?: string;
   dataFim?: string;
   dataPagamentoInicio?: string;
@@ -70,6 +71,7 @@ async function buildTransactionWhere(filters?: TransactionFilters) {
         ? { in: ["PENDENTE", "VENCIDO"] as TransactionStatus[] }
         : filters?.status,
     supplierId: filters?.supplierId,
+    bankAccountId: filters?.bankAccountId,
     favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
     dataVencimento: {
       gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,
