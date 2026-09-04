@@ -161,6 +161,9 @@ export async function deleteInvoice(invoiceId: string, workId: string | null) {
   }
 
   await prisma.$transaction(async (tx) => {
+    // A exclusão do InvoiceItem em cascata só desvincula a StockMovement (ON DELETE SET NULL),
+    // não a apaga — sem isso o material ficava contando no estoque mesmo com a nota excluída.
+    await tx.stockMovement.deleteMany({ where: { invoiceItem: { invoiceId } } });
     if (invoice?.financialTransactions.length) {
       await tx.financialTransaction.deleteMany({ where: { invoiceId } });
     }
