@@ -45,6 +45,7 @@ function parseModulePermissionFields(formData: FormData) {
     contratosSomenteLeitura: formData.get("contratosSomenteLeitura") === "on",
     notasFiscaisSomenteLeitura: formData.get("notasFiscaisSomenteLeitura") === "on",
     cadastrosSomenteLeitura: formData.get("cadastrosSomenteLeitura") === "on",
+    financeiroSomenteLeitura: formData.get("financeiroSomenteLeitura") === "on",
   };
 }
 

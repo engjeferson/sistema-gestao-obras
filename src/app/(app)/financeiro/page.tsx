@@ -6,7 +6,7 @@ import { getWork } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
-import { getCurrentFinancePermissions } from "@/server/actions/permissions";
+import { getCurrentFinancePermissions, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
@@ -47,15 +47,19 @@ export default async function FinanceiroPage({
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
 
-  const [session, perms, allCategorias, suppliers, clients, bankAccounts] = await Promise.all([
+  const [session, perms, modulePerms, allCategorias, suppliers, clients, bankAccounts] = await Promise.all([
     auth(),
     getCurrentFinancePermissions(),
+    getCurrentModulePermissions(),
     listFinancialCategories(),
     listSuppliers(),
     listClients(),
     listActiveBankAccounts(),
   ]);
-  const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
+  const canEdit =
+    session?.user.role === "ADMINISTRADOR" ||
+    session?.user.role === "FINANCEIRO" ||
+    (session?.user.role === "ENGENHEIRO" && !modulePerms.financeiroSomenteLeitura);
   const hasAccess = perms.verEntradas || perms.verSaidas;
   const filters = restrictTransactionFilters(requestedFilters, perms);
   const categorias = perms.categoriasPermitidasIds

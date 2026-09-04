@@ -4,14 +4,30 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { addMonths } from "date-fns";
 import { randomUUID } from "crypto";
+import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
-import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { getCurrentWorkAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
 import { calcularVencimentoFatura } from "@/lib/fatura-cartao";
-import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
+import type { PaymentMethod, Role, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
+
+const FINANCEIRO_EDIT_ROLES: Role[] = ["ADMINISTRADOR", "FINANCEIRO", "ENGENHEIRO"];
+
+/**
+ * Administrador e Financeiro sempre podem lançar/editar. Engenheiro também
+ * pode, a menos que um admin tenha marcado "Financeiro" como só leitura para
+ * ele em Configurações > Usuários.
+ */
+async function assertCanEditFinanceiro(session: Session) {
+  if (session.user.role !== "ENGENHEIRO") return;
+  const modulePerms = await getCurrentModulePermissions();
+  if (modulePerms.financeiroSomenteLeitura) {
+    throw new ForbiddenError("Você só tem acesso de visualização ao Financeiro.");
+  }
+}
 
 async function calcularVencimentoCartao(
   formaPagamento: PaymentMethod | undefined,
@@ -194,7 +210,8 @@ export async function getTransactionsSummary(filters?: TransactionFilters) {
 
 export async function batchMarkAsPago(transactionIds: string[], formaPagamento?: PaymentMethod) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
   if (transactionIds.length === 0) return;
 
   const transactions = await prisma.financialTransaction.findMany({
@@ -321,7 +338,8 @@ export async function getWorkFinancialSummary(workId: string) {
 
 export async function createTransaction(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
 
   const parsed = parseTransactionForm(formData);
   if (!parsed.success) {
@@ -409,7 +427,8 @@ export async function updateTransaction(
   formData: FormData,
 ) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
 
   const parsed = parseTransactionForm(formData);
   if (!parsed.success) {
@@ -450,7 +469,8 @@ export async function updateTransaction(
 
 export async function markAsPago(transactionId: string, workId: string | null, formaPagamento?: PaymentMethod) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
 
   await prisma.financialTransaction.update({
     where: { id: transactionId },
@@ -479,7 +499,8 @@ export async function partialPayTransaction(
   },
 ) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
 
   const original = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) {
@@ -550,7 +571,8 @@ export async function partialPayTransaction(
 
 export async function deleteTransaction(transactionId: string, workId: string | null) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
 
   const transaction = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
   if (transaction?.invoiceId) {
