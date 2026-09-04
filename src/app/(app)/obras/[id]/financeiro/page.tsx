@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Plus, FileSignature, ArrowDownCircle, ArrowUpCircle, PiggyBank } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getWorkFinancialSummary, listTransactions } from "@/server/actions/financeiro";
-import { getCurrentFinancePermissions } from "@/server/actions/permissions";
+import { getCurrentFinancePermissions, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -22,16 +22,20 @@ export default async function ObraFinanceiroPage({
   const { id } = await params;
   const { page: pageParam } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
-  const [session, summary, perms] = await Promise.all([
+  const [session, summary, perms, modulePerms] = await Promise.all([
     auth(),
     getWorkFinancialSummary(id),
     getCurrentFinancePermissions(),
+    getCurrentModulePermissions(),
   ]);
 
   if (!summary) {
     notFound();
   }
-  const canEdit = session?.user.role === "ADMINISTRADOR" || session?.user.role === "FINANCEIRO";
+  const canEdit =
+    session?.user.role === "ADMINISTRADOR" ||
+    session?.user.role === "FINANCEIRO" ||
+    (session?.user.role === "ENGENHEIRO" && !modulePerms.financeiroSomenteLeitura);
   const hasAccess = perms.verEntradas || perms.verSaidas;
   const baseFilters: { workId: string; tipo?: TransactionType; categoriaId?: string } = { workId: id };
   const filters = restrictTransactionFilters(baseFilters, perms);

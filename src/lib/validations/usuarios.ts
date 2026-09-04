@@ -23,6 +23,7 @@ const modulePermissionFields = {
   contratosSomenteLeitura: z.boolean().optional(),
   notasFiscaisSomenteLeitura: z.boolean().optional(),
   cadastrosSomenteLeitura: z.boolean().optional(),
+  financeiroSomenteLeitura: z.boolean().optional(),
 };
 
 const visibilityFields = {

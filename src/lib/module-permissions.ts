@@ -6,6 +6,10 @@ export type ModulePermissions = {
   contratosSomenteLeitura: boolean;
   notasFiscaisSomenteLeitura: boolean;
   cadastrosSomenteLeitura: boolean;
+  // Só se aplica a quem já teria acesso de edição ao Financeiro fora daqui
+  // (hoje, ENGENHEIRO) — Administrador e Financeiro nunca são restringidos
+  // por este campo.
+  financeiroSomenteLeitura: boolean;
 };
 
 export const DEFAULT_MODULE_PERMISSIONS: ModulePermissions = {
@@ -14,6 +18,7 @@ export const DEFAULT_MODULE_PERMISSIONS: ModulePermissions = {
   contratosSomenteLeitura: false,
   notasFiscaisSomenteLeitura: false,
   cadastrosSomenteLeitura: false,
+  financeiroSomenteLeitura: false,
 };
 
 export function resolveModulePermissions(role: Role, raw: unknown): ModulePermissions {
@@ -27,5 +32,6 @@ export function resolveModulePermissions(role: Role, raw: unknown): ModulePermis
     contratosSomenteLeitura: perms.contratosSomenteLeitura === true,
     notasFiscaisSomenteLeitura: perms.notasFiscaisSomenteLeitura === true,
     cadastrosSomenteLeitura: perms.cadastrosSomenteLeitura === true,
+    financeiroSomenteLeitura: perms.financeiroSomenteLeitura === true,
   };
 }

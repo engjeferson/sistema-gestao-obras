@@ -8,6 +8,7 @@ const MODULE_FIELDS: { name: keyof ModulePermissions; label: string }[] = [
   { name: "contratosSomenteLeitura", label: "Contratos" },
   { name: "notasFiscaisSomenteLeitura", label: "Notas Fiscais" },
   { name: "cadastrosSomenteLeitura", label: "Cadastros (clientes, fornecedores, profissionais)" },
+  { name: "financeiroSomenteLeitura", label: "Financeiro (só para o perfil Engenheiro)" },
 ];
 
 export function ModulePermissionsFields({ defaultValues }: { defaultValues?: ModulePermissions }) {
