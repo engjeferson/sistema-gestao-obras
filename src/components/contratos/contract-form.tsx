@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Combobox } from "@/components/ui/combobox";
 import { CONTRACT_TYPE_LABELS } from "@/lib/status-labels";
 import { uploadFileToR2 } from "@/lib/upload-file";
 
@@ -17,7 +16,6 @@ type ContractFormDefaultValues = {
   nome?: string;
   tipo?: string;
   direcao?: "PAGAR" | "RECEBER";
-  contratanteClientId?: string | null;
   contratado?: string;
   valor?: number | null;
   data?: Date | string;
@@ -35,16 +33,16 @@ export function ContractForm({
   action,
   workId,
   companyName,
+  workClient,
   supplierNames,
-  clients,
   defaultValues,
   submitLabel = "Criar contrato",
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   workId: string;
   companyName: string;
+  workClient: { id: string; nome: string } | null;
   supplierNames: string[];
-  clients: { id: string; nome: string }[];
   defaultValues?: ContractFormDefaultValues;
   submitLabel?: string;
 }) {
@@ -52,8 +50,6 @@ export function ContractForm({
   const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [direcao, setDirecao] = useState<"PAGAR" | "RECEBER">(defaultValues?.direcao ?? "PAGAR");
-  const [contratanteClientId, setContratanteClientId] = useState(defaultValues?.contratanteClientId ?? "");
-  const clientOptions = clients.map((c) => ({ value: c.id, label: c.nome }));
 
   async function handleFileChange(file: File | undefined) {
     if (!file) return;
@@ -107,18 +103,21 @@ export function ContractForm({
         </div>
         {direcao === "RECEBER" ? (
           <div key="contratante-cliente" className="flex flex-col gap-2">
-            <Label htmlFor="contratanteClientId">Contratante</Label>
-            <Combobox
-              value={contratanteClientId}
-              onChange={setContratanteClientId}
-              options={clientOptions}
-              placeholder="Buscar cliente cadastrado..."
-              emptyMessage="Nenhum cliente encontrado."
-            />
-            <input type="hidden" name="contratanteClientId" value={contratanteClientId} />
-            <Link href="/cadastros/clientes/novo" target="_blank" className="text-xs text-muted-foreground underline">
-              Cliente não encontrado? Cadastrar novo cliente
-            </Link>
+            <Label htmlFor="contratante">Contratante</Label>
+            {workClient ? (
+              <>
+                <Input id="contratante" value={workClient.nome} disabled />
+                <input type="hidden" name="contratanteClientId" value={workClient.id} />
+              </>
+            ) : (
+              <p className="text-xs text-destructive">
+                Esta obra não tem cliente cadastrado —{" "}
+                <Link href={`/obras/${workId}/editar`} target="_blank" className="underline">
+                  edite a obra
+                </Link>{" "}
+                para definir o cliente antes de criar um contrato de receita.
+              </p>
+            )}
           </div>
         ) : (
           <div key="contratante-empresa" className="flex flex-col gap-2">

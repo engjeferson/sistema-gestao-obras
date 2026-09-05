@@ -170,7 +170,9 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
                 <Badge variant={STATUS_BADGE[row.status]}>{STATUS_LABELS[row.status]}</Badge>
               </TableCell>
               <TableCell className="font-medium">
-                {row.emitenteNome ?? "—"}
+                <span title={row.emitenteNome ?? undefined} className="block max-w-[180px] truncate">
+                  {row.emitenteNome ?? "—"}
+                </span>
                 {!row.xmlCompleto && !row.manifestadoEm && row.manifestacaoErro ? (
                   <p className="mt-0.5 max-w-56 truncate text-xs font-normal text-destructive" title={row.manifestacaoErro}>
                     {row.manifestacaoErro}
@@ -183,7 +185,16 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
               <TableCell>{row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"}</TableCell>
               <TableCell>{row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}</TableCell>
               <TableCell className="text-muted-foreground">
-                {row.invoiceLink ? (row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL) : "—"}
+                {row.invoiceLink ? (
+                  <span
+                    title={row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL}
+                    className="block max-w-[160px] truncate"
+                  >
+                    {row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL}
+                  </span>
+                ) : (
+                  "—"
+                )}
               </TableCell>
               <TableCell>
                 <Button
