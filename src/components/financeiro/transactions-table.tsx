@@ -64,11 +64,11 @@ export function TransactionsTable({
   const [formaPagamento, setFormaPagamento] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const showSelection = selectable && canEdit;
   const eligibleIds = useMemo(
     () => transactions.filter((t) => t.effectiveStatus !== "PAGO").map((t) => t.id),
     [transactions],
   );
+  const showSelection = selectable && canEdit && eligibleIds.length > 0;
   const totalSelecionado = useMemo(
     () => transactions.filter((t) => selected.has(t.id)).reduce((sum, t) => sum + Number(t.valor), 0),
     [transactions, selected],
@@ -201,7 +201,11 @@ export function TransactionsTable({
                 ) : null}
                 <TableCell>{TRANSACTION_TYPE_LABELS[t.tipo]}</TableCell>
                 <TableCell>{t.categoria.nome}</TableCell>
-                <TableCell>{t.favorecidoNome}</TableCell>
+                <TableCell>
+                  <span title={t.favorecidoNome} className="block max-w-[160px] truncate">
+                    {t.favorecidoNome}
+                  </span>
+                </TableCell>
                 <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
                 <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
                 <TableCell>
