@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Trash2, Paperclip, CheckCircle2, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deleteMeasurement } from "@/server/actions/contratos";
 import { markAsPago } from "@/server/actions/financeiro";
@@ -52,11 +53,7 @@ function DeleteButton({ measurementId, workId, contractId }: { measurementId: st
   const [confirming, setConfirming] = useState(false);
   const router = useRouter();
 
-  function handleClick() {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
+  function handleConfirm() {
     startTransition(async () => {
       try {
         await deleteMeasurement(measurementId, workId, contractId);
@@ -71,16 +68,22 @@ function DeleteButton({ measurementId, workId, contractId }: { measurementId: st
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      disabled={isPending}
-      onClick={handleClick}
-      className={confirming ? "text-destructive" : ""}
-      title={confirming ? "Confirmar exclusão" : "Excluir"}
-    >
-      <Trash2 className="size-4" />
-    </Button>
+    <>
+      <Button variant="ghost" size="icon" disabled={isPending} onClick={() => setConfirming(true)} title="Excluir">
+        <Trash2 className="size-4" />
+      </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Excluir medição"
+        description="Tem certeza que deseja excluir esta medição? Essa ação não pode ser desfeita."
+        confirmLabel="Excluir"
+        onConfirm={handleConfirm}
+        isPending={isPending}
+        destructive
+      />
+    </>
   );
 }
 

@@ -8,6 +8,7 @@ import { Trash2, FileText, ChevronRight, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteContract, reorderContracts } from "@/server/actions/contratos";
 import { CONTRACT_TYPE_LABELS, formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
@@ -32,29 +33,37 @@ function DeleteContractButton({ contractId, workId }: { contractId: string; work
   const [confirming, setConfirming] = useState(false);
   const router = useRouter();
 
-  function handleClick() {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
+  function handleConfirm() {
     startTransition(async () => {
-      await deleteContract(contractId, workId);
-      toast.success("Contrato excluído.");
-      router.refresh();
+      try {
+        await deleteContract(contractId, workId);
+        toast.success("Contrato excluído.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } finally {
+        setConfirming(false);
+      }
     });
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      disabled={isPending}
-      onClick={handleClick}
-      className={confirming ? "text-destructive" : ""}
-      title={confirming ? "Confirmar exclusão" : "Excluir"}
-    >
-      <Trash2 className="size-4" />
-    </Button>
+    <>
+      <Button variant="ghost" size="icon" disabled={isPending} onClick={() => setConfirming(true)} title="Excluir">
+        <Trash2 className="size-4" />
+      </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Excluir contrato"
+        description="Tem certeza que deseja excluir este contrato? Essa ação não pode ser desfeita."
+        confirmLabel="Excluir"
+        onConfirm={handleConfirm}
+        isPending={isPending}
+        destructive
+      />
+    </>
   );
 }
 

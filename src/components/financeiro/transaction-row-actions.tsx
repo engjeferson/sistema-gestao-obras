@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2, CheckCircle2, SplitSquareHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { markAsPago, deleteTransaction } from "@/server/actions/financeiro";
 import { PartialPaymentDialog } from "@/components/financeiro/partial-payment-dialog";
 
@@ -39,10 +40,6 @@ export function TransactionRowActions({
   }
 
   function handleDelete() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
-      return;
-    }
     startTransition(async () => {
       try {
         await deleteTransaction(transactionId, workId);
@@ -77,10 +74,9 @@ export function TransactionRowActions({
       <Button
         variant="ghost"
         size="icon"
-        title={confirmingDelete ? "Confirmar exclusão" : "Excluir"}
+        title="Excluir"
         disabled={isPending}
-        onClick={handleDelete}
-        className={confirmingDelete ? "text-destructive" : ""}
+        onClick={() => setConfirmingDelete(true)}
       >
         <Trash2 className="size-4" />
       </Button>
@@ -92,6 +88,17 @@ export function TransactionRowActions({
         workId={workId}
         valorTotal={valor}
         vencimentoAtual={dataVencimento}
+      />
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Excluir lançamento"
+        description="Tem certeza que deseja excluir este lançamento? Essa ação não pode ser desfeita."
+        confirmLabel="Excluir"
+        onConfirm={handleDelete}
+        isPending={isPending}
+        destructive
       />
     </div>
   );
