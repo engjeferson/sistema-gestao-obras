@@ -1,13 +1,15 @@
 import { ContractForm } from "@/components/contratos/contract-form";
 import { createContract } from "@/server/actions/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
+import { getWork } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 
 export default async function NovoContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [companySettings, suppliers, clients] = await Promise.all([
+  const [companySettings, work, suppliers, clients] = await Promise.all([
     getCompanySettings(),
+    getWork(id),
     listSuppliers(),
     listClients(),
   ]);
@@ -23,6 +25,7 @@ export default async function NovoContratoPage({ params }: { params: Promise<{ i
         companyName={companySettings.nome}
         supplierNames={suppliers.map((s) => s.nome)}
         clients={clients.map((c) => ({ id: c.id, nome: c.nome }))}
+        defaultValues={{ contratanteClientId: work?.clientId ?? null }}
       />
     </div>
   );
