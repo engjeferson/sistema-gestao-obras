@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
+import { listWorks } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,9 @@ function defaultFim() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function DownloadNotasFiscaisPage() {
+export default async function DownloadNotasFiscaisPage() {
+  const works = await listWorks();
+
   return (
     <div className="flex max-w-lg flex-col gap-4 p-4 md:p-6">
       <div>
@@ -46,6 +49,17 @@ export default function DownloadNotasFiscaisPage() {
                 <Label htmlFor="dataFim">Data de emissão — até</Label>
                 <Input id="dataFim" name="dataFim" type="date" defaultValue={defaultFim()} required />
               </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="workId">Obra</Label>
+              <NativeSelect id="workId" name="workId" defaultValue="">
+                <option value="">Todas as obras</option>
+                {works.map((work) => (
+                  <option key={work.id} value={work.id}>
+                    {work.codigo} — {work.nome}
+                  </option>
+                ))}
+              </NativeSelect>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="formato">Formato dos arquivos</Label>

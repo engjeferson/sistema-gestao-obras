@@ -41,6 +41,7 @@ export async function GET(request: Request) {
   const dataInicio = url.searchParams.get("dataInicio");
   const dataFim = url.searchParams.get("dataFim");
   const formato = url.searchParams.get("formato");
+  const workId = url.searchParams.get("workId") || undefined;
   if (!dataInicio || !dataFim) {
     return NextResponse.json({ error: "Informe o período (data início e data fim)." }, { status: 400 });
   }
@@ -49,6 +50,9 @@ export async function GET(request: Request) {
   }
 
   const workAccess = await getCurrentWorkAccess();
+  if (workId && workAccess !== null && !workAccess.includes(workId)) {
+    return NextResponse.json({ error: "Você não tem acesso a essa obra." }, { status: 403 });
+  }
   const inicio = new Date(dataInicio);
   const fim = new Date(dataFim);
   fim.setUTCHours(23, 59, 59, 999);
@@ -56,7 +60,7 @@ export async function GET(request: Request) {
   const invoices = await prisma.invoice.findMany({
     where: {
       dataEmissao: { gte: inicio, lte: fim },
-      workId: workAccess !== null ? { in: workAccess } : undefined,
+      workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined),
     },
     include: { supplier: true, incomingNFe: { select: { xmlCompleto: true } } },
     orderBy: { dataEmissao: "asc" },
