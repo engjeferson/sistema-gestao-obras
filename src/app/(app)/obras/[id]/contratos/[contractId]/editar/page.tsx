@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import { ContractForm } from "@/components/contratos/contract-form";
 import { getContract, updateContract } from "@/server/actions/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
+import { getWork } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
-import { listClients } from "@/server/actions/clientes";
 
 export default async function EditarContratoPage({
   params,
@@ -11,11 +11,11 @@ export default async function EditarContratoPage({
   params: Promise<{ id: string; contractId: string }>;
 }) {
   const { id, contractId } = await params;
-  const [contract, companySettings, suppliers, clients] = await Promise.all([
+  const [contract, companySettings, work, suppliers] = await Promise.all([
     getContract(contractId),
     getCompanySettings(),
+    getWork(id),
     listSuppliers(),
-    listClients(),
   ]);
 
   if (!contract || contract.workId !== id) {
@@ -33,14 +33,13 @@ export default async function EditarContratoPage({
         action={updateContractWithId}
         workId={id}
         companyName={companySettings.nome}
+        workClient={work?.client ? { id: work.client.id, nome: work.client.nome } : null}
         supplierNames={suppliers.map((s) => s.nome)}
-        clients={clients.map((c) => ({ id: c.id, nome: c.nome }))}
         submitLabel="Salvar alterações"
         defaultValues={{
           nome: contract.nome,
           tipo: contract.tipo,
           direcao: contract.direcao,
-          contratanteClientId: contract.contratanteClientId,
           contratado: contract.contratado,
           valor: contract.valor !== null ? Number(contract.valor) : null,
           data: contract.data,
