@@ -47,11 +47,16 @@ export async function presignGet(key: string, expiresInSeconds = 600) {
 }
 
 export async function getObjectBase64(key: string): Promise<string> {
+  const bytes = await getObjectBuffer(key);
+  return bytes.toString("base64");
+}
+
+export async function getObjectBuffer(key: string): Promise<Buffer> {
   const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
   const response = await r2Client.send(command);
   const bytes = await response.Body?.transformToByteArray();
   if (!bytes) {
     throw new Error(`Objeto não encontrado no R2: ${key}`);
   }
-  return Buffer.from(bytes).toString("base64");
+  return Buffer.from(bytes);
 }

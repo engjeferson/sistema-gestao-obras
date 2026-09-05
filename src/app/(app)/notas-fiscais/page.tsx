@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Radar } from "lucide-react";
+import { Plus, Radar, Download } from "lucide-react";
 import { listInvoices } from "@/server/actions/notas-fiscais";
 import { countPendingIncomingNFes } from "@/server/actions/sefaz-radar";
 import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
@@ -43,6 +43,9 @@ export default async function NotasFiscaisPage({
           <p className="text-muted-foreground">Compras e materiais lançados em todas as obras.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" render={<Link href="/notas-fiscais/download" />} nativeButton={false}>
+            <Download /> Baixar em massa
+          </Button>
           <Button variant="outline" render={<Link href="/notas-fiscais/radar" />} nativeButton={false}>
             <Radar /> Radar de NF-e
             {pendentesRadar > 0 ? <Badge variant="warning">{pendentesRadar}</Badge> : null}
