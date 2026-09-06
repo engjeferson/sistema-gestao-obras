@@ -36,10 +36,10 @@ const STATUS_LABELS: Record<string, string> = {
   IGNORADA: "Ignorada",
 };
 
-const STATUS_BADGE: Record<string, "success" | "secondary" | "warning"> = {
+const STATUS_BADGE: Record<string, "success" | "destructive" | "warning"> = {
   PENDENTE: "warning",
   LANCADA: "success",
-  IGNORADA: "secondary",
+  IGNORADA: "destructive",
 };
 
 function RowActions({ row }: { row: IncomingNFeRow }) {
