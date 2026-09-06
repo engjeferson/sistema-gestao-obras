@@ -83,7 +83,7 @@ export async function enviarManifestacao(params: {
 
   console.log(`[manifestacao] chave=${params.chaveAcesso} tpEvento=${params.tpEvento} ambiente=${ambienteTpAmb()} evento (antes de assinar):`, evento);
 
-  const eventoAssinado = signInfEvento(evento, id, loadSefazCertPem());
+  const eventoAssinado = signInfEvento(evento, id, await loadSefazCertPem());
 
   console.log(`[manifestacao] chave=${params.chaveAcesso} evento assinado:`, eventoAssinado);
 

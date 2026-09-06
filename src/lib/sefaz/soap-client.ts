@@ -23,8 +23,8 @@ function extractSoapFaultReason(xml: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-function postSoap12(pathname: string, soapAction: string, body: string): Promise<string> {
-  const { pfx, passphrase } = loadSefazCert();
+async function postSoap12(pathname: string, soapAction: string, body: string): Promise<string> {
+  const { pfx, passphrase } = await loadSefazCert();
   const buffer = Buffer.from(body, "utf-8");
   const hostname = getAmbienteHost();
 
