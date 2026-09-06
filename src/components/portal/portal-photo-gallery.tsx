@@ -5,9 +5,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-type Photo = { url: string; descricao: string | null };
+type Photo = { url: string | null; descricao: string | null };
 
-export function PortalPhotoGallery({ photos }: { photos: Photo[] }) {
+export function PortalPhotoGallery({ photos: allPhotos }: { photos: Photo[] }) {
+  const photos = allPhotos.filter((foto): foto is Photo & { url: string } => Boolean(foto.url));
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const current = openIndex !== null ? photos[openIndex] : null;
 

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDocumento, formatTelefone } from "@/lib/masks";
+import { ClientPeopleEditor } from "@/components/cadastros/client-people-editor";
+import type { ClientPersonValues } from "@/lib/validations/clientes";
 import type { ClientModel } from "@/generated/prisma/models";
 
 function formatCep(value: string) {
@@ -23,13 +25,18 @@ type Endereco = {
 export function ClientForm({
   action,
   defaultValues,
+  defaultPeople,
   submitLabel,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   defaultValues?: Partial<ClientModel>;
+  defaultPeople?: ClientPersonValues[];
   submitLabel: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [people, setPeople] = useState<ClientPersonValues[]>(
+    defaultPeople && defaultPeople.length > 0 ? defaultPeople : [{ nome: defaultValues?.nome ?? "", dataAniversario: undefined }],
+  );
   const [documento, setDocumento] = useState(formatDocumento(defaultValues?.documento ?? ""));
   const [telefone, setTelefone] = useState(formatTelefone(defaultValues?.telefone ?? ""));
   const [cep, setCep] = useState(defaultValues?.cep ?? "");
@@ -69,11 +76,13 @@ export function ClientForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <input type="hidden" name="peopleJson" value={JSON.stringify(people)} readOnly />
+
+      <div className="flex flex-col gap-2">
+        <ClientPeopleEditor people={people} onChange={setPeople} />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label htmlFor="nome">Nome</Label>
-          <Input id="nome" name="nome" defaultValue={defaultValues?.nome} required />
-        </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="documento">CPF/CNPJ</Label>
           <Input

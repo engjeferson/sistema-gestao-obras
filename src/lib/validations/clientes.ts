@@ -1,7 +1,16 @@
 import { z } from "zod";
 
-export const clientFormSchema = z.object({
+export const clientPersonSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome."),
+  dataAniversario: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+});
+
+export const clientFormSchema = z.object({
+  people: z.array(clientPersonSchema).min(1, "Informe ao menos uma pessoa."),
   documento: z.string().trim().optional(),
   telefone: z.string().trim().optional(),
   email: z.string().trim().optional(),
@@ -16,3 +25,4 @@ export const clientFormSchema = z.object({
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;
+export type ClientPersonValues = z.infer<typeof clientPersonSchema>;

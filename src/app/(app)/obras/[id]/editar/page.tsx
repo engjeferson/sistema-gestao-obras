@@ -16,7 +16,9 @@ export default async function EditarObraPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  const renderPreviewUrl = work.renderUrl ? await presignGet(work.renderUrl) : null;
+  const renderPreviewUrl = work.renderUrl
+    ? await presignGet(work.renderUrl).catch(() => null)
+    : null;
   const updateWorkWithId = updateWork.bind(null, work.id);
 
   return (
