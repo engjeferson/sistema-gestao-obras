@@ -17,7 +17,15 @@ async function findOrCreateMaterialId(
 ) {
   const trimmed = nome.trim();
   const existing = await prisma.material.findUnique({ where: { nome: trimmed } });
-  if (existing) return existing.id;
+  if (existing) {
+    // Preço do material sempre reflete a última compra lançada — o histórico
+    // de preços (tela de editar material) continua consultável pelos itens
+    // de NF já registrados, então nada se perde ao sobrescrever aqui.
+    if (precoUnitario > 0 && Number(existing.precoUnitario ?? 0) !== precoUnitario) {
+      await prisma.material.update({ where: { id: existing.id }, data: { precoUnitario } });
+    }
+    return existing.id;
+  }
   const created = await prisma.material.create({
     data: { nome: trimmed, unidadePadrao, precoUnitario: precoUnitario > 0 ? precoUnitario : null },
   });

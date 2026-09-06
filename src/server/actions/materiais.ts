@@ -19,6 +19,29 @@ export async function getMaterial(materialId: string) {
   return prisma.material.findUnique({ where: { id: materialId } });
 }
 
+export async function getMaterialPriceHistory(materialId: string) {
+  const items = await prisma.invoiceItem.findMany({
+    where: { materialId },
+    select: {
+      id: true,
+      quantidade: true,
+      valorUnitario: true,
+      invoice: { select: { numero: true, dataEmissao: true, supplier: { select: { nome: true } } } },
+    },
+    orderBy: { invoice: { dataEmissao: "desc" } },
+    take: 50,
+  });
+
+  return items.map((item) => ({
+    id: item.id,
+    quantidade: Number(item.quantidade),
+    valorUnitario: Number(item.valorUnitario),
+    numeroNF: item.invoice.numero,
+    fornecedorNome: item.invoice.supplier.nome,
+    dataEmissao: item.invoice.dataEmissao,
+  }));
+}
+
 function parseMaterialForm(formData: FormData) {
   return materialFormSchema.safeParse({
     nome: formData.get("nome"),
