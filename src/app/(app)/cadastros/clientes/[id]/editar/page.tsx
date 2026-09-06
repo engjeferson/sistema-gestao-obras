@@ -11,10 +11,23 @@ export default async function EditarClientePage({ params }: { params: Promise<{ 
 
   const updateClientWithId = updateClient.bind(null, client.id);
 
+  const defaultPeople =
+    client.people.length > 0
+      ? client.people.map((p) => ({
+          nome: p.nome,
+          dataAniversario: p.dataAniversario ? p.dataAniversario.toISOString().slice(0, 10) : undefined,
+        }))
+      : [{ nome: client.nome, dataAniversario: undefined }];
+
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       <h2 className="text-lg font-semibold">Editar cliente</h2>
-      <ClientForm action={updateClientWithId} defaultValues={client} submitLabel="Salvar alterações" />
+      <ClientForm
+        action={updateClientWithId}
+        defaultValues={client}
+        defaultPeople={defaultPeople}
+        submitLabel="Salvar alterações"
+      />
     </div>
   );
 }

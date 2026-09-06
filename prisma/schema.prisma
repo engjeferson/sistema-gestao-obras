@@ -218,6 +218,23 @@ model Client {
   works                 Work[]
   financialTransactions FinancialTransaction[]
   contracts             Contract[]
+  people                ClientPerson[]
+}
+
+// Pessoas ligadas a um cliente (ex: casal) — nome de cada uma e data de
+// aniversário. `Client.nome` guarda o nome já combinado (ex: "Ricardo e
+// Maria"), gerado a partir desta lista, pra continuar funcionando sem
+// mudança em todo lugar que já exibe/busca por `Client.nome`.
+model ClientPerson {
+  id              String    @id @default(cuid())
+  clientId        String
+  nome            String
+  dataAniversario DateTime? @db.Date
+  createdAt       DateTime  @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
 }
 
 model Supplier {

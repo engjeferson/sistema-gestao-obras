@@ -7,18 +7,32 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { clientFormSchema } from "@/lib/validations/clientes";
+import { joinPeopleNames } from "@/lib/text";
 
 export async function listClients() {
   return prisma.client.findMany({ orderBy: { nome: "asc" } });
 }
 
 export async function getClient(clientId: string) {
-  return prisma.client.findUnique({ where: { id: clientId } });
+  return prisma.client.findUnique({
+    where: { id: clientId },
+    include: { people: { orderBy: { createdAt: "asc" } } },
+  });
+}
+
+function parseJsonField<T>(formData: FormData, key: string, fallback: T): T {
+  const raw = formData.get(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 function parseClientForm(formData: FormData) {
   return clientFormSchema.safeParse({
-    nome: formData.get("nome"),
+    people: parseJsonField(formData, "peopleJson", []),
     documento: formData.get("documento") ?? undefined,
     telefone: formData.get("telefone") ?? undefined,
     email: formData.get("email") ?? undefined,
@@ -43,10 +57,11 @@ export async function createClient(_prevState: string | undefined, formData: For
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const nome = joinPeopleNames(data.people.map((p) => p.nome));
 
   await prisma.client.create({
     data: {
-      nome: data.nome,
+      nome,
       documento: data.documento || null,
       telefone: data.telefone || null,
       email: data.email || null,
@@ -58,6 +73,12 @@ export async function createClient(_prevState: string | undefined, formData: For
       cidade: data.cidade || null,
       uf: data.uf || null,
       observacoes: data.observacoes || null,
+      people: {
+        create: data.people.map((p) => ({
+          nome: p.nome,
+          dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
+        })),
+      },
     },
   });
 
@@ -75,11 +96,12 @@ export async function updateClient(clientId: string, _prevState: string | undefi
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const nome = joinPeopleNames(data.people.map((p) => p.nome));
 
   await prisma.client.update({
     where: { id: clientId },
     data: {
-      nome: data.nome,
+      nome,
       documento: data.documento || null,
       telefone: data.telefone || null,
       email: data.email || null,
@@ -91,6 +113,13 @@ export async function updateClient(clientId: string, _prevState: string | undefi
       cidade: data.cidade || null,
       uf: data.uf || null,
       observacoes: data.observacoes || null,
+      people: {
+        deleteMany: {},
+        create: data.people.map((p) => ({
+          nome: p.nome,
+          dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
+        })),
+      },
     },
   });
 

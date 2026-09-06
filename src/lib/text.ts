@@ -68,3 +68,11 @@ export function getInitials(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();
 }
+
+/** Junta os nomes de um casal/grupo de pessoas de um cliente num único texto (ex: "João e Maria"). */
+export function joinPeopleNames(names: string[]) {
+  const cleaned = names.map((n) => n.trim()).filter(Boolean);
+  if (cleaned.length === 0) return "";
+  if (cleaned.length === 1) return cleaned[0];
+  return `${cleaned.slice(0, -1).join(", ")} e ${cleaned[cleaned.length - 1]}`;
+}
