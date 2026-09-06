@@ -137,6 +137,7 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
 
   revalidatePath("/notas-fiscais");
   revalidatePath("/estoque");
+  revalidatePath("/cadastros/materiais");
   if (data.workId) {
     revalidatePath(`/obras/${data.workId}/materiais`);
     revalidatePath(`/obras/${data.workId}/financeiro`);
