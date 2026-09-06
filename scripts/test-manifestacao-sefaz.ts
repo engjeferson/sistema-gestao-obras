@@ -181,7 +181,7 @@ function dhEventoAgora(): string {
   return `${brasilia.getUTCFullYear()}-${pad(brasilia.getUTCMonth() + 1)}-${pad(brasilia.getUTCDate())}T${pad(brasilia.getUTCHours())}:${pad(brasilia.getUTCMinutes())}:${pad(brasilia.getUTCSeconds())}-03:00`;
 }
 
-function montarEnvEventoAssinado(nSeqEvento: number, cOrgao: string): { envEvento: string; id: string } {
+async function montarEnvEventoAssinado(nSeqEvento: number, cOrgao: string): Promise<{ envEvento: string; id: string }> {
   const cnpj = CNPJ_DESTINATARIO.replace(/\D/g, "");
   const nSeqPad = String(nSeqEvento).padStart(2, "0");
   const id = `ID${TP_EVENTO}${CHAVE}${nSeqPad}`;
@@ -189,7 +189,7 @@ function montarEnvEventoAssinado(nSeqEvento: number, cOrgao: string): { envEvent
 
   const infEvento = `<infEvento Id="${id}"><cOrgao>${cOrgao}</cOrgao><tpAmb>1</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${CHAVE}</chNFe><dhEvento>${dhEventoAgora()}</dhEvento><tpEvento>${TP_EVENTO}</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>Ciencia da Operacao</descEvento></detEvento></infEvento>`;
   const evento = `<evento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">${infEvento}</evento>`;
-  const eventoAssinado = signInfEvento(evento, id, loadSefazCertPem());
+  const eventoAssinado = signInfEvento(evento, id, await loadSefazCertPem());
   const envEvento = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>${idLote}</idLote>${eventoAssinado}</envEvento>`;
   return { envEvento, id };
 }
@@ -256,8 +256,8 @@ function post(hostname: string, path_: string, headers: Record<string, string | 
 }
 
 async function testarVariante(variante: Variante, nSeqEvento: number): Promise<ResultadoVariante> {
-  const { pfx, passphrase } = loadSefazCert();
-  const { envEvento, id } = montarEnvEventoAssinado(nSeqEvento, variante.cOrgao ?? "91");
+  const { pfx, passphrase } = await loadSefazCert();
+  const { envEvento, id } = await montarEnvEventoAssinado(nSeqEvento, variante.cOrgao ?? "91");
   const envelope = montarEnvelope(variante, envEvento);
   const body = Buffer.from(envelope, "utf-8");
 

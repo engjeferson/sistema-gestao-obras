@@ -1,0 +1,10 @@
+ALTER TABLE "CompanySettings" ADD COLUMN "certificadoArquivoNome" TEXT,
+ADD COLUMN "certificadoTitular" TEXT,
+ADD COLUMN "certificadoValidoAte" TIMESTAMP(3),
+ADD COLUMN "certificadoEnviadoEm" TIMESTAMP(3),
+ADD COLUMN "certificadoDados" BYTEA,
+ADD COLUMN "certificadoIv" BYTEA,
+ADD COLUMN "certificadoAuthTag" BYTEA,
+ADD COLUMN "certificadoSenha" BYTEA,
+ADD COLUMN "certificadoSenhaIv" BYTEA,
+ADD COLUMN "certificadoSenhaAuthTag" BYTEA;

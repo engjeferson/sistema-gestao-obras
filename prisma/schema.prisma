@@ -164,6 +164,21 @@ model CompanySettings {
   sefazUltimoNsu         String?
   sefazUltimaTentativaEm DateTime?
   updatedAt              DateTime  @updatedAt
+
+  // Certificado digital A1 (.pfx/.p12) usado para autenticar (mTLS) e assinar
+  // XML junto à SEFAZ. Arquivo e senha nunca ficam em texto plano — ambos
+  // passam por AES-256-GCM (ver src/lib/secrets.ts) com a chave vinda de
+  // CERT_ENCRYPTION_KEY (variável de ambiente, nunca fica no banco).
+  certificadoArquivoNome  String?
+  certificadoTitular      String?
+  certificadoValidoAte    DateTime?
+  certificadoEnviadoEm    DateTime?
+  certificadoDados        Bytes?
+  certificadoIv           Bytes?
+  certificadoAuthTag      Bytes?
+  certificadoSenha        Bytes?
+  certificadoSenhaIv      Bytes?
+  certificadoSenhaAuthTag Bytes?
 }
 
 enum IncomingNFeStatus {
