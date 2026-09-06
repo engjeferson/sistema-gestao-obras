@@ -75,7 +75,7 @@ export async function getPortalData(token: string) {
     Math.floor((hoje.getTime() - work.dataInicio.getTime()) / (1000 * 60 * 60 * 24)),
   );
 
-  const renderUrl = work.renderUrl ? await presignGet(work.renderUrl, 3600) : null;
+  const renderUrl = work.renderUrl ? await presignGet(work.renderUrl, 3600).catch(() => null) : null;
 
   return {
     nome: work.nome,
@@ -134,7 +134,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       })),
       fotos: await Promise.all(
         rdo.photos.map(async (photo) => ({
-          url: await presignGet(photo.url, 3600),
+          url: await presignGet(photo.url, 3600).catch(() => null),
           descricao: photo.descricao,
         })),
       ),
