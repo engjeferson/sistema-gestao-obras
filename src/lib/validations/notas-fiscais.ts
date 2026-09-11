@@ -18,6 +18,7 @@ export const invoiceEntradaSchema = z.object({
   valor: z.coerce.number().positive("Informe um valor de entrada maior que zero."),
   dataVencimento: z.string().min(1, "Informe a data da entrada."),
   paga: z.boolean().optional(),
+  comprovanteUrl: z.string().optional(),
 });
 
 export const invoiceFormSchema = z
