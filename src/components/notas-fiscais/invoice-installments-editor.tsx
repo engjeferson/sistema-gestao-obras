@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AttachmentField } from "@/components/notas-fiscais/attachment-field";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { InvoiceInstallmentValues } from "@/lib/validations/notas-fiscais";
@@ -130,17 +131,15 @@ export function InvoiceInstallmentsEditor({
 
       <input type="hidden" name="comprovanteEntradaUrl" value={comprovanteEntradaUrl ?? ""} readOnly />
       {temEntrada && entradaPaga ? (
-        <div className="flex flex-col gap-2 sm:max-w-sm">
-          <Label htmlFor="comprovanteEntrada">Comprovante de pagamento da entrada (opcional)</Label>
-          <Input
-            id="comprovanteEntrada"
-            type="file"
-            disabled={uploadingComprovante}
-            onChange={(e) => void handleComprovanteChange(e.target.files?.[0])}
-          />
-          {uploadingComprovante ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-          {comprovanteEntradaUrl ? <p className="text-xs text-success">Comprovante anexado.</p> : null}
-        </div>
+        <AttachmentField
+          id="comprovanteEntrada"
+          label="Comprovante de pagamento da entrada (opcional)"
+          uploading={uploadingComprovante}
+          url={comprovanteEntradaUrl}
+          className="sm:max-w-sm"
+          onFileChange={(file) => void handleComprovanteChange(file)}
+          onRemove={() => setComprovanteEntradaUrl(null)}
+        />
       ) : null}
 
       <div className="flex flex-wrap items-end gap-2">

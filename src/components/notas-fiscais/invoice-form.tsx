@@ -10,6 +10,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { InvoiceItemsEditor } from "@/components/notas-fiscais/invoice-items-editor";
 import { InvoiceInstallmentsEditor } from "@/components/notas-fiscais/invoice-installments-editor";
 import { XmlItemsReviewDialog } from "@/components/notas-fiscais/xml-items-review-dialog";
+import { AttachmentField } from "@/components/notas-fiscais/attachment-field";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { parseNFeXml } from "@/lib/parse-nfe-xml";
 import { formatCurrencyBRL } from "@/lib/status-labels";
@@ -191,23 +192,20 @@ export function InvoiceForm({
       <input type="hidden" name="comprovanteUrl" value={comprovanteUrl ?? ""} readOnly />
       <input type="hidden" name="radarId" value={radarId ?? ""} readOnly />
 
-      <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
-        <Label htmlFor="arquivoXml">Importar XML da NF (opcional)</Label>
-        <Input
+      <div className="rounded-lg border border-dashed p-4">
+        <AttachmentField
           id="arquivoXml"
-          type="file"
+          label="Importar XML da NF (opcional)"
           accept=".xml,text/xml"
-          disabled={uploadingXml}
-          onChange={(e) => {
+          uploading={uploadingXml}
+          url={arquivoXmlUrl}
+          helperText="Selecione o XML da nota fiscal para preencher fornecedor, número, data e itens automaticamente."
+          onFileChange={(file) => {
             const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
-            void handleFileChange(e.target.files?.[0], "xml", workSelect?.value ?? "");
+            void handleFileChange(file, "xml", workSelect?.value ?? "");
           }}
+          onRemove={() => setArquivoXmlUrl(null)}
         />
-        <p className="text-xs text-muted-foreground">
-          Selecione o XML da nota fiscal para preencher fornecedor, número, data e itens automaticamente.
-        </p>
-        {uploadingXml ? <p className="text-xs text-muted-foreground">Enviando anexo...</p> : null}
-        {arquivoXmlUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -349,21 +347,19 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:max-w-sm">
-        <Label htmlFor="arquivoPdf">Arquivo PDF</Label>
-        <Input
-          id="arquivoPdf"
-          type="file"
-          accept="application/pdf"
-          disabled={uploadingPdf}
-          onChange={(e) => {
-            const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
-            void handleFileChange(e.target.files?.[0], "pdf", workSelect?.value ?? "");
-          }}
-        />
-        {uploadingPdf ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-        {arquivoUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
-      </div>
+      <AttachmentField
+        id="arquivoPdf"
+        label="Arquivo PDF"
+        accept="application/pdf"
+        uploading={uploadingPdf}
+        url={arquivoUrl}
+        className="sm:max-w-sm"
+        onFileChange={(file) => {
+          const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
+          void handleFileChange(file, "pdf", workSelect?.value ?? "");
+        }}
+        onRemove={() => setArquivoUrl(null)}
+      />
 
       <div className="flex flex-col gap-3 rounded-lg border p-4">
         <label className="flex items-center gap-2 text-sm font-medium">
@@ -414,20 +410,18 @@ export function InvoiceForm({
                   Já foi paga (à vista)
                 </label>
                 {contaPaga ? (
-                  <div className="flex flex-col gap-2 sm:max-w-sm">
-                    <Label htmlFor="comprovante">Comprovante de pagamento (opcional)</Label>
-                    <Input
-                      id="comprovante"
-                      type="file"
-                      disabled={uploadingComprovante}
-                      onChange={(e) => {
-                        const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
-                        void handleFileChange(e.target.files?.[0], "comprovante", workSelect?.value ?? "");
-                      }}
-                    />
-                    {uploadingComprovante ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-                    {comprovanteUrl ? <p className="text-xs text-success">Comprovante anexado.</p> : null}
-                  </div>
+                  <AttachmentField
+                    id="comprovante"
+                    label="Comprovante de pagamento (opcional)"
+                    uploading={uploadingComprovante}
+                    url={comprovanteUrl}
+                    className="sm:max-w-sm"
+                    onFileChange={(file) => {
+                      const workSelect = document.getElementById("workId") as HTMLSelectElement | null;
+                      void handleFileChange(file, "comprovante", workSelect?.value ?? "");
+                    }}
+                    onRemove={() => setComprovanteUrl(null)}
+                  />
                 ) : null}
               </div>
             ) : null}
