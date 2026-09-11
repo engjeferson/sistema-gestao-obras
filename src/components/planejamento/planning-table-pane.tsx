@@ -722,9 +722,8 @@ function TaskRowView({
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <input
-        type="number"
-        min={0}
-        step="0.1"
+        type="text"
+        inputMode="decimal"
         disabled={isPending}
         value={peso}
         title="Impacto da atividade dentro da etapa — usado pra calcular o avanço físico da etapa"
