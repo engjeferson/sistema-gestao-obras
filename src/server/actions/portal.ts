@@ -7,26 +7,23 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { presignGet } from "@/lib/r2";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
-import { hasAnyTaskInSubtree } from "@/lib/planning";
-
-function average(values: number[]) {
-  return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
-}
+import { hasAnyTaskInSubtree, computeWeightedAvanco, type WeightedProgress } from "@/lib/planning";
 
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-// Percentuais "folha" dentro da subárvore de uma etapa: quando ela mesma funciona como "atividade
-// solta" (sem nenhuma tarefa nela ou em qualquer sub dela), conta o percentual da própria etapa;
-// senão, agrega o das tarefas diretas + o que vier recursivamente das sub-etapas. Mesma regra do
-// RDO (`listPlanningTasksForPicker`), aplicada aqui pra não zerar o progresso de etapas soltas.
-function collectLeafPercentages(stage: StageTreeNode): number[] {
+// Percentuais "folha" (com peso) dentro da subárvore de uma etapa: quando ela mesma funciona como
+// "atividade solta" (sem nenhuma tarefa nela ou em qualquer sub dela), conta o percentual da
+// própria etapa; senão, agrega o das tarefas diretas + o que vier recursivamente das sub-etapas,
+// cada uma com seu peso (impacto) — mesma regra do RDO (`listPlanningTasksForPicker`), aplicada
+// aqui pra não zerar o progresso de etapas soltas.
+function collectLeafPercentages(stage: StageTreeNode): WeightedProgress[] {
   if (!hasAnyTaskInSubtree(stage)) {
-    return [Number(stage.percentualExecutado)];
+    return [{ percentualExecutado: Number(stage.percentualExecutado), peso: 1 }];
   }
   return [
-    ...stage.tasks.map((task) => Number(task.percentualExecutado)),
+    ...stage.tasks.map((task) => ({ percentualExecutado: Number(task.percentualExecutado), peso: Number(task.peso) })),
     ...stage.children.flatMap(collectLeafPercentages),
   ];
 }
@@ -61,12 +58,12 @@ export async function getPortalData(token: string) {
     }),
   ]);
 
-  const percentualExecutado = average(stageTree.flatMap(collectLeafPercentages));
+  const percentualExecutado = computeWeightedAvanco(stageTree.flatMap(collectLeafPercentages));
 
   const etapas = flattenStages(stageTree).map((stage) => ({
     id: stage.id,
     nome: stage.nome,
-    percentualExecutado: average(collectLeafPercentages(stage)),
+    percentualExecutado: computeWeightedAvanco(collectLeafPercentages(stage)),
   }));
 
   const hoje = new Date();

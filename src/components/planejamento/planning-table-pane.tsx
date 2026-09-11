@@ -30,10 +30,11 @@ import {
   updateStageName,
   updateStageProgress,
   updateTaskName,
+  updateTaskPeso,
 } from "@/server/actions/planejamento";
 import { ROW_HEIGHT, HEADER_HEIGHT } from "@/components/gantt/gantt-canvas";
 
-const GRID = "28px 52px minmax(180px,1fr) 104px 104px 58px 58px 104px 190px 32px";
+const GRID = "28px 52px minmax(180px,1fr) 104px 104px 58px 58px 58px 104px 190px 32px";
 
 type PendingRow = { kind: "stage" | "task"; groupId: string | null };
 type AugRow = PlanningRow | { type: "pending"; kind: "stage" | "task"; groupId: string | null };
@@ -234,6 +235,7 @@ export function PlanningTablePane({
         <span>Início</span>
         <span>Término</span>
         <span>Dias</span>
+        <span title="Impacto da atividade dentro da etapa">Peso</span>
         <span>%</span>
         <span>Status</span>
         <span>Predecessoras</span>
@@ -308,7 +310,7 @@ function PendingRowView({
     <div className="grid items-center border-b bg-accent/40 px-1" style={{ gridTemplateColumns: GRID, height: ROW_HEIGHT }}>
       <span />
       <span className="text-muted-foreground">…</span>
-      <div className="col-span-8">
+      <div className="col-span-9">
         <EditableName
           value=""
           autoEdit
@@ -404,6 +406,7 @@ function StageRowView({
       </button>
       <EditableName value={stage.nome} bold onCommit={handleRename} />
       <StageDateCells stage={stage} row={row} workId={workId} calendar={calendar} />
+      <StagePesoCell stage={stage} />
       <StageProgressCells stage={stage} workId={workId} />
       <PredecessorsCell
         workId={workId}
@@ -430,6 +433,25 @@ function StageRowView({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// Soma do peso das atividades diretas da etapa — pra ficar visível se está extrapolando 100 (o
+// peso não PRECISA somar 100 pra funcionar matematicamente, mas é assim que o usuário pensa nele:
+// "30% pra esquadria interna, 70% pra externa"), então só um aviso visual, não bloqueia o preenchimento.
+function StagePesoCell({ stage }: { stage: PlainStage }) {
+  if (stage.tasks.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const total = stage.tasks.reduce((sum, t) => sum + t.peso, 0);
+  const isOver = total > 100;
+  return (
+    <span
+      className={`text-xs ${isOver ? "font-semibold text-destructive" : "text-muted-foreground"}`}
+      title="Soma do peso das atividades desta etapa"
+    >
+      {Number.isInteger(total) ? total : total.toFixed(1)}
+    </span>
   );
 }
 
@@ -478,9 +500,13 @@ function StageDateCells({
   }
 
   // Só dá pra digitar a duração (e calcular o Fim sozinho) quando já tem um Início — sem isso não
-  // tem de onde contar os dias.
+  // tem de onde contar os dias. Só salva no servidor ao sair do campo (blur/Enter) — a cada tecla
+  // deixaria a digitação lenta.
   function handleDurationChange(value: string) {
     setDurationDraft(value);
+  }
+
+  function commitDuration(value: string) {
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -513,14 +539,20 @@ function StageDateCells({
         className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <input
-        type="number"
-        min={1}
+        type="text"
+        inputMode="numeric"
         disabled={!start}
         value={durationDraft ?? (duration !== null ? String(duration) : "")}
         title="Dias úteis, conforme o calendário da obra"
         onFocus={() => setDurationDraft(duration !== null ? String(duration) : "")}
         onChange={(e) => handleDurationChange(e.target.value)}
-        onBlur={() => setDurationDraft(null)}
+        onBlur={(e) => {
+          commitDuration(e.target.value);
+          setDurationDraft(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
     </>
@@ -607,6 +639,11 @@ function TaskRowView({
   const [start, setStart] = useState(toDateInputValue(task.dataInicioPrevista));
   const [end, setEnd] = useState(toDateInputValue(task.dataFimPrevista));
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
+  const [peso, setPeso] = useState(String(task.peso));
+
+  useEffect(() => {
+    setPeso(String(task.peso));
+  }, [task.peso]);
 
   useEffect(() => {
     setStart(toDateInputValue(task.dataInicioPrevista));
@@ -628,8 +665,12 @@ function TaskRowView({
     });
   }
 
+  // Só salva no servidor ao sair do campo (blur/Enter) — a cada tecla deixaria a digitação lenta.
   function handleDurationChange(value: string) {
     setDurationDraft(value);
+  }
+
+  function commitDuration(value: string) {
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -642,6 +683,15 @@ function TaskRowView({
     startTransition(async () => {
       await deleteTask(task.id, workId);
       toast.success("Atividade removida.");
+      router.refresh();
+    });
+  }
+
+  function commitPeso(value: string) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || n === task.peso) return;
+    startTransition(async () => {
+      await updateTaskPeso(task.id, workId, n);
       router.refresh();
     });
   }
@@ -694,14 +744,33 @@ function TaskRowView({
         ) : null}
       </div>
       <input
-        type="number"
-        min={1}
+        type="text"
+        inputMode="numeric"
         value={durationDraft ?? String(duration)}
         title="Dias úteis, conforme o calendário da obra"
         onFocus={() => setDurationDraft(String(duration))}
         onChange={(e) => handleDurationChange(e.target.value)}
-        onBlur={() => setDurationDraft(null)}
+        onBlur={(e) => {
+          commitDuration(e.target.value);
+          setDurationDraft(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+      />
+      <input
+        type="text"
+        inputMode="decimal"
+        disabled={isPending}
+        value={peso}
+        title="Impacto da atividade dentro da etapa — usado pra calcular o avanço físico da etapa"
+        onChange={(e) => setPeso(e.target.value)}
+        onBlur={(e) => commitPeso(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="w-12 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <span className="text-xs text-muted-foreground">{Number(task.percentualExecutado).toFixed(0)}%</span>
       <Badge

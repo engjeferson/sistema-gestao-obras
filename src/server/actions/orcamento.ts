@@ -19,6 +19,7 @@ import {
   buildStageAlerts,
 } from "@/lib/budget";
 import { budgetItemFormSchema } from "@/lib/validations/orcamento";
+import { computeWeightedAvanco } from "@/lib/planning";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
 
@@ -83,6 +84,7 @@ export async function getBudgetVsActualByStage(workId: string) {
       const saldo = computeSaldo({ orcado, projetado });
       const maoDeObra = sumTxCategoria((t) => t.taskId === task.id, maoDeObraCategoriaId);
       const avancoFisico = Number(task.percentualExecutado);
+      const peso = Number(task.peso);
       const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
       const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
       return {
@@ -98,6 +100,7 @@ export async function getBudgetVsActualByStage(workId: string) {
         maoDeObra,
         material,
         avancoFisico,
+        peso,
         avancoFinanceiro,
         diferenca,
         status,
@@ -113,9 +116,12 @@ export async function getBudgetVsActualByStage(workId: string) {
     const saldo = computeSaldo({ orcado, projetado });
     const maoDeObra = sumTxCategoria((t) => t.stageId === stage.id, maoDeObraCategoriaId);
     // Sem atividade nenhuma, a etapa funciona como uma "atividade solta" — usa o % próprio dela
-    // em vez de zerar o avanço físico da obra.
+    // em vez de zerar o avanço físico da obra. Com atividades, pondera pelo peso de cada uma —
+    // não divide o percentual igualmente entre elas.
     const avancoFisico =
-      tasks.length > 0 ? tasks.reduce((sum, t) => sum + t.avancoFisico, 0) / tasks.length : Number(stage.percentualExecutado);
+      tasks.length > 0
+        ? computeWeightedAvanco(tasks.map((t) => ({ percentualExecutado: t.avancoFisico, peso: t.peso })))
+        : Number(stage.percentualExecutado);
     const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido: projetado, orcado });
     const { diferenca, status } = computeFisicoFinanceiroStatus({ fisico: avancoFisico, financeiro: avancoFinanceiro });
 
