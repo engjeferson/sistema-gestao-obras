@@ -18,6 +18,20 @@ export function getEffectiveStatus(entity: { percentualExecutado: number; dataFi
   return "NAO_INICIADA";
 }
 
+export type WeightedProgress = { percentualExecutado: number; peso: number };
+
+/**
+ * Avanço agregado a partir de itens com peso (impacto) diferente — em vez de dividir o percentual
+ * igualmente entre eles (ex: esquadria externa custando muito mais que a interna dentro da mesma
+ * etapa). Peso default é 1, então uma lista de itens sem peso customizado se comporta exatamente
+ * como uma média simples — mesmo resultado de antes deste campo existir.
+ */
+export function computeWeightedAvanco(items: WeightedProgress[]): number {
+  const totalPeso = items.reduce((sum, item) => sum + item.peso, 0);
+  if (totalPeso <= 0) return 0;
+  return items.reduce((sum, item) => sum + item.percentualExecutado * item.peso, 0) / totalPeso;
+}
+
 // Enquanto uma etapa (ou toda a subárvore dela) não tem nenhuma atividade cadastrada, ela funciona
 // como "atividade solta" — mesma regra usada na tela de Planejamento, no RDO e no portal do cliente
 // pra decidir se mostra o percentual da própria etapa ou agrega o das atividades.

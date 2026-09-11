@@ -30,10 +30,11 @@ import {
   updateStageName,
   updateStageProgress,
   updateTaskName,
+  updateTaskPeso,
 } from "@/server/actions/planejamento";
 import { ROW_HEIGHT, HEADER_HEIGHT } from "@/components/gantt/gantt-canvas";
 
-const GRID = "28px 52px minmax(180px,1fr) 104px 104px 58px 58px 104px 190px 32px";
+const GRID = "28px 52px minmax(180px,1fr) 104px 104px 58px 58px 58px 104px 190px 32px";
 
 type PendingRow = { kind: "stage" | "task"; groupId: string | null };
 type AugRow = PlanningRow | { type: "pending"; kind: "stage" | "task"; groupId: string | null };
@@ -234,6 +235,7 @@ export function PlanningTablePane({
         <span>Início</span>
         <span>Término</span>
         <span>Dias</span>
+        <span title="Impacto da atividade dentro da etapa">Peso</span>
         <span>%</span>
         <span>Status</span>
         <span>Predecessoras</span>
@@ -308,7 +310,7 @@ function PendingRowView({
     <div className="grid items-center border-b bg-accent/40 px-1" style={{ gridTemplateColumns: GRID, height: ROW_HEIGHT }}>
       <span />
       <span className="text-muted-foreground">…</span>
-      <div className="col-span-8">
+      <div className="col-span-9">
         <EditableName
           value=""
           autoEdit
@@ -404,6 +406,7 @@ function StageRowView({
       </button>
       <EditableName value={stage.nome} bold onCommit={handleRename} />
       <StageDateCells stage={stage} row={row} workId={workId} calendar={calendar} />
+      <span className="text-xs text-muted-foreground">—</span>
       <StageProgressCells stage={stage} workId={workId} />
       <PredecessorsCell
         workId={workId}
@@ -607,6 +610,11 @@ function TaskRowView({
   const [start, setStart] = useState(toDateInputValue(task.dataInicioPrevista));
   const [end, setEnd] = useState(toDateInputValue(task.dataFimPrevista));
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
+  const [peso, setPeso] = useState(String(task.peso));
+
+  useEffect(() => {
+    setPeso(String(task.peso));
+  }, [task.peso]);
 
   useEffect(() => {
     setStart(toDateInputValue(task.dataInicioPrevista));
@@ -642,6 +650,16 @@ function TaskRowView({
     startTransition(async () => {
       await deleteTask(task.id, workId);
       toast.success("Atividade removida.");
+      router.refresh();
+    });
+  }
+
+  function handlePesoChange(value: string) {
+    setPeso(value);
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return;
+    startTransition(async () => {
+      await updateTaskPeso(task.id, workId, n);
       router.refresh();
     });
   }
@@ -702,6 +720,16 @@ function TaskRowView({
         onChange={(e) => handleDurationChange(e.target.value)}
         onBlur={() => setDurationDraft(null)}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
+      />
+      <input
+        type="number"
+        min={0}
+        step="0.1"
+        disabled={isPending}
+        value={peso}
+        title="Impacto da atividade dentro da etapa — usado pra calcular o avanço físico da etapa"
+        onChange={(e) => handlePesoChange(e.target.value)}
+        className="w-12 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <span className="text-xs text-muted-foreground">{Number(task.percentualExecutado).toFixed(0)}%</span>
       <Badge

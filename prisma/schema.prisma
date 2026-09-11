@@ -654,6 +654,11 @@ model PlanningTask {
   baselineInicio      DateTime?      @db.Date
   baselineFim         DateTime?      @db.Date
   percentualExecutado Decimal        @default(0) @db.Decimal(5, 2)
+  // Impacto relativo da atividade dentro da etapa (ex: esquadria externa custa muito mais que a
+  // interna) — usado pra ponderar o avanço físico agregado da etapa, em vez de dividir o percentual
+  // igualmente entre as atividades. Default 1: uma etapa cujas atividades nunca tiveram o peso
+  // ajustado continua se comportando como média simples (comportamento de antes deste campo).
+  peso                Decimal        @default(1) @db.Decimal(8, 2)
   status              PlanningStatus @default(NAO_INICIADA)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt

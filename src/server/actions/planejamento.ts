@@ -189,6 +189,7 @@ export type StageTreeNode = {
     baselineInicio: Date | null;
     baselineFim: Date | null;
     percentualExecutado: number;
+    peso: number;
     status: string;
     predecessors: { id: string; predecessorTask: { id: string; codigo: string | null; nome: string } }[];
     predecessorChips: PredecessorChip[];
@@ -702,6 +703,23 @@ export async function createTask(_prevState: string | undefined, formData: FormD
 
   revalidatePath(`/obras/${data.workId}/planejamento`);
   return undefined;
+}
+
+/**
+ * Peso (impacto) da atividade dentro da etapa — usado pra ponderar o avanço físico agregado da
+ * etapa em vez de dividir o percentual igualmente entre as atividades (ver `computeWeightedAvanco`
+ * em `@/lib/planning`). Sem limite superior (é relativo às outras atividades da mesma etapa, não
+ * precisa somar 100), só não pode ser negativo.
+ */
+export async function updateTaskPeso(taskId: string, workId: string, peso: number) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  await assertModuleWrite("planejamentoSomenteLeitura");
+
+  const clamped = Math.max(0, peso);
+  await prisma.planningTask.update({ where: { id: taskId }, data: { peso: clamped } });
+
+  revalidatePath(`/obras/${workId}/planejamento`);
 }
 
 export async function updateTaskName(taskId: string, workId: string, nome: string) {

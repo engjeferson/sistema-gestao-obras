@@ -36,6 +36,7 @@ function mapStage(stage: StageTreeNode): PlainStage {
       baselineInicio: task.baselineInicio,
       baselineFim: task.baselineFim,
       percentualExecutado: Number(task.percentualExecutado),
+      peso: Number(task.peso),
       status: task.status,
       predecessorChips: task.predecessorChips,
     })),
