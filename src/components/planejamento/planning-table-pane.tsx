@@ -654,10 +654,9 @@ function TaskRowView({
     });
   }
 
-  function handlePesoChange(value: string) {
-    setPeso(value);
+  function commitPeso(value: string) {
     const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) return;
+    if (!Number.isFinite(n) || n < 0 || n === task.peso) return;
     startTransition(async () => {
       await updateTaskPeso(task.id, workId, n);
       router.refresh();
@@ -727,7 +726,11 @@ function TaskRowView({
         disabled={isPending}
         value={peso}
         title="Impacto da atividade dentro da etapa — usado pra calcular o avanço físico da etapa"
-        onChange={(e) => handlePesoChange(e.target.value)}
+        onChange={(e) => setPeso(e.target.value)}
+        onBlur={(e) => commitPeso(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
         className="w-12 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <span className="text-xs text-muted-foreground">{Number(task.percentualExecutado).toFixed(0)}%</span>
