@@ -481,9 +481,13 @@ function StageDateCells({
   }
 
   // Só dá pra digitar a duração (e calcular o Fim sozinho) quando já tem um Início — sem isso não
-  // tem de onde contar os dias.
+  // tem de onde contar os dias. Só salva no servidor ao sair do campo (blur/Enter) — a cada tecla
+  // deixaria a digitação lenta.
   function handleDurationChange(value: string) {
     setDurationDraft(value);
+  }
+
+  function commitDuration(value: string) {
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -516,14 +520,20 @@ function StageDateCells({
         className="w-[98px] rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <input
-        type="number"
-        min={1}
+        type="text"
+        inputMode="numeric"
         disabled={!start}
         value={durationDraft ?? (duration !== null ? String(duration) : "")}
         title="Dias úteis, conforme o calendário da obra"
         onFocus={() => setDurationDraft(duration !== null ? String(duration) : "")}
         onChange={(e) => handleDurationChange(e.target.value)}
-        onBlur={() => setDurationDraft(null)}
+        onBlur={(e) => {
+          commitDuration(e.target.value);
+          setDurationDraft(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
     </>
@@ -636,8 +646,12 @@ function TaskRowView({
     });
   }
 
+  // Só salva no servidor ao sair do campo (blur/Enter) — a cada tecla deixaria a digitação lenta.
   function handleDurationChange(value: string) {
     setDurationDraft(value);
+  }
+
+  function commitDuration(value: string) {
     const dias = Number(value);
     if (!start || !Number.isFinite(dias) || dias < 1) return;
     const nextEnd = toDateInputValue(addWorkingDays(new Date(start), dias - 1, calendar));
@@ -711,13 +725,19 @@ function TaskRowView({
         ) : null}
       </div>
       <input
-        type="number"
-        min={1}
+        type="text"
+        inputMode="numeric"
         value={durationDraft ?? String(duration)}
         title="Dias úteis, conforme o calendário da obra"
         onFocus={() => setDurationDraft(String(duration))}
         onChange={(e) => handleDurationChange(e.target.value)}
-        onBlur={() => setDurationDraft(null)}
+        onBlur={(e) => {
+          commitDuration(e.target.value);
+          setDurationDraft(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
         className="w-14 rounded border bg-background px-1 py-0.5 text-[0.7rem]"
       />
       <input
