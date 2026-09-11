@@ -446,7 +446,12 @@ export function InvoiceForm({
             ) : null}
 
             {parcelar ? (
-              <InvoiceInstallmentsEditor totalValor={totalValor} parcelas={parcelas} onChange={setParcelas} />
+              <InvoiceInstallmentsEditor
+                totalValor={totalValor}
+                parcelas={parcelas}
+                onChange={setParcelas}
+                workId={selectedWorkId}
+              />
             ) : null}
           </div>
         ) : null}

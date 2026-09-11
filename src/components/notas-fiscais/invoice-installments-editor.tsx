@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { addMonths } from "date-fns";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { uploadFileToR2 } from "@/lib/upload-file";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { InvoiceInstallmentValues } from "@/lib/validations/notas-fiscais";
 
@@ -13,10 +15,12 @@ export function InvoiceInstallmentsEditor({
   totalValor,
   parcelas,
   onChange,
+  workId,
 }: {
   totalValor: number;
   parcelas: InvoiceInstallmentValues[];
   onChange: (parcelas: InvoiceInstallmentValues[]) => void;
+  workId: string;
 }) {
   const [numeroParcelas, setNumeroParcelas] = useState(Math.max(parcelas.length, 2));
   const [primeiroVencimento, setPrimeiroVencimento] = useState("");
@@ -24,6 +28,23 @@ export function InvoiceInstallmentsEditor({
   const [valorEntrada, setValorEntrada] = useState(0);
   const [dataEntrada, setDataEntrada] = useState("");
   const [entradaPaga, setEntradaPaga] = useState(true);
+  const [comprovanteEntradaUrl, setComprovanteEntradaUrl] = useState<string | null>(null);
+  const [uploadingComprovante, setUploadingComprovante] = useState(false);
+  const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  async function handleComprovanteChange(file: File | undefined) {
+    if (!file || !workId) return;
+    setUploadingComprovante(true);
+    try {
+      const key = await uploadFileToR2(file, "comprovantes", workId, draftId);
+      setComprovanteEntradaUrl(key);
+      toast.success("Comprovante enviado.");
+    } catch {
+      toast.error("Não foi possível enviar o comprovante. Verifique a configuração de armazenamento.");
+    } finally {
+      setUploadingComprovante(false);
+    }
+  }
 
   const valorRestante = Math.max(0, totalValor - (temEntrada ? valorEntrada : 0));
 
@@ -104,6 +125,21 @@ export function InvoiceInstallmentsEditor({
               Entrada já foi paga
             </label>
           </div>
+        </div>
+      ) : null}
+
+      <input type="hidden" name="comprovanteEntradaUrl" value={comprovanteEntradaUrl ?? ""} readOnly />
+      {temEntrada && entradaPaga ? (
+        <div className="flex flex-col gap-2 sm:max-w-sm">
+          <Label htmlFor="comprovanteEntrada">Comprovante de pagamento da entrada (opcional)</Label>
+          <Input
+            id="comprovanteEntrada"
+            type="file"
+            disabled={uploadingComprovante}
+            onChange={(e) => void handleComprovanteChange(e.target.files?.[0])}
+          />
+          {uploadingComprovante ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
+          {comprovanteEntradaUrl ? <p className="text-xs text-success">Comprovante anexado.</p> : null}
         </div>
       ) : null}
 

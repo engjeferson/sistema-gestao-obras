@@ -133,6 +133,7 @@ export async function createInvoiceWithFinancialEntry(
               dataVencimento: dataEntrada,
               dataPagamento: data.entrada.paga ? dataEntrada : null,
               status: data.entrada.paga ? "PAGO" : "PENDENTE",
+              comprovanteUrl: data.entrada.comprovanteUrl || null,
               invoiceId: invoice.id,
               parcelaGrupoId: grupoId,
               parcelaNumero: 1,

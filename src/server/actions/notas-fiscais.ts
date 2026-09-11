@@ -73,6 +73,7 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
         valor: Number(formData.get("valorEntrada") ?? 0),
         dataVencimento: String(formData.get("dataEntrada") ?? ""),
         paga: formData.get("entradaPaga") === "on",
+        comprovanteUrl: String(formData.get("comprovanteEntradaUrl") ?? "") || undefined,
       }
     : undefined;
 
