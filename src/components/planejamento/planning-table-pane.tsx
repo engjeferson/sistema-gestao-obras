@@ -406,7 +406,7 @@ function StageRowView({
       </button>
       <EditableName value={stage.nome} bold onCommit={handleRename} />
       <StageDateCells stage={stage} row={row} workId={workId} calendar={calendar} />
-      <span className="text-xs text-muted-foreground">—</span>
+      <StagePesoCell stage={stage} />
       <StageProgressCells stage={stage} workId={workId} />
       <PredecessorsCell
         workId={workId}
@@ -433,6 +433,25 @@ function StageRowView({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// Soma do peso das atividades diretas da etapa — pra ficar visível se está extrapolando 100 (o
+// peso não PRECISA somar 100 pra funcionar matematicamente, mas é assim que o usuário pensa nele:
+// "30% pra esquadria interna, 70% pra externa"), então só um aviso visual, não bloqueia o preenchimento.
+function StagePesoCell({ stage }: { stage: PlainStage }) {
+  if (stage.tasks.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const total = stage.tasks.reduce((sum, t) => sum + t.peso, 0);
+  const isOver = total > 100;
+  return (
+    <span
+      className={`text-xs ${isOver ? "font-semibold text-destructive" : "text-muted-foreground"}`}
+      title="Soma do peso das atividades desta etapa"
+    >
+      {Number.isInteger(total) ? total : total.toFixed(1)}
+    </span>
   );
 }
 
