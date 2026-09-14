@@ -41,6 +41,7 @@ type TransactionRow = {
   valor: unknown;
   dataVencimento: Date;
   effectiveStatus: string;
+  formaPagamento: string | null;
   categoria: { nome: string };
   work: { nome: string; codigo: string } | null;
   invoice: { items: InvoiceItemRow[] } | null;
@@ -145,6 +146,7 @@ export function TransactionsTable({
               <TableHead>Favorecido</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Valor</TableHead>
+              <TableHead>Forma</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -208,6 +210,13 @@ export function TransactionsTable({
                 </TableCell>
                 <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
                 <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
+                <TableCell>
+                  {t.formaPagamento ? (
+                    <Badge variant="outline">{PAYMENT_METHOD_LABELS[t.formaPagamento] ?? t.formaPagamento}</Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}
