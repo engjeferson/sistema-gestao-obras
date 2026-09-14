@@ -12,12 +12,15 @@ import { getCurrentWorkAccess, assertModuleWrite } from "@/server/actions/permis
 
 const DEFAULT_PAGE_SIZE = 20;
 
-export async function listInvoices(workId?: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+export async function listInvoices(workId?: string, page = 1, pageSize = DEFAULT_PAGE_SIZE, fornecedor?: string) {
   const workAccess = await getCurrentWorkAccess();
   if (workId && workAccess !== null && !workAccess.includes(workId)) {
     return { items: [], totalCount: 0, totalPages: 1, page, pageSize };
   }
-  const where = { workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined) };
+  const where = {
+    workId: workId ?? (workAccess !== null ? { in: workAccess } : undefined),
+    ...(fornecedor?.trim() ? { supplier: { nome: { contains: fornecedor.trim(), mode: "insensitive" as const } } } : {}),
+  };
   const [items, totalCount] = await Promise.all([
     prisma.invoice.findMany({
       where,

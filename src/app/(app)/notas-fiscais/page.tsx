@@ -6,18 +6,19 @@ import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InvoicesTable } from "@/components/notas-fiscais/invoices-table";
+import { InvoicesFilters } from "@/components/notas-fiscais/invoices-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 
 export default async function NotasFiscaisPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; pageSize?: string }>;
+  searchParams: Promise<{ page?: string; pageSize?: string; fornecedor?: string }>;
 }) {
-  const { page: pageParam, pageSize: pageSizeParam } = await searchParams;
+  const { page: pageParam, pageSize: pageSizeParam, fornecedor } = await searchParams;
   const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
   const pageSize = Number(pageSizeParam) > 0 ? Number(pageSizeParam) : 20;
   const [result, pendentesRadar, canSeeValues, modulePermissions] = await Promise.all([
-    listInvoices(undefined, page, pageSize),
+    listInvoices(undefined, page, pageSize, fornecedor),
     countPendingIncomingNFes(),
     getCurrentSensitiveValuesAccess(),
     getCurrentModulePermissions(),
@@ -59,6 +60,7 @@ export default async function NotasFiscaisPage({
       </div>
 
       <div className="p-4 md:p-6">
+        <InvoicesFilters />
         <InvoicesTable invoices={invoices} canSeeValues={canSeeValues} canEdit={canEdit} />
       </div>
 
