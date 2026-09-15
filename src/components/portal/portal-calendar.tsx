@@ -6,9 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PortalPhotoGallery } from "@/components/portal/portal-photo-gallery";
+import { CLIMA_ICONS } from "@/components/rdo/clima-picker";
 import { getPortalDayDetails } from "@/server/actions/portal";
 import { formatDateBR } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
+
+type RdoDay = { data: string; clima: string | null; semAtividade: boolean };
 
 type DayDetail = Awaited<ReturnType<typeof getPortalDayDetails>>[number];
 
@@ -32,8 +35,8 @@ function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: string[] }) {
-  const rdoDateSet = new Set(rdoDates);
+export function PortalCalendar({ token, rdoDays }: { token: string; rdoDays: RdoDay[] }) {
+  const rdoDayMap = new Map(rdoDays.map((d) => [d.data, d]));
   const today = new Date();
   const [year, setYear] = useState(today.getUTCFullYear());
   const [month, setMonth] = useState(today.getUTCMonth());
@@ -66,7 +69,7 @@ export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: s
   }
 
   function handleDayClick(dateStr: string) {
-    if (!rdoDateSet.has(dateStr)) return;
+    if (!rdoDayMap.has(dateStr)) return;
     setSelectedDate(dateStr);
     startTransition(async () => {
       const details = await getPortalDayDetails(token, dateStr);
@@ -99,9 +102,11 @@ export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: s
         <div className="grid grid-cols-7 gap-1">
           {cells.map((dateStr, index) => {
             if (!dateStr) return <div key={index} />;
-            const hasRdo = rdoDateSet.has(dateStr);
+            const dayInfo = rdoDayMap.get(dateStr);
+            const hasRdo = !!dayInfo;
             const isSelected = dateStr === selectedDate;
             const day = Number(dateStr.slice(8, 10));
+            const ClimaIcon = dayInfo?.clima ? CLIMA_ICONS[dayInfo.clima] : null;
             return (
               <button
                 key={dateStr}
@@ -109,12 +114,14 @@ export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: s
                 disabled={!hasRdo}
                 onClick={() => handleDayClick(dateStr)}
                 className={cn(
-                  "flex aspect-square items-center justify-center rounded-full text-sm transition-colors",
+                  "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full text-sm transition-colors",
                   hasRdo ? "cursor-pointer font-medium hover:opacity-80" : "cursor-default text-muted-foreground/40",
-                  hasRdo && !isSelected ? "bg-success/15 text-success" : "",
+                  hasRdo && !isSelected && dayInfo?.semAtividade ? "bg-destructive/15 text-destructive" : "",
+                  hasRdo && !isSelected && !dayInfo?.semAtividade ? "bg-success/15 text-success" : "",
                   isSelected ? "bg-primary text-primary-foreground" : "",
                 )}
               >
+                {ClimaIcon ? <ClimaIcon className="size-3" /> : null}
                 {day}
               </button>
             );
@@ -128,15 +135,18 @@ export function PortalCalendar({ token, rdoDates }: { token: string; rdoDates: s
             ) : dayDetails && dayDetails.length > 0 ? (
               dayDetails.map((rdo) => (
                 <div key={rdo.id} className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">
                       RDO nº {rdo.numero} — {formatDateBR(selectedDate)}
                     </span>
-                    {rdo.clima ? (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <CloudSun className="size-3.5" /> {rdo.clima}
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      {rdo.semAtividade ? <Badge variant="destructive">Sem atividade</Badge> : null}
+                      {rdo.clima ? (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <CloudSun className="size-3.5" /> {rdo.clima}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   {rdo.atividades.length > 0 ? (
                     <ul className="flex flex-col gap-2 text-sm">

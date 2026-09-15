@@ -1,0 +1,1 @@
+ALTER TABLE "Rdo" ADD COLUMN "semAtividade" BOOLEAN NOT NULL DEFAULT false;

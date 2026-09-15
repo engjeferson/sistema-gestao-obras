@@ -42,6 +42,7 @@ export const rdoFormSchema = z.object({
   workId: z.string().min(1),
   data: z.string().min(1, "Informe a data."),
   clima: z.string().trim().optional(),
+  semAtividade: z.coerce.boolean().default(false),
   observacoesGerais: z.string().trim().optional(),
   workers: z.array(rdoWorkerSchema).default([]),
   activities: z.array(rdoActivitySchema).default([]),

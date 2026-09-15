@@ -795,6 +795,7 @@ model Rdo {
   data              DateTime @db.Date
   responsavelId     String
   clima             String?
+  semAtividade      Boolean  @default(false)
   observacoesGerais String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

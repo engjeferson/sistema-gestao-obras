@@ -15,6 +15,7 @@ import type { RdoWorkerValues, RdoActivityValues, RdoOccurrenceValues, RdoPhotoV
 type RdoFormDefaultValues = {
   data: string;
   clima: string;
+  semAtividade: boolean;
   observacoesGerais: string;
   workers: RdoWorkerValues[];
   activities: RdoActivityValues[];
@@ -43,6 +44,7 @@ export function RdoForm({
   const [occurrences, setOccurrences] = useState<RdoOccurrenceValues[]>(defaultValues?.occurrences ?? []);
   const [photos, setPhotos] = useState<RdoPhotoValues[]>(defaultValues?.photos ?? []);
   const [clima, setClima] = useState(defaultValues?.clima ?? "");
+  const [semAtividade, setSemAtividade] = useState(defaultValues?.semAtividade ?? false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   return (
@@ -75,6 +77,17 @@ export function RdoForm({
         <Label>Clima</Label>
         <ClimaPicker value={clima} onChange={setClima} />
       </div>
+
+      <input type="hidden" name="semAtividade" value={semAtividade ? "true" : "false"} readOnly />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={semAtividade}
+          onChange={(e) => setSemAtividade(e.target.checked)}
+          className="size-4"
+        />
+        Não houve atividade na obra hoje (chuva, sem equipe, etc.)
+      </label>
 
       <section className="flex flex-col gap-2">
         <Label>Equipe presente</Label>

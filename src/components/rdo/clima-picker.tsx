@@ -1,6 +1,6 @@
 "use client";
 
-import { Sun, Cloud, CloudRain } from "lucide-react";
+import { Sun, Cloud, CloudRain, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CLIMA_OPTIONS = [
@@ -8,6 +8,10 @@ const CLIMA_OPTIONS = [
   { value: "Nublado", label: "Nublado", icon: Cloud },
   { value: "Chuva", label: "Chuva", icon: CloudRain },
 ];
+
+export const CLIMA_ICONS: Record<string, LucideIcon> = Object.fromEntries(
+  CLIMA_OPTIONS.map((option) => [option.value, option.icon]),
+);
 
 export function ClimaPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (

@@ -92,12 +92,12 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
 
       <div className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Diário de obra</h2>
-        {data.rdoDates.length === 0 ? (
+        {data.rdoDays.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
             Nenhum registro de andamento ainda.
           </p>
         ) : (
-          <PortalCalendar token={token} rdoDates={data.rdoDates} />
+          <PortalCalendar token={token} rdoDays={data.rdoDays} />
         )}
       </div>
     </div>
