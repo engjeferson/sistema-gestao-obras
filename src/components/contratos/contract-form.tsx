@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { CONTRACT_TYPE_LABELS } from "@/lib/status-labels";
 import { uploadFileToR2 } from "@/lib/upload-file";
+import { ContractAttachmentsField, type ContractAttachmentValue } from "@/components/contratos/contract-attachments-field";
 
 type ContractFormDefaultValues = {
   nome?: string;
@@ -20,7 +21,7 @@ type ContractFormDefaultValues = {
   valor?: number | null;
   data?: Date | string;
   observacoes?: string | null;
-  arquivoUrl?: string | null;
+  attachments?: ContractAttachmentValue[];
 };
 
 function toDateInputValue(date: Date | string | undefined | null) {
@@ -47,28 +48,35 @@ export function ContractForm({
   submitLabel?: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
+  const [attachments, setAttachments] = useState<ContractAttachmentValue[]>(defaultValues?.attachments ?? []);
   const [uploading, setUploading] = useState(false);
   const [direcao, setDirecao] = useState<"PAGAR" | "RECEBER">(defaultValues?.direcao ?? "PAGAR");
 
-  async function handleFileChange(file: File | undefined) {
-    if (!file) return;
+  async function handleFilesChange(files: FileList | null) {
+    if (!files || files.length === 0) return;
     setUploading(true);
     try {
-      const key = await uploadFileToR2(file, "contratos", workId, `novo-${Date.now()}`);
-      setArquivoUrl(key);
-      toast.success("Arquivo enviado.");
+      const uploaded: ContractAttachmentValue[] = [];
+      for (const file of Array.from(files)) {
+        const key = await uploadFileToR2(file, "contratos", workId, `novo-${Date.now()}-${uploaded.length}`);
+        uploaded.push({ url: key, nome: file.name });
+      }
+      setAttachments((prev) => [...prev, ...uploaded]);
+      toast.success(uploaded.length > 1 ? "Arquivos enviados." : "Arquivo enviado.");
     } catch {
-      toast.error("Não foi possível enviar o arquivo. Verifique a configuração de armazenamento.");
+      toast.error("Não foi possível enviar o(s) arquivo(s). Verifique a configuração de armazenamento.");
     } finally {
       setUploading(false);
     }
   }
 
+  function handleRemoveAttachment(url: string) {
+    setAttachments((prev) => prev.filter((a) => a.url !== url));
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="workId" value={workId} />
-      <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2 sm:col-span-2">
@@ -154,18 +162,12 @@ export function ContractForm({
           <Label htmlFor="valor">Valor (R$)</Label>
           <CurrencyInput id="valor" name="valor" defaultValue={defaultValues?.valor ?? undefined} />
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="arquivo">Arquivo PDF</Label>
-          <Input
-            id="arquivo"
-            type="file"
-            accept="application/pdf"
-            disabled={uploading}
-            onChange={(e) => void handleFileChange(e.target.files?.[0])}
-          />
-          {uploading ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-          {arquivoUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
-        </div>
+        <ContractAttachmentsField
+          attachments={attachments}
+          uploading={uploading}
+          onFilesChange={(files) => void handleFilesChange(files)}
+          onRemove={handleRemoveAttachment}
+        />
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacoes">Observações</Label>
           <Textarea id="observacoes" name="observacoes" defaultValue={defaultValues?.observacoes ?? ""} />

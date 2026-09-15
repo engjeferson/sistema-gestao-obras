@@ -9,9 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { deleteContract, reorderContracts } from "@/server/actions/contratos";
 import { CONTRACT_TYPE_LABELS, formatCurrencyOrHidden, formatDateBR } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
+
+type ContractAttachmentRow = { url: string; nome: string };
 
 type ContractRow = {
   id: string;
@@ -25,7 +28,7 @@ type ContractRow = {
   saldo: number | null;
   percentual: number;
   data: Date;
-  arquivoUrl: string | null;
+  attachments: ContractAttachmentRow[];
 };
 
 function DeleteContractButton({ contractId, workId }: { contractId: string; workId: string }) {
@@ -81,6 +84,7 @@ export function ContractsTable({
   const router = useRouter();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [displayOrder, setDisplayOrder] = useState<string[] | null>(null);
+  const [arquivosDe, setArquivosDe] = useState<ContractRow | null>(null);
   const draggingIdRef = useRef(draggingId);
   const displayOrderRef = useRef(displayOrder);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
@@ -184,15 +188,34 @@ export function ContractsTable({
                 </Link>
               </div>
               <div className="flex items-center gap-1">
-                {contract.arquivoUrl ? (
+                {contract.attachments.length === 1 ? (
                   <Button
                     variant="ghost"
                     size="icon"
                     title="Ver arquivo do contrato"
-                    render={<a href={`/api/files?key=${encodeURIComponent(contract.arquivoUrl)}`} target="_blank" rel="noopener noreferrer" />}
+                    render={
+                      <a
+                        href={`/api/files?key=${encodeURIComponent(contract.attachments[0].url)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    }
                     nativeButton={false}
                   >
                     <FileText className="size-4" />
+                  </Button>
+                ) : contract.attachments.length > 1 ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title={`Ver arquivos do contrato (${contract.attachments.length})`}
+                    onClick={() => setArquivosDe(contract)}
+                    className="relative"
+                  >
+                    <FileText className="size-4" />
+                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] leading-none text-primary-foreground">
+                      {contract.attachments.length}
+                    </span>
                   </Button>
                 ) : null}
                 {canEdit ? <DeleteContractButton contractId={contract.id} workId={workId} /> : null}
@@ -238,6 +261,29 @@ export function ContractsTable({
           </CardContent>
         </Card>
       ))}
+
+      <Dialog open={arquivosDe !== null} onOpenChange={(open) => !open && setArquivosDe(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Arquivos — {arquivosDe?.nome}</DialogTitle>
+          </DialogHeader>
+          <ul className="flex flex-col gap-1">
+            {(arquivosDe?.attachments ?? []).map((att) => (
+              <li key={att.url}>
+                <a
+                  href={`/api/files?key=${encodeURIComponent(att.url)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:underline"
+                >
+                  <FileText className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{att.nome}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

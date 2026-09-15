@@ -25,7 +25,7 @@ export default async function ContratosPage({ params }: { params: Promise<{ id: 
     saldo: contract.saldo,
     percentual: contract.percentual,
     data: contract.data,
-    arquivoUrl: contract.arquivoUrl,
+    attachments: contract.attachments,
   }));
 
   return (

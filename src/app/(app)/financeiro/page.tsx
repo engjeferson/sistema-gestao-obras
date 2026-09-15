@@ -107,7 +107,14 @@ export default async function FinanceiroPage({
         <TransactionFilters
           categorias={categorias}
           favorecidos={favorecidos}
-          bankAccounts={bankAccounts.map((b) => ({ id: b.id, nome: b.nome, banco: b.banco, tipo: b.tipo }))}
+          bankAccounts={bankAccounts.map((b) => ({
+            id: b.id,
+            nome: b.nome,
+            banco: b.banco,
+            tipo: b.tipo,
+            diaFechamento: b.diaFechamento,
+            diaVencimento: b.diaVencimento,
+          }))}
         />
 
         {work ? (

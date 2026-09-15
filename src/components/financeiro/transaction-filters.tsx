@@ -22,7 +22,14 @@ export function TransactionFilters({
 }: {
   categorias: { id: string; nome: string }[];
   favorecidos?: string[];
-  bankAccounts?: { id: string; nome: string; banco: string | null; tipo: string }[];
+  bankAccounts?: {
+    id: string;
+    nome: string;
+    banco: string | null;
+    tipo: string;
+    diaFechamento?: number | null;
+    diaVencimento?: number | null;
+  }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -31,13 +38,38 @@ export function TransactionFilters({
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   function setParam(key: string, value: string) {
+    setParams({ [key]: value });
+  }
+
+  function setParams(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
     }
     router.push(`${pathname}?${params.toString()}`);
+  }
+
+  const bankAccountId = searchParams.get("bankAccountId") ?? "";
+  const selectedAccount = bankAccounts.find((a) => a.id === bankAccountId);
+  const isCartaoComVencimento =
+    selectedAccount?.tipo === "CARTAO_CREDITO" && !!selectedAccount.diaVencimento;
+  const dataInicioParam = searchParams.get("dataInicio") ?? "";
+  const dataFimParam = searchParams.get("dataFim") ?? "";
+  const defaultMesFatura =
+    isCartaoComVencimento && dataInicioParam && dataInicioParam === dataFimParam
+      ? dataInicioParam.slice(0, 7)
+      : "";
+
+  function handleMesFaturaChange(value: string) {
+    if (!value || !selectedAccount?.diaVencimento) return;
+    const [yearStr, monthStr] = value.split("-");
+    const dueDate = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, selectedAccount.diaVencimento));
+    const dataStr = dueDate.toISOString().slice(0, 10);
+    setParams({ periodo: "personalizado", dataInicio: dataStr, dataFim: dataStr });
   }
 
   const suggestions = useMemo(() => {
@@ -124,6 +156,21 @@ export function TransactionFilters({
         ))}
       </NativeSelect>
       <PeriodoFilter inicioLabel="Vencimento de" fimLabel="Vencimento até" />
+      {isCartaoComVencimento ? (
+        <div className="flex items-center gap-2">
+          <label htmlFor="mesFatura" className="text-sm text-muted-foreground">
+            Mês da fatura
+          </label>
+          <input
+            id="mesFatura"
+            type="month"
+            key={bankAccountId}
+            defaultValue={defaultMesFatura}
+            onChange={(e) => handleMesFaturaChange(e.target.value)}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
