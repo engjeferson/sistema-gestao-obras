@@ -21,11 +21,10 @@ export function ContractAttachmentsField({
   return (
     <div className="flex flex-col gap-2 sm:col-span-2">
       <input type="hidden" name="attachmentsJson" value={JSON.stringify(attachments)} readOnly />
-      <Label htmlFor="anexos">Arquivos (PDF)</Label>
+      <Label htmlFor="anexos">Arquivos</Label>
       <Input
         id="anexos"
         type="file"
-        accept="application/pdf"
         multiple
         disabled={uploading}
         onChange={(e) => {
