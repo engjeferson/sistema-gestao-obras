@@ -67,7 +67,11 @@ export async function listContracts(workId: string) {
   const contracts = await prisma.contract.findMany({
     where: { workId },
     orderBy: { ordem: "asc" },
-    include: { measurements: { include: { financialTransaction: true } }, addendums: true },
+    include: {
+      measurements: { include: { financialTransaction: true } },
+      addendums: true,
+      attachments: { orderBy: { createdAt: "asc" } },
+    },
   });
 
   return contracts.map((contract) => {
@@ -90,8 +94,23 @@ export async function getContract(contractId: string) {
     include: {
       measurements: { include: { financialTransaction: true }, orderBy: { numero: "desc" } },
       addendums: { orderBy: { data: "desc" } },
+      attachments: { orderBy: { createdAt: "asc" } },
     },
   });
+}
+
+function parseAttachments(formData: FormData): { url: string; nome: string }[] {
+  const raw = formData.get("attachmentsJson");
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((a): a is { url: string; nome: string } => typeof a?.url === "string" && typeof a?.nome === "string")
+      .map((a) => ({ url: a.url, nome: a.nome }));
+  } catch {
+    return [];
+  }
 }
 
 export async function createContract(_prevState: string | undefined, formData: FormData) {
@@ -104,7 +123,7 @@ export async function createContract(_prevState: string | undefined, formData: F
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
-  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+  const attachments = parseAttachments(formData);
   const [parties, contratosCount] = await Promise.all([
     resolveContractParties(data),
     prisma.contract.count({ where: { workId: data.workId } }),
@@ -120,8 +139,8 @@ export async function createContract(_prevState: string | undefined, formData: F
       valor: data.valor ?? null,
       data: new Date(data.data),
       observacoes: data.observacoes || null,
-      arquivoUrl,
       ordem: contratosCount,
+      attachments: { create: attachments },
     },
   });
 
@@ -151,7 +170,7 @@ export async function updateContract(contractId: string, _prevState: string | un
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
-  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+  const attachments = parseAttachments(formData);
   const parties = await resolveContractParties(data);
 
   await prisma.contract.update({
@@ -164,7 +183,7 @@ export async function updateContract(contractId: string, _prevState: string | un
       valor: data.valor ?? null,
       data: new Date(data.data),
       observacoes: data.observacoes || null,
-      arquivoUrl,
+      attachments: { deleteMany: {}, create: attachments },
     },
   });
 

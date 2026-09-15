@@ -44,7 +44,7 @@ export default async function EditarContratoPage({
           valor: contract.valor !== null ? Number(contract.valor) : null,
           data: contract.data,
           observacoes: contract.observacoes,
-          arquivoUrl: contract.arquivoUrl,
+          attachments: contract.attachments,
         }}
       />
     </div>

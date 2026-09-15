@@ -559,7 +559,6 @@ model Contract {
   valor                Decimal?        @db.Decimal(14, 2)
   data                 DateTime        @db.Date
   observacoes          String?
-  arquivoUrl           String?
   ordem                Int             @default(0)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -569,10 +568,23 @@ model Contract {
   contratadoSupplier Supplier?             @relation(fields: [contratadoSupplierId], references: [id])
   measurements       ContractMeasurement[]
   addendums          ContractAddendum[]
+  attachments        ContractAttachment[]
 
   @@index([workId])
   @@index([contratanteClientId])
   @@index([contratadoSupplierId])
+}
+
+model ContractAttachment {
+  id         String   @id @default(cuid())
+  contractId String
+  url        String
+  nome       String
+  createdAt  DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
 }
 
 model ContractAddendum {
