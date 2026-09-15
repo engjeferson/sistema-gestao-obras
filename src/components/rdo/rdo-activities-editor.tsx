@@ -86,7 +86,7 @@ export function RdoActivitiesEditor({
                     <optgroup key={stage.id} label={stage.nome}>
                       {stage.tasks.map((t) => (
                         <option key={t.id} value={encodeOption(t)}>
-                          {t.nome}
+                          {t.nome} ({t.percentualExecutado.toFixed(0)}%)
                         </option>
                       ))}
                     </optgroup>

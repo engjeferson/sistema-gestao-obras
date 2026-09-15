@@ -23,6 +23,7 @@ export default async function CampoEditarRdoPage({ params }: { params: Promise<{
         defaultValues={{
           data: rdo.data.toISOString().slice(0, 10),
           clima: rdo.clima ?? "",
+          semAtividade: rdo.semAtividade,
           observacoesGerais: rdo.observacoesGerais ?? "",
           workers: rdo.workers.map((w) => ({ funcao: w.funcao, quantidade: w.quantidade })),
           activities: rdo.activities.map((a) => ({

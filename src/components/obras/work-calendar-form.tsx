@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toggleWorkingWeekday } from "@/server/actions/work-calendar";
+import { cn } from "@/lib/utils";
 
 const WEEKDAYS = [
   { value: 1, label: "Segunda" },
@@ -36,16 +37,19 @@ export function WorkCalendarForm({ workId, workingWeekdays }: { workId: string; 
         </p>
       </div>
       <div className="flex flex-wrap gap-4">
-        {WEEKDAYS.map((day) => (
-          <label key={day.value} className="flex items-center gap-2">
-            <Checkbox
-              checked={workingWeekdays.includes(day.value)}
-              disabled={isPending}
-              onCheckedChange={(checked) => handleToggle(day.value, checked === true)}
-            />
-            <Label className="font-normal">{day.label}</Label>
-          </label>
-        ))}
+        {WEEKDAYS.map((day) => {
+          const isWorking = workingWeekdays.includes(day.value);
+          return (
+            <label key={day.value} className="flex items-center gap-2">
+              <Checkbox
+                checked={isWorking}
+                disabled={isPending}
+                onCheckedChange={(checked) => handleToggle(day.value, checked === true)}
+              />
+              <Label className={cn("font-normal", !isWorking && "text-muted-foreground")}>{day.label}</Label>
+            </label>
+          );
+        })}
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ export async function createRdoWithSync(data: RdoFormValues, responsavelId: stri
         data: new Date(data.data),
         responsavelId,
         clima: data.clima || null,
+        semAtividade: data.semAtividade,
         observacoesGerais: data.observacoesGerais || null,
         workers: { create: data.workers.map((w) => ({ funcao: w.funcao, quantidade: w.quantidade })) },
         occurrences: { create: data.occurrences.map((o) => ({ tipo: o.tipo, descricao: o.descricao })) },
@@ -111,6 +112,7 @@ export async function updateRdoWithSync(rdoId: string, data: RdoFormValues) {
       data: {
         data: new Date(data.data),
         clima: data.clima || null,
+        semAtividade: data.semAtividade,
         observacoesGerais: data.observacoesGerais || null,
       },
     });

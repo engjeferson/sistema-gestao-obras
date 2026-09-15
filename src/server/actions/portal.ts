@@ -53,7 +53,7 @@ export async function getPortalData(token: string) {
     listStagesWithTasks(work.id),
     prisma.rdo.findMany({
       where: { workId: work.id },
-      select: { data: true },
+      select: { data: true, clima: true, semAtividade: true },
       orderBy: { data: "asc" },
     }),
   ]);
@@ -74,6 +74,18 @@ export async function getPortalData(token: string) {
 
   const renderUrl = work.renderUrl ? await presignGet(work.renderUrl, 3600).catch(() => null) : null;
 
+  // Agrega por dia — pode haver mais de um RDO na mesma data: mantém o primeiro clima
+  // encontrado e marca "sem atividade" se qualquer um dos RDOs daquele dia estiver assim.
+  const rdoDaysMap = new Map<string, { clima: string | null; semAtividade: boolean }>();
+  for (const r of rdoRows) {
+    const dateStr = toDateOnly(r.data);
+    const existing = rdoDaysMap.get(dateStr);
+    rdoDaysMap.set(dateStr, {
+      clima: existing?.clima ?? r.clima,
+      semAtividade: (existing?.semAtividade ?? false) || r.semAtividade,
+    });
+  }
+
   return {
     nome: work.nome,
     codigo: work.codigo,
@@ -85,7 +97,7 @@ export async function getPortalData(token: string) {
     diasDecorridos,
     percentualExecutado,
     etapas,
-    rdoDates: [...new Set(rdoRows.map((r) => toDateOnly(r.data)))],
+    rdoDays: Array.from(rdoDaysMap.entries()).map(([data, info]) => ({ data, ...info })),
   };
 }
 
@@ -117,6 +129,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       id: rdo.id,
       numero: rdo.numero,
       clima: rdo.clima,
+      semAtividade: rdo.semAtividade,
       observacoesGerais: rdo.observacoesGerais,
       atividades: rdo.activities.map((activity) => ({
         atividadeNome: activity.planningTask

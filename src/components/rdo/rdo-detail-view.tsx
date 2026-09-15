@@ -32,9 +32,12 @@ export function RdoDetailView({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">RDO #{rdo.numero}</h1>
-          <p className="text-muted-foreground">
-            {formatDateBR(rdo.data)} · {rdo.responsavel.name}
-            {rdo.clima ? ` · ${rdo.clima}` : ""}
+          <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
+            <span>
+              {formatDateBR(rdo.data)} · {rdo.responsavel.name}
+              {rdo.clima ? ` · ${rdo.clima}` : ""}
+            </span>
+            {rdo.semAtividade ? <Badge variant="destructive">Sem atividade</Badge> : null}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
