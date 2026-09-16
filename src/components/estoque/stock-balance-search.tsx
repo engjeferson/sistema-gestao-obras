@@ -8,9 +8,11 @@ import { normalizeSearch } from "@/lib/text";
 export function StockBalanceSearch({ balances }: { balances: BalanceRow[] }) {
   const [query, setQuery] = useState("");
 
+  // Sem busca, mostra só materiais com saldo — a lista completa (incluindo zerados) fica
+  // disponível pesquisando por nome, pra não poluir a visão padrão do estoque.
   const filtered = useMemo(() => {
     const q = normalizeSearch(query);
-    if (!q) return balances;
+    if (!q) return balances.filter((b) => b.saldo !== 0);
     return balances.filter((b) => normalizeSearch(b.materialNome).includes(q));
   }, [balances, query]);
 
@@ -33,7 +35,9 @@ export function StockBalanceSearch({ balances }: { balances: BalanceRow[] }) {
       />
       {filtered.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          Nenhum material encontrado para &quot;{query}&quot;.
+          {query
+            ? `Nenhum material encontrado para "${query}".`
+            : "Nenhum material com saldo neste local. Use a busca para ver também os materiais zerados."}
         </p>
       ) : (
         <StockBalanceTable balances={filtered} />
