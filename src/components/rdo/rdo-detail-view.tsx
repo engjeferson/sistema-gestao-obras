@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateBR } from "@/lib/status-labels";
 import { RdoPhotosGallery } from "@/components/rdo/rdo-photos-gallery";
+import { DeleteRdoButton } from "@/components/rdo/delete-rdo-button";
 import type { getRdo } from "@/server/actions/rdo";
 
 const OCCURRENCE_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ export function RdoDetailView({
               <Pencil /> Editar
             </Button>
           ) : null}
+          {canEdit ? <DeleteRdoButton rdoId={rdo.id} workId={rdo.workId} basePath={basePath} /> : null}
           <Button
             variant="outline"
             size="sm"

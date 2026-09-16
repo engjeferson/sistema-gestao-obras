@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
-import { createRdoWithSync, updateRdoWithSync } from "@/server/services/rdo-sync";
+import { createRdoWithSync, updateRdoWithSync, deleteRdoWithSync } from "@/server/services/rdo-sync";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 import { hasAnyTaskInSubtree } from "@/lib/planning";
 
@@ -140,4 +140,17 @@ export async function updateRdo(rdoId: string, _prevState: string | undefined, f
 
   const basePath = session.user.role === "OBRA" ? "/campo/obras" : "/obras";
   redirect(`${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
+}
+
+export async function deleteRdo(rdoId: string, workId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+  await assertModuleWrite("rdoSomenteLeitura");
+
+  await deleteRdoWithSync(rdoId);
+
+  revalidatePath(`/obras/${workId}/rdo`);
+  revalidatePath(`/obras/${workId}/planejamento`);
+  revalidatePath(`/obras/${workId}/visao-geral`);
+  revalidatePath(`/campo/obras/${workId}/rdo`);
 }
