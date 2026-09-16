@@ -236,3 +236,56 @@ export async function updateRdoWithSync(rdoId: string, data: RdoFormValues) {
     return existing;
   });
 }
+
+// Exclui o RDO e recalcula o percentual das tarefas/etapas que ele tocou, revertendo pro valor do
+// RDO anterior mais recente que ainda a mencione (ou 0, se essa era a única menção) — mesma regra
+// de "só o RDO mais recente vale" usada em `updateRdoWithSync`, aplicada de trás pra frente.
+export async function deleteRdoWithSync(rdoId: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.rdo.findUniqueOrThrow({
+      where: { id: rdoId },
+      include: { activities: true },
+    });
+
+    const taskIds = [...new Set(existing.activities.map((a) => a.planningTaskId).filter((id): id is string => !!id))];
+    const stageIds = [...new Set(existing.activities.map((a) => a.planningStageId).filter((id): id is string => !!id))];
+
+    await tx.rdo.delete({ where: { id: rdoId } });
+
+    for (const taskId of taskIds) {
+      const latestActivity = await tx.rdoActivity.findFirst({
+        where: { planningTaskId: taskId },
+        orderBy: { rdo: { numero: "desc" } },
+      });
+      const planningTask = await tx.planningTask.findUniqueOrThrow({ where: { id: taskId } });
+      const percentualExecutado = latestActivity ? Number(latestActivity.percentualAtual) : 0;
+
+      await tx.planningTask.update({
+        where: { id: taskId },
+        data: {
+          percentualExecutado,
+          status: getEffectiveStatus({ percentualExecutado, dataFimPrevista: planningTask.dataFimPrevista }),
+        },
+      });
+    }
+
+    for (const stageId of stageIds) {
+      const latestActivity = await tx.rdoActivity.findFirst({
+        where: { planningStageId: stageId },
+        orderBy: { rdo: { numero: "desc" } },
+      });
+      const planningStage = await tx.planningStage.findUniqueOrThrow({ where: { id: stageId } });
+      const percentualExecutado = latestActivity ? Number(latestActivity.percentualAtual) : 0;
+
+      await tx.planningStage.update({
+        where: { id: stageId },
+        data: {
+          percentualExecutado,
+          status: getEffectiveStatus({ percentualExecutado, dataFimPrevista: planningStage.dataFimPrevista }),
+        },
+      });
+    }
+
+    return existing;
+  });
+}
