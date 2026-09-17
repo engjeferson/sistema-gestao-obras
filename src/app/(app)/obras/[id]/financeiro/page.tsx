@@ -89,9 +89,19 @@ export default async function ObraFinanceiroPage({
       : []),
   ];
 
+  // Nº de colunas no desktop acompanha a quantidade de cartões (varia com permissões),
+  // pra caberem numa linha só em vez de sobrar um cartão sozinho na linha de baixo.
+  const lgGridColsClass: Record<number, string> = {
+    1: "lg:grid-cols-1",
+    2: "lg:grid-cols-2",
+    3: "lg:grid-cols-3",
+    4: "lg:grid-cols-4",
+    5: "lg:grid-cols-5",
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid gap-4 sm:grid-cols-2 ${lgGridColsClass[cards.length] ?? "lg:grid-cols-4"}`}>
         {cards.map((card) => (
           <KpiCard key={card.label} {...card} />
         ))}
