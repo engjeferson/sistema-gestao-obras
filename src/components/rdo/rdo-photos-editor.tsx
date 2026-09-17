@@ -64,22 +64,30 @@ export function RdoPhotosEditor({
       {photos.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {photos.map((photo, index) => (
-            <div key={index} className="flex items-center gap-2 rounded-md border p-2">
-              <span className="flex-1 truncate text-xs text-muted-foreground">{photo.url.split("/").pop()}</span>
-              <Input
-                placeholder="Descrição (opcional)"
-                value={photo.descricao ?? ""}
-                onChange={(e) => updateDescricao(index, e.target.value)}
-                className="max-w-40"
+            <div key={index} className="flex flex-col gap-2 rounded-md border p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/files?key=${encodeURIComponent(photo.url)}`}
+                alt={photo.descricao || "Foto adicionada"}
+                className="aspect-video w-full rounded-md border object-cover"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => onChange(photos.filter((_, i) => i !== index))}
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Descrição (opcional)"
+                  value={photo.descricao ?? ""}
+                  onChange={(e) => updateDescricao(index, e.target.value)}
+                  className="min-w-0 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => onChange(photos.filter((_, i) => i !== index))}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

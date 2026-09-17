@@ -107,7 +107,7 @@ export function RdoActivitiesEditor({
               value={activity.descricaoServico ?? ""}
               onChange={(e) => update(index, { descricaoServico: e.target.value })}
             />
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Anterior: {anterior.toFixed(0)}%</span>
               <div className="flex items-center gap-2">
                 <label className="text-sm">Medição de hoje:</label>
@@ -119,13 +119,28 @@ export function RdoActivitiesEditor({
                   onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => {
                     const digitado = e.target.value === "" ? 0 : Number(e.target.value);
-                    update(index, { percentualAtual: Math.min(100, anterior + digitado) });
+                    update(index, { percentualAtual: Math.min(100, Math.max(0, anterior + digitado)) });
                   }}
                   className="w-20"
                 />
                 <span className="text-sm">%</span>
               </div>
-              <span className="text-sm text-muted-foreground">→ Total: {activity.percentualAtual.toFixed(0)}%</span>
+              <div className="flex items-center gap-2">
+                <label className="text-sm">Total:</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={activity.percentualAtual === 0 ? "" : activity.percentualAtual}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => {
+                    const digitado = e.target.value === "" ? 0 : Number(e.target.value);
+                    update(index, { percentualAtual: Math.min(100, Math.max(0, digitado)) });
+                  }}
+                  className="w-20"
+                />
+                <span className="text-sm">%</span>
+              </div>
             </div>
           </div>
         );
