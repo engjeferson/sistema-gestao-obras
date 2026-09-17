@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus, FileSignature, ArrowDownCircle, ArrowUpCircle, PiggyBank } from "lucide-react";
+import { Plus, FileSignature, ArrowDownCircle, ArrowUpCircle, PiggyBank, TrendingUp, TrendingDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getWorkFinancialSummary, listTransactions } from "@/server/actions/financeiro";
 import { getCurrentFinancePermissions, getCurrentModulePermissions } from "@/server/actions/permissions";
@@ -74,6 +74,16 @@ export default async function ObraFinanceiroPage({
             label: "Saldo",
             value: formatCurrencyBRL(summary.saldo),
             tone: (summary.saldo < 0 ? "destructive" : "success") as "destructive" | "success",
+          },
+        ]
+      : []),
+    ...(perms.verSaudeFinanceiraObra
+      ? [
+          {
+            icon: summary.saudeFinanceira >= 0 ? TrendingUp : TrendingDown,
+            label: "Saúde financeira",
+            value: formatCurrencyBRL(summary.saudeFinanceira),
+            tone: (summary.saudeFinanceira < 0 ? "destructive" : "success") as "destructive" | "success",
           },
         ]
       : []),

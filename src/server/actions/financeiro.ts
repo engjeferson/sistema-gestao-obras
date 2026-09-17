@@ -332,8 +332,11 @@ export async function getWorkFinancialSummary(workId: string) {
   const gasto = Number(gastoNaoMaterialAgg._sum.valor ?? 0) + (materialCosts.totalByWork.get(workId) ?? 0);
   const recebido = Number(recebidoAgg._sum.valor ?? 0);
   const saldo = contrato - gasto;
+  // Diferente da "Saúde financeira" do dashboard/lista de obras (que só considera
+  // despesas pagas): aqui o gasto entra assim que lançado, pago ou não.
+  const saudeFinanceira = recebido - gasto;
 
-  return { contrato, gasto, recebido, saldo };
+  return { contrato, gasto, recebido, saldo, saudeFinanceira };
 }
 
 export async function createTransaction(_prevState: string | undefined, formData: FormData) {
