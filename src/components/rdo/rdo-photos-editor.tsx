@@ -25,17 +25,27 @@ export function RdoPhotosEditor({
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(true);
-    const uploaded: RdoPhotoValues[] = [];
-    for (const file of Array.from(files)) {
-      try {
+    const fileList = Array.from(files);
+    // Compacta e envia todas as fotos em paralelo em vez de uma por vez — numa obra
+    // com sinal fraco, mandar 4-5 fotos em sequência multiplicava o tempo de espera.
+    const results = await Promise.allSettled(
+      fileList.map(async (file) => {
         const compressed = await compressImage(file);
         const key = await uploadFileToR2(compressed, "rdo-fotos", workId, draftId);
-        uploaded.push({ url: key, descricao: "" });
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "";
-        toast.error(`Não foi possível enviar ${file.name}.${detail ? ` (${detail})` : ""}`);
+        return { url: key, descricao: "" } satisfies RdoPhotoValues;
+      }),
+    );
+
+    const uploaded: RdoPhotoValues[] = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        uploaded.push(result.value);
+      } else {
+        const detail = result.reason instanceof Error ? result.reason.message : "";
+        toast.error(`Não foi possível enviar ${fileList[index].name}.${detail ? ` (${detail})` : ""}`);
       }
-    }
+    });
+
     if (uploaded.length > 0) {
       onChange([...photos, ...uploaded]);
       toast.success(`${uploaded.length} foto(s) enviada(s).`);
