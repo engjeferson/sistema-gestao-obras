@@ -152,6 +152,29 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
   );
 }
 
+// Rota publica — galeria com todas as fotos de todas as RDOs da obra, sem precisar navegar
+// dia a dia pelo calendário.
+export async function getPortalGallery(token: string) {
+  const work = await prisma.work.findUnique({ where: { portalToken: token }, select: { id: true, nome: true } });
+  if (!work) return null;
+
+  const photos = await prisma.rdoPhoto.findMany({
+    where: { rdo: { workId: work.id } },
+    include: { rdo: { select: { data: true, numero: true } } },
+    orderBy: [{ rdo: { data: "desc" } }, { ordem: "asc" }],
+  });
+
+  const fotos = await Promise.all(
+    photos.map(async (photo) => ({
+      url: await presignGet(photo.url, 3600).catch(() => null),
+      descricao: photo.descricao,
+      data: photo.rdo.data,
+    })),
+  );
+
+  return { workNome: work.nome, fotos };
+}
+
 export async function regeneratePortalToken(workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);

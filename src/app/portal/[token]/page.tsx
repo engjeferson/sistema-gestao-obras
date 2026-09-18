@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Images } from "lucide-react";
 import { getPortalData } from "@/server/actions/portal";
 import { PortalCalendar } from "@/components/portal/portal-calendar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WORK_STATUS_BADGE, WORK_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 
@@ -89,6 +92,10 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
           </CardContent>
         </Card>
       ) : null}
+
+      <Button size="lg" className="h-14 w-full text-base" render={<Link href={`/portal/${token}/galeria`} />} nativeButton={false}>
+        <Images /> Ver galeria de fotos
+      </Button>
 
       <div className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Diário de obra</h2>
