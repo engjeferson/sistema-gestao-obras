@@ -9,7 +9,7 @@ export default async function EditarRdoPage({ params }: { params: Promise<{ id: 
     notFound();
   }
 
-  const updateRdoWithId = updateRdo.bind(null, rdo.id);
+  const updateRdoWithId = updateRdo.bind(null, "/obras", rdo.id);
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
