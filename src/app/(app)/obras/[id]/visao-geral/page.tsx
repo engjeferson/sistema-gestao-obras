@@ -3,11 +3,8 @@ import { notFound } from "next/navigation";
 import {
   FileSignature,
   TrendingUp,
-  Percent,
-  Calculator,
   Wallet,
   ArrowDownCircle,
-  Layers,
   PiggyBank,
   HardHat,
   Gauge,
@@ -55,25 +52,15 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
   const margemTone = summary.indicadorMargem === "MELHOROU" ? "success" : summary.indicadorMargem === "PIOROU" ? "destructive" : "default";
   const margemLabel = summary.indicadorMargem === "MELHOROU" ? "melhorou" : summary.indicadorMargem === "PIOROU" ? "piorou" : "estável";
 
-  const contratoKpis = [
+  // Só os essenciais do dia a dia — os demais (Lucro previsto, Margem prevista, Custo orçado,
+  // Custo comprometido) saíram por serem redundantes com os que ficaram e, sem orçamento
+  // cadastrado, exibiam números que não faziam sentido (ex: Lucro previsto == Valor do contrato).
+  const financeiroKpis: { icon: typeof FileSignature; label: string; value: string; tone?: "default" | "success" | "destructive" }[] = [
     { icon: FileSignature, label: "Valor do contrato", value: formatCurrencyBRL(summary.contrato) },
-    { icon: TrendingUp, label: "Lucro previsto", value: formatCurrencyBRL(summary.lucroPrevisto) },
-    { icon: Percent, label: "Margem prevista", value: `${summary.margemPrevista.toFixed(1)}%` },
-    {
-      icon: TrendingUp,
-      label: "Margem projetada",
-      value: `${summary.margemProjetada.toFixed(1)}% (${margemLabel})`,
-      tone: margemTone as "default" | "success" | "destructive",
-    },
-  ];
-
-  const custoKpis: { icon: typeof Calculator; label: string; value: string; tone?: "destructive" | "success" }[] = [
-    { icon: Calculator, label: "Custo orçado", value: formatCurrencyBRL(summary.orcado) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(summary.realizado) },
     ...(perms.verSaidas
       ? [{ icon: ArrowDownCircle, label: "Contas a pagar", value: formatCurrencyBRL(summary.aPagar), tone: "destructive" as const }]
       : []),
-    { icon: Layers, label: "Custo comprometido", value: formatCurrencyBRL(summary.comprometido) },
     ...(perms.verSaldo
       ? [
           {
@@ -84,7 +71,22 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
           },
         ]
       : []),
+    {
+      icon: TrendingUp,
+      label: "Margem projetada",
+      value: `${summary.margemProjetada.toFixed(1)}% (${margemLabel})`,
+      tone: margemTone as "default" | "success" | "destructive",
+    },
   ];
+
+  // Nº de colunas no desktop acompanha a quantidade de cartões (varia com permissões).
+  const lgGridColsClass: Record<number, string> = {
+    1: "lg:grid-cols-1",
+    2: "lg:grid-cols-2",
+    3: "lg:grid-cols-3",
+    4: "lg:grid-cols-4",
+    5: "lg:grid-cols-5",
+  };
 
   const avancoKpis = [
     { icon: HardHat, label: "Avanço físico", value: `${summary.avancoFisico.toFixed(0)}%` },
@@ -97,18 +99,9 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
       <PortalShareCard workId={work.id} portalToken={work.portalToken} />
 
       <div className="flex flex-col gap-3">
-        <SectionTitle>Contrato & margem</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {contratoKpis.map((kpi) => (
-            <KpiCard key={kpi.label} {...kpi} />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <SectionTitle>Custos</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {custoKpis.map((kpi) => (
+        <SectionTitle>Financeiro</SectionTitle>
+        <div className={`grid gap-4 sm:grid-cols-2 ${lgGridColsClass[financeiroKpis.length] ?? "lg:grid-cols-5"}`}>
+          {financeiroKpis.map((kpi) => (
             <KpiCard key={kpi.label} {...kpi} />
           ))}
         </div>
