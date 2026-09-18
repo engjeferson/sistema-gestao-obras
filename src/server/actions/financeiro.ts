@@ -79,6 +79,7 @@ function parseTransactionForm(formData: FormData) {
     formaPagamento: formData.get("formaPagamento") ?? undefined,
     status: formData.get("status"),
     observacao: formData.get("observacao") ?? undefined,
+    comprovanteUrl: formData.get("comprovanteUrl") ?? undefined,
     parcelar: formData.get("parcelar") === "on",
     numeroParcelas: formData.get("numeroParcelas") ?? undefined,
   });
@@ -412,6 +413,7 @@ export async function createTransaction(_prevState: string | undefined, formData
         formaPagamento: data.formaPagamento,
         status: data.status,
         observacao: data.observacao || null,
+        comprovanteUrl: data.comprovanteUrl || null,
         createdById: session.user.id,
       },
     });
@@ -460,6 +462,7 @@ export async function updateTransaction(
       formaPagamento: data.formaPagamento,
       status: data.status,
       observacao: data.observacao || null,
+      comprovanteUrl: data.comprovanteUrl || null,
     },
   });
 
@@ -482,6 +485,24 @@ export async function markAsPago(transactionId: string, workId: string | null, f
       dataPagamento: new Date(),
       formaPagamento,
     },
+  });
+
+  revalidatePath("/financeiro");
+  if (workId) {
+    revalidatePath(`/obras/${workId}/financeiro`);
+  }
+}
+
+// Reverte um pagamento sem apagar o lançamento — volta pra "Pendente" (ou "Vencido", se o
+// vencimento já passou, via healOverdueTransactions no próximo carregamento da lista).
+export async function undoPayment(transactionId: string, workId: string | null) {
+  const session = await auth();
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
+
+  await prisma.financialTransaction.update({
+    where: { id: transactionId },
+    data: { status: "PENDENTE", dataPagamento: null, formaPagamento: null },
   });
 
   revalidatePath("/financeiro");

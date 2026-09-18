@@ -1,12 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useId, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
+import { AttachmentField } from "@/components/notas-fiscais/attachment-field";
+import { uploadFileToR2 } from "@/lib/upload-file";
 import { TRANSACTION_STATUS_LABELS, TRANSACTION_TYPE_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 import { calcularVencimentoFatura } from "@/lib/fatura-cartao";
 import type { FinancialTransactionModel } from "@/generated/prisma/models";
@@ -68,6 +71,23 @@ export function TransactionForm({
   const [selectedBankAccountId, setSelectedBankAccountId] = useState(defaultValues?.bankAccountId ?? "");
   const [dataEmissao, setDataEmissao] = useState(toDateInputValue(defaultValues?.dataEmissao));
   const [dataVencimento, setDataVencimento] = useState(toDateInputValue(defaultValues?.dataVencimento));
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(defaultValues?.comprovanteUrl ?? null);
+  const [uploadingComprovante, setUploadingComprovante] = useState(false);
+  const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  async function handleComprovanteChange(file: File | undefined) {
+    if (!file) return;
+    setUploadingComprovante(true);
+    try {
+      const key = await uploadFileToR2(file, "comprovantes", selectedWorkId || null, draftId);
+      setComprovanteUrl(key);
+      toast.success("Comprovante enviado.");
+    } catch {
+      toast.error("Não foi possível enviar o arquivo. Verifique a configuração de armazenamento.");
+    } finally {
+      setUploadingComprovante(false);
+    }
+  }
 
   const valorParcela = numeroParcelas > 0 ? valor / numeroParcelas : 0;
   const stagesForWork = stagesByWork[selectedWorkId] ?? [];
@@ -90,6 +110,7 @@ export function TransactionForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <input type="hidden" name="comprovanteUrl" value={comprovanteUrl ?? ""} readOnly />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="workId">Obra</Label>
@@ -110,7 +131,7 @@ export function TransactionForm({
             ))}
           </NativeSelect>
           <p className="text-xs text-muted-foreground">
-            Use "Despesa geral da empresa" para custos que não são de uma obra específica — água, luz, internet,
+            Use &quot;Despesa geral da empresa&quot; para custos que não são de uma obra específica — água, luz, internet,
             escritório etc.
           </p>
         </div>
@@ -287,6 +308,28 @@ export function TransactionForm({
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacao">Observação</Label>
           <Textarea id="observacao" name="observacao" defaultValue={defaultValues?.observacao ?? ""} />
+        </div>
+        <div className="sm:col-span-2">
+          <AttachmentField
+            id="comprovante"
+            label="Comprovante de pagamento (opcional)"
+            uploading={uploadingComprovante}
+            url={comprovanteUrl}
+            className="sm:max-w-sm"
+            helperText="Nota fiscal, recibo, comprovante de PIX/transferência etc."
+            onFileChange={(file) => void handleComprovanteChange(file)}
+            onRemove={() => setComprovanteUrl(null)}
+          />
+          {defaultValues?.comprovanteUrl && comprovanteUrl === defaultValues.comprovanteUrl ? (
+            <a
+              href={`/api/files?key=${encodeURIComponent(comprovanteUrl)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block text-xs text-primary hover:underline"
+            >
+              Ver comprovante atual
+            </a>
+          ) : null}
         </div>
       </div>
 

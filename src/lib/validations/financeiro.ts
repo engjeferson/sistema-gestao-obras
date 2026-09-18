@@ -28,6 +28,7 @@ export const transactionFormSchema = z.object({
   formaPagamento: z.enum(paymentMethodValues).optional().or(z.literal("").transform(() => undefined)),
   status: z.enum(transactionStatusValues),
   observacao: z.string().trim().optional(),
+  comprovanteUrl: z.string().optional(),
   parcelar: z.boolean().optional(),
   numeroParcelas: z.coerce.number().int().min(2).max(60).optional(),
 });

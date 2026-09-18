@@ -3,10 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, CheckCircle2, SplitSquareHorizontal } from "lucide-react";
+import { Trash2, CheckCircle2, SplitSquareHorizontal, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { markAsPago, deleteTransaction } from "@/server/actions/financeiro";
+import { markAsPago, deleteTransaction, undoPayment } from "@/server/actions/financeiro";
 import { PartialPaymentDialog } from "@/components/financeiro/partial-payment-dialog";
 
 export function TransactionRowActions({
@@ -35,6 +35,18 @@ export function TransactionRowActions({
         router.refresh();
       } catch {
         toast.error("Não foi possível marcar como paga.");
+      }
+    });
+  }
+
+  function handleUndoPayment() {
+    startTransition(async () => {
+      try {
+        await undoPayment(transactionId, workId);
+        toast.success("Pagamento desfeito — o lançamento voltou para pendente.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível desfazer o pagamento.");
       }
     });
   }
@@ -70,7 +82,17 @@ export function TransactionRowActions({
             <CheckCircle2 className="size-4" />
           </Button>
         </>
-      ) : null}
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Desfazer pagamento (volta para pendente, sem excluir o lançamento)"
+          disabled={isPending}
+          onClick={handleUndoPayment}
+        >
+          <Undo2 className="size-4" />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"
