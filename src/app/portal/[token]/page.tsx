@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Images } from "lucide-react";
 import { getPortalData } from "@/server/actions/portal";
 import { PortalCalendar } from "@/components/portal/portal-calendar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WORK_STATUS_BADGE, WORK_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 
@@ -91,7 +94,17 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
       ) : null}
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Diário de obra</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Diário de obra</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link href={`/portal/${token}/galeria`} />}
+            nativeButton={false}
+          >
+            <Images /> Galeria
+          </Button>
+        </div>
         {data.rdoDays.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
             Nenhum registro de andamento ainda.

@@ -5,12 +5,17 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
-import { presignGet } from "@/lib/r2";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 import { hasAnyTaskInSubtree, computeWeightedAvanco, type WeightedProgress } from "@/lib/planning";
 
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+// Monta a URL do proxy público (/api/portal-files) em vez de assinar direto pro R2 — evita
+// depender de CORS do bucket no domínio (que muda a cada preview) pra exibir as fotos.
+function portalFileUrl(token: string, key: string) {
+  return `/api/portal-files?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`;
 }
 
 // Percentuais "folha" (com peso) dentro da subárvore de uma etapa: quando ela mesma funciona como
@@ -72,7 +77,7 @@ export async function getPortalData(token: string) {
     Math.floor((hoje.getTime() - work.dataInicio.getTime()) / (1000 * 60 * 60 * 24)),
   );
 
-  const renderUrl = work.renderUrl ? await presignGet(work.renderUrl, 3600).catch(() => null) : null;
+  const renderUrl = work.renderUrl ? portalFileUrl(token, work.renderUrl) : null;
 
   // Agrega por dia — pode haver mais de um RDO na mesma data: mantém o primeiro clima
   // encontrado e marca "sem atividade" se qualquer um dos RDOs daquele dia estiver assim.
@@ -124,32 +129,49 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
     },
   });
 
-  return Promise.all(
-    rdos.map(async (rdo) => ({
-      id: rdo.id,
-      numero: rdo.numero,
-      clima: rdo.clima,
-      semAtividade: rdo.semAtividade,
-      observacoesGerais: rdo.observacoesGerais,
-      atividades: rdo.activities.map((activity) => ({
-        atividadeNome: activity.planningTask
-          ? `${activity.planningTask.stage.nome} — ${activity.planningTask.nome}`
-          : (activity.planningStage?.nome ?? ""),
-        descricaoServico: activity.descricaoServico,
-        percentualAtual: Number(activity.percentualAtual),
-      })),
-      ocorrencias: rdo.occurrences.map((o) => ({
-        tipoLabel: OCCURRENCE_LABELS[o.tipo] ?? o.tipo,
-        descricao: o.descricao,
-      })),
-      fotos: await Promise.all(
-        rdo.photos.map(async (photo) => ({
-          url: await presignGet(photo.url, 3600).catch(() => null),
-          descricao: photo.descricao,
-        })),
-      ),
+  return rdos.map((rdo) => ({
+    id: rdo.id,
+    numero: rdo.numero,
+    clima: rdo.clima,
+    semAtividade: rdo.semAtividade,
+    observacoesGerais: rdo.observacoesGerais,
+    atividades: rdo.activities.map((activity) => ({
+      atividadeNome: activity.planningTask
+        ? `${activity.planningTask.stage.nome} — ${activity.planningTask.nome}`
+        : (activity.planningStage?.nome ?? ""),
+      descricaoServico: activity.descricaoServico,
+      percentualAtual: Number(activity.percentualAtual),
     })),
-  );
+    ocorrencias: rdo.occurrences.map((o) => ({
+      tipoLabel: OCCURRENCE_LABELS[o.tipo] ?? o.tipo,
+      descricao: o.descricao,
+    })),
+    fotos: rdo.photos.map((photo) => ({
+      url: portalFileUrl(token, photo.url),
+      descricao: photo.descricao,
+    })),
+  }));
+}
+
+// Rota publica — galeria com todas as fotos de todas as RDOs da obra, sem precisar navegar
+// dia a dia pelo calendário.
+export async function getPortalGallery(token: string) {
+  const work = await prisma.work.findUnique({ where: { portalToken: token }, select: { id: true, nome: true } });
+  if (!work) return null;
+
+  const photos = await prisma.rdoPhoto.findMany({
+    where: { rdo: { workId: work.id } },
+    include: { rdo: { select: { data: true, numero: true } } },
+    orderBy: [{ rdo: { data: "desc" } }, { ordem: "asc" }],
+  });
+
+  const fotos = photos.map((photo) => ({
+    url: portalFileUrl(token, photo.url),
+    descricao: photo.descricao,
+    data: photo.rdo.data,
+  }));
+
+  return { workNome: work.nome, fotos };
 }
 
 export async function regeneratePortalToken(workId: string) {
