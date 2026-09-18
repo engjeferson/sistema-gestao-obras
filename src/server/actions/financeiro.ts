@@ -493,6 +493,24 @@ export async function markAsPago(transactionId: string, workId: string | null, f
   }
 }
 
+// Reverte um pagamento sem apagar o lançamento — volta pra "Pendente" (ou "Vencido", se o
+// vencimento já passou, via healOverdueTransactions no próximo carregamento da lista).
+export async function undoPayment(transactionId: string, workId: string | null) {
+  const session = await auth();
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
+
+  await prisma.financialTransaction.update({
+    where: { id: transactionId },
+    data: { status: "PENDENTE", dataPagamento: null, formaPagamento: null },
+  });
+
+  revalidatePath("/financeiro");
+  if (workId) {
+    revalidatePath(`/obras/${workId}/financeiro`);
+  }
+}
+
 export async function partialPayTransaction(
   transactionId: string,
   workId: string | null,
