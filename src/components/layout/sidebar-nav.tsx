@@ -11,7 +11,7 @@ import {
   Contact,
   BarChart3,
   Boxes,
-  Smartphone,
+  QrCode,
   LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,6 @@ const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/obras", label: "Obras", icon: Building2, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
       { href: "/estoque", label: "Estoque", icon: Boxes, roles: ["ADMINISTRADOR", "ENGENHEIRO"] },
-      { href: "/campo/obras", label: "Campo (RDO mobile)", icon: Smartphone, roles: ["ADMINISTRADOR", "ENGENHEIRO"] },
       {
         href: "/planejamento-templates",
         label: "Templates de planejamento",
@@ -54,7 +53,10 @@ const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
   },
   {
     label: "Sistema",
-    items: [{ href: "/configuracoes", label: "Configurações", icon: Settings, roles: ["ADMINISTRADOR"] }],
+    items: [
+      { href: "/instalar", label: "Instalar app RDO", icon: QrCode, roles: ["ADMINISTRADOR", "ENGENHEIRO"] },
+      { href: "/configuracoes", label: "Configurações", icon: Settings, roles: ["ADMINISTRADOR"] },
+    ],
   },
 ];
 
