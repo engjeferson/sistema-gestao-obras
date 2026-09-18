@@ -76,7 +76,7 @@ function parseJsonField<T>(formData: FormData, key: string, fallback: T): T {
   }
 }
 
-export async function createRdo(_prevState: string | undefined, formData: FormData) {
+export async function createRdo(basePath: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
   await assertModuleWrite("rdoSomenteLeitura");
@@ -104,11 +104,13 @@ export async function createRdo(_prevState: string | undefined, formData: FormDa
   revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
 
-  const basePath = session.user.role === "OBRA" ? "/campo/obras" : "/obras";
-  redirect(`${basePath}/${parsed.data.workId}/rdo/${rdo.id}`);
+  // No Campo (RDO mobile), volta pra lista de RDOs da obra em vez do detalhe — lá dá pra ver,
+  // editar, excluir ou voltar pra Minhas Obras, sem precisar navegar de novo até o RDO recém-criado.
+  const isMobile = basePath.startsWith("/campo");
+  redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdo.id}`);
 }
 
-export async function updateRdo(rdoId: string, _prevState: string | undefined, formData: FormData) {
+export async function updateRdo(basePath: string, rdoId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
   await assertModuleWrite("rdoSomenteLeitura");
@@ -138,8 +140,8 @@ export async function updateRdo(rdoId: string, _prevState: string | undefined, f
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo/${rdoId}`);
 
-  const basePath = session.user.role === "OBRA" ? "/campo/obras" : "/obras";
-  redirect(`${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
+  const isMobile = basePath.startsWith("/campo");
+  redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
 }
 
 export async function deleteRdo(rdoId: string, workId: string) {

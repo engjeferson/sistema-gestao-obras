@@ -9,12 +9,14 @@ export default async function NovoRdoPage({ params }: { params: Promise<{ id: st
     prisma.rdo.findFirst({ where: { workId: id }, orderBy: { numero: "desc" }, select: { numero: true } }),
   ]);
 
+  const createRdoBound = createRdo.bind(null, "/obras");
+
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Novo RDO</h1>
       </div>
-      <RdoForm action={createRdo} workId={id} stages={stages} numero={(lastRdo?.numero ?? 0) + 1} />
+      <RdoForm action={createRdoBound} workId={id} stages={stages} numero={(lastRdo?.numero ?? 0) + 1} />
     </div>
   );
 }
