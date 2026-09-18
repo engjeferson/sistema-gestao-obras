@@ -121,7 +121,9 @@ export function RdoForm({
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
       <div>
-        <Button type="submit" size="lg" disabled={isPending}>
+        {/* Botão bem maior no mobile — o toast de "foto enviada" aparece fixo no rodapé e
+            acabava cobrindo por completo um botão de altura padrão. */}
+        <Button type="submit" size="lg" className="h-14 w-full text-base" disabled={isPending}>
           {isPending ? "Salvando..." : submitLabel}
         </Button>
       </div>
