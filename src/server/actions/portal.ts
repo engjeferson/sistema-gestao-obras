@@ -162,7 +162,7 @@ export async function getPortalGallery(token: string) {
   const photos = await prisma.rdoPhoto.findMany({
     where: { rdo: { workId: work.id } },
     include: { rdo: { select: { data: true, numero: true } } },
-    orderBy: [{ rdo: { data: "desc" } }, { ordem: "asc" }],
+    orderBy: [{ rdo: { data: "asc" } }, { ordem: "asc" }],
   });
 
   const fotos = photos.map((photo) => ({
