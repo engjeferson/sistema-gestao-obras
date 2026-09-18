@@ -79,6 +79,7 @@ function parseTransactionForm(formData: FormData) {
     formaPagamento: formData.get("formaPagamento") ?? undefined,
     status: formData.get("status"),
     observacao: formData.get("observacao") ?? undefined,
+    comprovanteUrl: formData.get("comprovanteUrl") ?? undefined,
     parcelar: formData.get("parcelar") === "on",
     numeroParcelas: formData.get("numeroParcelas") ?? undefined,
   });
@@ -412,6 +413,7 @@ export async function createTransaction(_prevState: string | undefined, formData
         formaPagamento: data.formaPagamento,
         status: data.status,
         observacao: data.observacao || null,
+        comprovanteUrl: data.comprovanteUrl || null,
         createdById: session.user.id,
       },
     });
@@ -460,6 +462,7 @@ export async function updateTransaction(
       formaPagamento: data.formaPagamento,
       status: data.status,
       observacao: data.observacao || null,
+      comprovanteUrl: data.comprovanteUrl || null,
     },
   });
 
