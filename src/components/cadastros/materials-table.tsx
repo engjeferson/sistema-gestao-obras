@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toggleMaterialActive } from "@/server/actions/materiais";
+import { toggleMaterialActive, deleteMaterial } from "@/server/actions/materiais";
 import { formatCurrencyOrHidden } from "@/lib/status-labels";
 
 type MaterialRow = {
@@ -16,6 +19,7 @@ type MaterialRow = {
   precoUnitario: number | null;
   categoria: string | null;
   ativo: boolean;
+  usado: boolean;
 };
 
 function ToggleButton({ material }: { material: MaterialRow }) {
@@ -36,6 +40,44 @@ function ToggleButton({ material }: { material: MaterialRow }) {
     >
       {material.ativo ? "Desativar" : "Ativar"}
     </Button>
+  );
+}
+
+function DeleteButton({ material }: { material: MaterialRow }) {
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const router = useRouter();
+
+  function handleDelete() {
+    startTransition(async () => {
+      try {
+        await deleteMaterial(material.id);
+        toast.success("Material excluído.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } finally {
+        setConfirming(false);
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" title="Excluir" disabled={isPending} onClick={() => setConfirming(true)}>
+        <Trash2 className="size-4" />
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Excluir material"
+        description={`Tem certeza que deseja excluir "${material.nome}"? Essa ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        onConfirm={handleDelete}
+        isPending={isPending}
+        destructive
+      />
+    </>
   );
 }
 
@@ -80,7 +122,10 @@ export function MaterialsTable({ materials, canSeeValues }: { materials: Materia
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                <ToggleButton material={material} />
+                <div className="flex items-center justify-end gap-1">
+                  <ToggleButton material={material} />
+                  {!material.usado ? <DeleteButton material={material} /> : null}
+                </div>
               </TableCell>
             </TableRow>
           ))}
