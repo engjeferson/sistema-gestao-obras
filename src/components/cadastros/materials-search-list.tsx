@@ -12,6 +12,7 @@ type MaterialRow = {
   precoUnitario: number | null;
   categoria: string | null;
   ativo: boolean;
+  usado: boolean;
 };
 
 export function MaterialsSearchList({ materials, canSeeValues }: { materials: MaterialRow[]; canSeeValues: boolean }) {

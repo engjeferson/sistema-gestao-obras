@@ -8,7 +8,14 @@ import { assertRole } from "@/lib/permissions";
 import { materialFormSchema } from "@/lib/validations/materiais";
 
 export async function listMaterials() {
-  return prisma.material.findMany({ orderBy: { nome: "asc" } });
+  const materials = await prisma.material.findMany({
+    orderBy: { nome: "asc" },
+    include: { _count: { select: { invoiceItems: true, stockMovements: true } } },
+  });
+  return materials.map(({ _count, ...material }) => ({
+    ...material,
+    usado: _count.invoiceItems > 0 || _count.stockMovements > 0,
+  }));
 }
 
 export async function listActiveMaterials() {
@@ -111,5 +118,23 @@ export async function toggleMaterialActive(materialId: string, ativo: boolean) {
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
   await prisma.material.update({ where: { id: materialId }, data: { ativo } });
+  revalidatePath("/cadastros/materiais");
+}
+
+// Só pode ser excluído material que nunca entrou em nenhuma NF/entrada nem movimentação de
+// estoque (compra, saída, transferência) — se já foi usado em algum lugar, só desativar.
+export async function deleteMaterial(materialId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const [invoiceItemsCount, stockMovementsCount] = await Promise.all([
+    prisma.invoiceItem.count({ where: { materialId } }),
+    prisma.stockMovement.count({ where: { materialId } }),
+  ]);
+  if (invoiceItemsCount > 0 || stockMovementsCount > 0) {
+    throw new Error("Este material já foi utilizado e não pode ser excluído. Desative-o em vez disso.");
+  }
+
+  await prisma.material.delete({ where: { id: materialId } });
   revalidatePath("/cadastros/materiais");
 }
