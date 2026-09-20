@@ -15,7 +15,9 @@ async function findOrCreateMaterialId(
   unidadePadrao: InvoiceFormValues["items"][number]["unidade"],
   precoUnitario: number,
 ) {
-  const trimmed = nome.trim();
+  // Uppercase antes de comparar/gravar — mantém o catálogo consistente e evita duplicar o
+  // mesmo material só porque foi digitado com outra caixa numa NF (ex: "cimento" x "CIMENTO").
+  const trimmed = nome.trim().toUpperCase();
   const existing = await prisma.material.findUnique({ where: { nome: trimmed } });
   if (existing) {
     // Preço do material sempre reflete a última compra lançada — o histórico

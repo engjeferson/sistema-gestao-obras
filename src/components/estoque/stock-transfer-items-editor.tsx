@@ -68,7 +68,7 @@ export function StockTransferItemsEditor({
                       options={optionsFor(item.materialId).map((m) => ({ value: m.id, label: m.nome }))}
                       placeholder="Buscar material..."
                       emptyMessage="Nenhum material com saldo nesta origem."
-                      className="min-w-[16rem]"
+                      className="min-w-[28rem]"
                     />
                   </td>
                   <td className={`p-2 whitespace-nowrap ${excedeSaldo ? "text-destructive" : "text-muted-foreground"}`}>

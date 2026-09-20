@@ -20,7 +20,7 @@ export default async function NovaTransferenciaPage({
   const balances = await getStockBalancesAllLocations(works.map((w) => w.id));
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Nova transferência de estoque</h1>
       </div>
