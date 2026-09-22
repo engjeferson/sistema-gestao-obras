@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, ExternalLink, Eye } from "lucide-react";
+import { Trash2, ExternalLink, Eye, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -122,6 +122,16 @@ export function InvoicesTable({
                   >
                     <Eye /> Ver detalhes
                   </Button>
+                  {canEdit ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={<Link href={`/notas-fiscais/${invoice.id}/editar`} />}
+                      nativeButton={false}
+                    >
+                      <Pencil /> Editar
+                    </Button>
+                  ) : null}
                   {showObraColumn ? (
                     <Button
                       variant="outline"

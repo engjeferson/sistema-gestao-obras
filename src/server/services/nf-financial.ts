@@ -40,6 +40,7 @@ export async function createInvoiceWithFinancialEntry(
   arquivoUrl: string | null,
   arquivoXmlUrl: string | null,
   comprovanteUrl: string | null,
+  existingInvoiceId?: string,
 ) {
   const supplierId = await findOrCreateSupplierId(data.supplierNome);
   const itemsSum = data.items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
@@ -56,24 +57,33 @@ export async function createInvoiceWithFinancialEntry(
   }
 
   return prisma.$transaction(async (tx) => {
-    const invoice = await tx.invoice.create({
-      data: {
-        workId: data.workId,
-        supplierId,
-        stageId,
-        taskId,
-        nome: data.nome || null,
-        numero: data.numero || "",
-        dataEmissao: new Date(data.dataEmissao),
-        valorTotal,
-        valorDesconto: data.valorDesconto,
-        valorFrete: data.valorFrete,
-        categoriaId: data.categoriaId,
-        arquivoUrl,
-        arquivoXmlUrl,
-        observacao: data.observacao || null,
-      },
-    });
+    const invoiceData = {
+      workId: data.workId,
+      supplierId,
+      stageId,
+      taskId,
+      nome: data.nome || null,
+      numero: data.numero || "",
+      dataEmissao: new Date(data.dataEmissao),
+      valorTotal,
+      valorDesconto: data.valorDesconto,
+      valorFrete: data.valorFrete,
+      categoriaId: data.categoriaId,
+      arquivoUrl,
+      arquivoXmlUrl,
+      observacao: data.observacao || null,
+    };
+    const invoice = existingInvoiceId
+      ? await tx.invoice.update({ where: { id: existingInvoiceId }, data: invoiceData })
+      : await tx.invoice.create({ data: invoiceData });
+
+    if (existingInvoiceId) {
+      // Mesma ordem já usada em deleteInvoice: apaga os StockMovements antes dos InvoiceItems
+      // (senão a FK barra a exclusão), depois as contas antigas — tudo recriado do zero a seguir.
+      await tx.stockMovement.deleteMany({ where: { invoiceItem: { invoiceId: existingInvoiceId } } });
+      await tx.invoiceItem.deleteMany({ where: { invoiceId: existingInvoiceId } });
+      await tx.financialTransaction.deleteMany({ where: { invoiceId: existingInvoiceId } });
+    }
 
     for (const [index, item] of data.items.entries()) {
       const materialId = materialIds[index];

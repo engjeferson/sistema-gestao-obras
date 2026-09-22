@@ -51,23 +51,19 @@ export async function getInvoice(invoiceId: string) {
   });
 }
 
-export async function createInvoice(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("notasFiscaisSomenteLeitura");
-
+function parseInvoiceForm(formData: FormData) {
   let itemsParsed: unknown;
   try {
     itemsParsed = JSON.parse(String(formData.get("itemsJson") ?? "[]"));
   } catch {
-    return "Itens inválidos.";
+    return { error: "Itens inválidos." } as const;
   }
 
   let parcelasParsed: unknown;
   try {
     parcelasParsed = JSON.parse(String(formData.get("parcelasJson") ?? "[]"));
   } catch {
-    return "Parcelas inválidas.";
+    return { error: "Parcelas inválidas." } as const;
   }
 
   const temEntrada = formData.get("temEntrada") === "on";
@@ -104,12 +100,12 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
   });
 
   if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." } as const;
   }
   const data = parsed.data;
 
   if (data.gerarContaPagar && !data.parcelar && !data.dataVencimento) {
-    return "Informe a data de vencimento para gerar a conta a pagar.";
+    return { error: "Informe a data de vencimento para gerar a conta a pagar." } as const;
   }
 
   if (data.gerarContaPagar && data.parcelar && data.parcelas) {
@@ -118,9 +114,25 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
     const somaEntrada = data.temEntrada && data.entrada ? data.entrada.valor : 0;
     const somaParcelas = somaEntrada + data.parcelas.reduce((sum, parcela) => sum + parcela.valor, 0);
     if (Math.abs(somaParcelas - valorTotal) > 0.01) {
-      return `A soma da entrada + parcelas (${somaParcelas.toFixed(2)}) deve ser igual ao valor total da nota (${valorTotal.toFixed(2)}).`;
+      return {
+        error: `A soma da entrada + parcelas (${somaParcelas.toFixed(2)}) deve ser igual ao valor total da nota (${valorTotal.toFixed(2)}).`,
+      } as const;
     }
   }
+
+  return { data } as const;
+}
+
+export async function createInvoice(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("notasFiscaisSomenteLeitura");
+
+  const result = parseInvoiceForm(formData);
+  if ("error" in result) {
+    return result.error;
+  }
+  const data = result.data;
 
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
   const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
@@ -149,6 +161,73 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
   }
   revalidatePath("/financeiro");
   redirect("/estoque");
+}
+
+// Só dá pra editar a nota inteira (itens, estoque, conta a pagar) enquanto a conta vinculada
+// não foi paga e não está parcelada — parcelas já lançadas se ajustam direto no Financeiro.
+export async function getInvoiceEditability(invoiceId: string) {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { financialTransactions: true },
+  });
+  if (!invoice) {
+    return { editable: false as const, reason: "Nota fiscal não encontrada." };
+  }
+  if (invoice.financialTransactions.some((t) => t.status === "PAGO")) {
+    return {
+      editable: false as const,
+      reason: "A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de editar.",
+    };
+  }
+  if (invoice.financialTransactions.length > 1) {
+    return {
+      editable: false as const,
+      reason: "Esta nota tem o pagamento parcelado — ajuste as parcelas diretamente no Financeiro em vez de editar a nota.",
+    };
+  }
+  return { editable: true as const };
+}
+
+export async function updateInvoice(invoiceId: string, _prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("notasFiscaisSomenteLeitura");
+
+  const editability = await getInvoiceEditability(invoiceId);
+  if (!editability.editable) {
+    return editability.reason;
+  }
+
+  const result = parseInvoiceForm(formData);
+  if ("error" in result) {
+    return result.error;
+  }
+  const data = result.data;
+
+  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+  const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
+  const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
+
+  await createInvoiceWithFinancialEntry(
+    data,
+    session.user.id,
+    arquivoUrl,
+    arquivoXmlUrl,
+    comprovanteUrl,
+    invoiceId,
+  );
+
+  revalidatePath("/notas-fiscais");
+  revalidatePath(`/notas-fiscais/${invoiceId}`);
+  revalidatePath("/estoque");
+  revalidatePath("/cadastros/materiais");
+  if (data.workId) {
+    revalidatePath(`/obras/${data.workId}/materiais`);
+    revalidatePath(`/obras/${data.workId}/financeiro`);
+  } else {
+    revalidatePath("/financeiro");
+  }
+  redirect(`/notas-fiscais/${invoiceId}`);
 }
 
 export async function deleteInvoice(invoiceId: string, workId: string | null) {

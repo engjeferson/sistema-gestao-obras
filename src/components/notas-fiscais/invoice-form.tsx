@@ -19,6 +19,28 @@ import type { InvoiceItemValues, InvoiceInstallmentValues } from "@/lib/validati
 
 type StageOption = { id: string; codigo: string | null; nome: string; tasks: { id: string; codigo: string | null; nome: string }[] };
 
+type InvoiceFormDefaultValues = {
+  workId: string | null;
+  supplierNome: string;
+  nome: string | null;
+  stageId: string | null;
+  taskId: string | null;
+  numero: string;
+  dataEmissao: string;
+  categoriaId: string;
+  observacao: string | null;
+  items: InvoiceItemValues[];
+  valorDesconto: number;
+  valorFrete: number;
+  arquivoUrl: string | null;
+  arquivoXmlUrl: string | null;
+  gerarContaPagar: boolean;
+  contaPaga: boolean;
+  dataVencimento: string | null;
+  bankAccountId: string | null;
+  comprovanteUrl: string | null;
+};
+
 type InvoiceFormProps = {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   works: { id: string; nome: string; codigo: string }[];
@@ -29,6 +51,8 @@ type InvoiceFormProps = {
   materials: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
   units: { sigla: string; nome: string | null }[];
   defaultWorkId?: string;
+  defaultValues?: InvoiceFormDefaultValues;
+  submitLabel?: string;
   initialXml?: string;
   initialSummary?: { numero: string | null; dataEmissao: string | null; fornecedorNome: string | null };
   radarId?: string;
@@ -44,33 +68,39 @@ export function InvoiceForm({
   materials,
   units,
   defaultWorkId,
+  defaultValues,
+  submitLabel = "Lançar nota fiscal",
   initialXml,
   initialSummary,
   radarId,
 }: InvoiceFormProps) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const [items, setItems] = useState<InvoiceItemValues[]>([
-    { material: "", quantidade: 1, unidade: units[0]?.sigla ?? "", valorUnitario: 0 },
-  ]);
-  const [gerarContaPagar, setGerarContaPagar] = useState(false);
+  const [items, setItems] = useState<InvoiceItemValues[]>(
+    defaultValues?.items.length
+      ? defaultValues.items
+      : [{ material: "", quantidade: 1, unidade: units[0]?.sigla ?? "", valorUnitario: 0 }],
+  );
+  const [gerarContaPagar, setGerarContaPagar] = useState(defaultValues?.gerarContaPagar ?? false);
   const [parcelar, setParcelar] = useState(false);
   const [parcelas, setParcelas] = useState<InvoiceInstallmentValues[]>([]);
-  const [valorDesconto, setValorDesconto] = useState(0);
-  const [valorFrete, setValorFrete] = useState(0);
+  const [valorDesconto, setValorDesconto] = useState(defaultValues?.valorDesconto ?? 0);
+  const [valorFrete, setValorFrete] = useState(defaultValues?.valorFrete ?? 0);
   const itemsSum = items.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
   const totalValor = Math.max(0, itemsSum - valorDesconto + valorFrete);
-  const [selectedWorkId, setSelectedWorkId] = useState(defaultWorkId ?? "");
-  const [selectedStageId, setSelectedStageId] = useState("");
+  const [selectedWorkId, setSelectedWorkId] = useState(
+    defaultValues ? (defaultValues.workId ?? ESTOQUE_GERAL_VALUE) : (defaultWorkId ?? ""),
+  );
+  const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const isEstoqueGeral = selectedWorkId === ESTOQUE_GERAL_VALUE;
   const stagesForWork = stagesByWork[selectedWorkId] ?? [];
   const tasksForStage = stagesForWork.find((s) => s.id === selectedStageId)?.tasks ?? [];
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null);
-  const [arquivoXmlUrl, setArquivoXmlUrl] = useState<string | null>(null);
-  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
+  const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
+  const [arquivoXmlUrl, setArquivoXmlUrl] = useState<string | null>(defaultValues?.arquivoXmlUrl ?? null);
+  const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(defaultValues?.comprovanteUrl ?? null);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingXml, setUploadingXml] = useState(false);
   const [uploadingComprovante, setUploadingComprovante] = useState(false);
-  const [contaPaga, setContaPaga] = useState(false);
+  const [contaPaga, setContaPaga] = useState(defaultValues?.contaPaga ?? false);
   const [pendingVencimentoUnico, setPendingVencimentoUnico] = useState<string | null>(null);
   const [pendingXmlItems, setPendingXmlItems] = useState<InvoiceItemValues[] | null>(null);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -210,7 +240,7 @@ export function InvoiceForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="nome">Descrição do pedido (opcional)</Label>
-        <Input id="nome" name="nome" placeholder="Ex: Aço, Madeiras tapume" />
+        <Input id="nome" name="nome" defaultValue={defaultValues?.nome ?? ""} placeholder="Ex: Aço, Madeiras tapume" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -239,7 +269,13 @@ export function InvoiceForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="supplierNome">Fornecedor</Label>
-          <Input id="supplierNome" name="supplierNome" list="fornecedores-datalist" required />
+          <Input
+            id="supplierNome"
+            name="supplierNome"
+            defaultValue={defaultValues?.supplierNome ?? ""}
+            list="fornecedores-datalist"
+            required
+          />
           <datalist id="fornecedores-datalist">
             {supplierNames.map((name) => (
               <option key={name} value={name} />
@@ -267,7 +303,13 @@ export function InvoiceForm({
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="taskId">Atividade</Label>
-              <NativeSelect id="taskId" name="taskId" key={selectedStageId} disabled={!selectedStageId}>
+              <NativeSelect
+                id="taskId"
+                name="taskId"
+                key={selectedStageId}
+                defaultValue={defaultValues?.taskId ?? ""}
+                disabled={!selectedStageId}
+              >
                 <option value="">—</option>
                 {tasksForStage.map((task) => (
                   <option key={task.id} value={task.id}>
@@ -281,15 +323,15 @@ export function InvoiceForm({
         ) : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="numero">Número da NF (opcional)</Label>
-          <Input id="numero" name="numero" />
+          <Input id="numero" name="numero" defaultValue={defaultValues?.numero ?? ""} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="dataEmissao">Data</Label>
-          <Input id="dataEmissao" name="dataEmissao" type="date" required />
+          <Input id="dataEmissao" name="dataEmissao" type="date" defaultValue={defaultValues?.dataEmissao ?? ""} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="categoriaId">Categoria</Label>
-          <NativeSelect id="categoriaId" name="categoriaId" defaultValue="" required>
+          <NativeSelect id="categoriaId" name="categoriaId" defaultValue={defaultValues?.categoriaId ?? ""} required>
             <option value="" disabled>
               Selecione a categoria
             </option>
@@ -378,12 +420,18 @@ export function InvoiceForm({
               {!parcelar ? (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="dataVencimento">Data de vencimento</Label>
-                  <Input id="dataVencimento" name="dataVencimento" type="date" required={!parcelar} />
+                  <Input
+                    id="dataVencimento"
+                    name="dataVencimento"
+                    type="date"
+                    defaultValue={defaultValues?.dataVencimento ?? ""}
+                    required={!parcelar}
+                  />
                 </div>
               ) : null}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="bankAccountId">Conta bancária</Label>
-                <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue="">
+                <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue={defaultValues?.bankAccountId ?? ""}>
                   <option value="">—</option>
                   {bankAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
@@ -453,14 +501,14 @@ export function InvoiceForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="observacao">Observação</Label>
-        <Textarea id="observacao" name="observacao" />
+        <Textarea id="observacao" name="observacao" defaultValue={defaultValues?.observacao ?? ""} />
       </div>
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
       <div>
         <Button type="submit" disabled={isPending || uploadingPdf || uploadingXml}>
-          {isPending ? "Salvando..." : "Lançar nota fiscal"}
+          {isPending ? "Salvando..." : submitLabel}
         </Button>
       </div>
     </form>
