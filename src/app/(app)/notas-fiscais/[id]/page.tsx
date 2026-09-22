@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, FileText, Paperclip, Receipt, Wallet, PiggyBank, Milestone } from "lucide-react";
+import { ExternalLink, FileText, Paperclip, Pencil, Receipt, Wallet, PiggyBank, Milestone } from "lucide-react";
 import { getInvoice } from "@/server/actions/notas-fiscais";
 import { getCurrentSensitiveValuesAccess } from "@/server/actions/permissions";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             nativeButton={false}
           >
             <ExternalLink /> {invoice.workId ? "Ver na obra" : "Ver estoque"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link href={`/notas-fiscais/${invoice.id}/editar`} />}
+            nativeButton={false}
+          >
+            <Pencil /> Editar
           </Button>
         </div>
       </div>
