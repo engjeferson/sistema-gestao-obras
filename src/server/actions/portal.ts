@@ -37,6 +37,29 @@ function flattenStages(nodes: StageTreeNode[]): StageTreeNode[] {
   return nodes.flatMap((stage) => [stage, ...flattenStages(stage.children)]);
 }
 
+// Ids da própria etapa + de todas as sub-etapas e tarefas na subárvore — usado pra achar as RDOs
+// (e portanto as fotos) que dizem respeito a essa etapa, já que a foto não é vinculada direto a
+// uma tarefa/etapa, só a RDO como um todo.
+function collectSubtreeIds(stage: StageTreeNode): { stageIds: string[]; taskIds: string[] } {
+  const stageIds = [stage.id];
+  const taskIds = stage.tasks.map((t) => t.id);
+  for (const child of stage.children) {
+    const nested = collectSubtreeIds(child);
+    stageIds.push(...nested.stageIds);
+    taskIds.push(...nested.taskIds);
+  }
+  return { stageIds, taskIds };
+}
+
+function findStageById(nodes: StageTreeNode[], stageId: string): StageTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === stageId) return node;
+    const found = findStageById(node.children, stageId);
+    if (found) return found;
+  }
+  return null;
+}
+
 // Rota publica (sem autenticacao) — nunca retornar dado financeiro aqui.
 export async function getPortalData(token: string) {
   const work = await prisma.work.findUnique({
@@ -151,6 +174,41 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
       descricao: photo.descricao,
     })),
   }));
+}
+
+// Rota publica — chamada quando o cliente clica numa etapa. Fotos das RDOs que tiveram alguma
+// atividade lançada dentro da subárvore dessa etapa (ela mesma, sub-etapas e tarefas).
+export async function getPortalStagePhotos(token: string, stageId: string) {
+  const work = await prisma.work.findUnique({ where: { portalToken: token }, select: { id: true } });
+  if (!work) return null;
+
+  const stageTree = await listStagesWithTasks(work.id);
+  const stage = findStageById(stageTree, stageId);
+  if (!stage) return null;
+
+  const { stageIds, taskIds } = collectSubtreeIds(stage);
+
+  const rdos = await prisma.rdo.findMany({
+    where: {
+      workId: work.id,
+      activities: {
+        some: {
+          OR: [{ planningStageId: { in: stageIds } }, { planningTaskId: { in: taskIds } }],
+        },
+      },
+    },
+    select: { photos: { orderBy: { ordem: "asc" } } },
+    orderBy: { data: "asc" },
+  });
+
+  const fotos = rdos.flatMap((rdo) =>
+    rdo.photos.map((photo) => ({
+      url: portalFileUrl(token, photo.url),
+      descricao: photo.descricao,
+    })),
+  );
+
+  return { stageName: stage.nome, fotos };
 }
 
 // Rota publica — galeria com todas as fotos de todas as RDOs da obra, sem precisar navegar

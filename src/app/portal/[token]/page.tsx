@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { Images } from "lucide-react";
 import { getPortalData } from "@/server/actions/portal";
 import { PortalCalendar } from "@/components/portal/portal-calendar";
+import { PortalStagesList } from "@/components/portal/portal-stages-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { WORK_STATUS_BADGE, WORK_STATUS_LABELS, formatDateBR } from "@/lib/status-labels";
 
 export const dynamic = "force-dynamic";
@@ -69,29 +70,7 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
         </CardContent>
       </Card>
 
-      {data.etapas.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Etapas</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {data.etapas.map((etapa) => {
-              const etapaProgresso = Math.min(100, Math.max(0, etapa.percentualExecutado));
-              return (
-                <div key={etapa.id} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{etapa.nome}</span>
-                    <span className="text-muted-foreground">{etapaProgresso.toFixed(0)}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${etapaProgresso}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      ) : null}
+      {data.etapas.length > 0 ? <PortalStagesList token={token} etapas={data.etapas} /> : null}
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
