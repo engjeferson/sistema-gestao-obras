@@ -36,6 +36,11 @@ export const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   RECEBER: "A receber",
 };
 
+export const TRANSACTION_TYPE_BADGE: Record<string, "success" | "destructive"> = {
+  PAGAR: "destructive",
+  RECEBER: "success",
+};
+
 export const CONTRACT_TYPE_LABELS: Record<string, string> = {
   CONTRATO_CLIENTE: "Contrato com cliente",
   EMPREITADA: "Empreitada",

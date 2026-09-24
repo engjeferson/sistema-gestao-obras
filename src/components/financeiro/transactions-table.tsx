@@ -16,6 +16,7 @@ import { batchMarkAsPago } from "@/server/actions/financeiro";
 import {
   TRANSACTION_STATUS_BADGE,
   TRANSACTION_STATUS_LABELS,
+  TRANSACTION_TYPE_BADGE,
   TRANSACTION_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
   UNIT_LABELS,
@@ -201,7 +202,9 @@ export function TransactionsTable({
                     )}
                   </TableCell>
                 ) : null}
-                <TableCell>{TRANSACTION_TYPE_LABELS[t.tipo]}</TableCell>
+                <TableCell>
+                  <Badge variant={TRANSACTION_TYPE_BADGE[t.tipo]}>{TRANSACTION_TYPE_LABELS[t.tipo]}</Badge>
+                </TableCell>
                 <TableCell>{t.categoria.nome}</TableCell>
                 <TableCell>
                   <span title={t.favorecidoNome} className="block max-w-[160px] truncate">
