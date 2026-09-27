@@ -53,11 +53,18 @@ export function TransactionsTable({
   showObraColumn = true,
   canEdit = true,
   selectable = false,
+  pagination,
+  footerTotals,
 }: {
   transactions: TransactionRow[];
   showObraColumn?: boolean;
   canEdit?: boolean;
   selectable?: boolean;
+  // Renderizado antes da barra fixa do rodapé — precisa vir de fora (em vez do próprio
+  // TransactionsTable) senão a paginação ficaria por baixo da barra fixa (sticky não empilha
+  // sozinho com o que vem depois dela no DOM).
+  pagination?: React.ReactNode;
+  footerTotals?: { totalAPagar: number; totalPagas: number; totalPendentes: number };
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -115,16 +122,16 @@ export function TransactionsTable({
     });
   }
 
-  if (transactions.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-        Nenhum lançamento encontrado.
-      </p>
-    );
-  }
+  const hasFooter = (showSelection && selected.size > 0) || !!footerTotals;
 
   return (
+    <>
     <div className="flex flex-col gap-4">
+      {transactions.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          Nenhum lançamento encontrado.
+        </p>
+      ) : (
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -245,6 +252,9 @@ export function TransactionsTable({
           </TableBody>
         </Table>
       </div>
+      )}
+
+      {pagination}
 
       <Dialog open={materiaisDe !== null} onOpenChange={(open) => !open && setMateriaisDe(null)}>
         <DialogContent className="sm:max-w-3xl">
@@ -274,28 +284,6 @@ export function TransactionsTable({
         </DialogContent>
       </Dialog>
 
-      {showSelection && selected.size > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-muted/30 p-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Selecionado ({selected.size})</p>
-            <p className="text-lg font-heading font-semibold text-primary">{formatCurrencyBRL(totalSelecionado)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <NativeSelect className="w-auto" value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)}>
-              <option value="">Forma de pagamento (opcional)</option>
-              {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-            <Button disabled={isPending} onClick={() => setConfirmBatchOpen(true)}>
-              Confirmar pagamento
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       <ConfirmDialog
         open={confirmBatchOpen}
         onOpenChange={setConfirmBatchOpen}
@@ -306,5 +294,55 @@ export function TransactionsTable({
         isPending={isPending}
       />
     </div>
+
+    {hasFooter ? (
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 border-t bg-background px-4 py-4 md:-mx-6 md:-mb-6 md:px-6 md:py-6">
+        {showSelection && selected.size > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Selecionado ({selected.size})</p>
+              <p className="text-lg font-heading font-semibold text-primary">{formatCurrencyBRL(totalSelecionado)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <NativeSelect
+                className="w-auto"
+                value={formaPagamento}
+                onChange={(e) => setFormaPagamento(e.target.value)}
+              >
+                <option value="">Forma de pagamento (opcional)</option>
+                {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <Button disabled={isPending} onClick={() => setConfirmBatchOpen(true)}>
+                Confirmar pagamento
+              </Button>
+            </div>
+          </div>
+        ) : footerTotals ? (
+          <div className="flex flex-wrap gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground">Total a pagar</p>
+              <p className="text-lg font-heading font-semibold">{formatCurrencyBRL(footerTotals.totalAPagar)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total pagas</p>
+              <p className="text-lg font-heading font-semibold text-success">
+                {formatCurrencyBRL(footerTotals.totalPagas)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total pendentes</p>
+              <p className="text-lg font-heading font-semibold text-warning">
+                {formatCurrencyBRL(footerTotals.totalPendentes)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : null}
+    </>
   );
 }
