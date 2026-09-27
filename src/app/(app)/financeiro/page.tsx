@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export default async function FinanceiroPage({
@@ -134,26 +133,17 @@ export default async function FinanceiroPage({
       </div>
 
       <div className="flex flex-col gap-4 p-4 md:p-6">
-        <TransactionsTable transactions={result.items} canEdit={canEdit} selectable />
-
-        <PaginationControls page={result.page} totalPages={result.totalPages} />
-      </div>
-
-      <div className="sticky bottom-0 z-10 flex flex-wrap gap-6 border-t bg-background p-4 md:p-6">
-        <div>
-          <p className="text-xs text-muted-foreground">Total a pagar</p>
-          <p className="text-lg font-heading font-semibold">{formatCurrencyBRL(summary.totalAPagar)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Total pagas</p>
-          <p className="text-lg font-heading font-semibold text-success">{formatCurrencyBRL(summary.totalPagas)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Total pendentes</p>
-          <p className="text-lg font-heading font-semibold text-warning">
-            {formatCurrencyBRL(summary.totalPendentes)}
-          </p>
-        </div>
+        <TransactionsTable
+          transactions={result.items}
+          canEdit={canEdit}
+          selectable
+          pagination={<PaginationControls page={result.page} totalPages={result.totalPages} />}
+          footerTotals={{
+            totalAPagar: summary.totalAPagar,
+            totalPagas: summary.totalPagas,
+            totalPendentes: summary.totalPendentes,
+          }}
+        />
       </div>
     </div>
   );
