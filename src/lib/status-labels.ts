@@ -32,8 +32,8 @@ export const TRANSACTION_STATUS_BADGE: Record<string, "secondary" | "success" | 
 };
 
 export const TRANSACTION_TYPE_LABELS: Record<string, string> = {
-  PAGAR: "A pagar",
-  RECEBER: "A receber",
+  PAGAR: "Despesa",
+  RECEBER: "Receita",
 };
 
 export const TRANSACTION_TYPE_BADGE: Record<string, "success" | "destructive"> = {
