@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
-  Wallet,
+  DollarSign,
   FileText,
   Settings,
   Contact,
@@ -40,7 +40,7 @@ const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
   {
     label: "Financeiro",
     items: [
-      { href: "/financeiro", label: "Financeiro", icon: Wallet, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
+      { href: "/financeiro", label: "Financeiro", icon: DollarSign, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
       { href: "/notas-fiscais", label: "Notas Fiscais", icon: FileText, roles: ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"] },
     ],
   },
