@@ -11,6 +11,7 @@ const TABS = [
   { slug: "planejamento", label: "Planejamento" },
   { slug: "calendario", label: "Calendário" },
   { slug: "orcamento", label: "Orçamento" },
+  { slug: "apropriacao", label: "Apropriação" },
   { slug: "rdo", label: "RDO" },
   { slug: "contratos", label: "Contratos" },
 ];
