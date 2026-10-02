@@ -46,7 +46,7 @@ export default async function ContractDetailPage({
     status: m.financialTransaction?.status ?? null,
     financialTransactionId: m.financialTransaction?.id ?? null,
     dataVencimento: m.financialTransaction?.dataVencimento ?? null,
-    arquivoUrl: m.arquivoUrl,
+    attachments: m.attachments,
   }));
 
   const addendums = contract.addendums.map((a) => ({

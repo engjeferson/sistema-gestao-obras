@@ -610,13 +610,25 @@ model ContractMeasurement {
   descricao   String?
   valor       Decimal  @db.Decimal(14, 2)
   observacoes String?
-  arquivoUrl  String?
   createdAt   DateTime @default(now())
 
-  contract             Contract              @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract             Contract                @relation(fields: [contractId], references: [id], onDelete: Cascade)
   financialTransaction FinancialTransaction?
+  attachments          MeasurementAttachment[]
 
   @@unique([contractId, numero])
+}
+
+model MeasurementAttachment {
+  id            String   @id @default(cuid())
+  measurementId String
+  url           String
+  nome          String
+  createdAt     DateTime @default(now())
+
+  measurement ContractMeasurement @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+
+  @@index([measurementId])
 }
 
 model PlanningStage {

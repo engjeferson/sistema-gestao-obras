@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { uploadFileToR2 } from "@/lib/upload-file";
 import { PAYMENT_METHOD_LABELS } from "@/lib/status-labels";
+import { ContractAttachmentsField, type ContractAttachmentValue } from "@/components/contratos/contract-attachments-field";
 
 type MeasurementFormDefaultValues = {
   data?: Date | string;
@@ -21,7 +22,7 @@ type MeasurementFormDefaultValues = {
   taskId?: string | null;
   descricao?: string | null;
   observacoes?: string | null;
-  arquivoUrl?: string | null;
+  attachments?: ContractAttachmentValue[];
 };
 
 type StageOption = { id: string; codigo: string | null; nome: string; tasks: { id: string; codigo: string | null; nome: string }[] };
@@ -58,32 +59,39 @@ export function MeasurementForm({
   const isEdit = Boolean(defaultValues);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
   const [confirmar, setConfirmar] = useState(false);
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(defaultValues?.arquivoUrl ?? null);
+  const [attachments, setAttachments] = useState<ContractAttachmentValue[]>(defaultValues?.attachments ?? []);
   const [uploading, setUploading] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   const tasksForStage = stages.find((s) => s.id === selectedStageId)?.tasks ?? [];
 
-  async function handleFileChange(file: File | undefined) {
-    if (!file) return;
+  async function handleFilesChange(files: FileList | null) {
+    if (!files || files.length === 0) return;
     setUploading(true);
     try {
-      const key = await uploadFileToR2(file, "medicoes", workId, draftId);
-      setArquivoUrl(key);
-      toast.success("Comprovante enviado.");
+      const uploaded: ContractAttachmentValue[] = [];
+      for (const file of Array.from(files)) {
+        const key = await uploadFileToR2(file, "medicoes", workId, `${draftId}-${uploaded.length}`);
+        uploaded.push({ url: key, nome: file.name });
+      }
+      setAttachments((prev) => [...prev, ...uploaded]);
+      toast.success(uploaded.length > 1 ? "Comprovantes enviados." : "Comprovante enviado.");
     } catch {
-      toast.error("Não foi possível enviar o arquivo. Verifique a configuração de armazenamento.");
+      toast.error("Não foi possível enviar o(s) arquivo(s). Verifique a configuração de armazenamento.");
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleRemoveAttachment(url: string) {
+    setAttachments((prev) => prev.filter((a) => a.url !== url));
   }
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="workId" value={workId} />
       <input type="hidden" name="contractId" value={contractId} />
-      <input type="hidden" name="arquivoUrl" value={arquivoUrl ?? ""} readOnly />
 
       {!isEdit ? <p className="text-sm text-muted-foreground">Medição #{proximoNumero}</p> : null}
 
@@ -181,17 +189,13 @@ export function MeasurementForm({
             defaultValue={defaultValues?.descricao ?? ""}
           />
         </div>
-        <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label htmlFor="comprovante">Comprovante (opcional)</Label>
-          <Input
-            id="comprovante"
-            type="file"
-            disabled={uploading}
-            onChange={(e) => void handleFileChange(e.target.files?.[0])}
-          />
-          {uploading ? <p className="text-xs text-muted-foreground">Enviando...</p> : null}
-          {arquivoUrl ? <p className="text-xs text-success">Arquivo anexado.</p> : null}
-        </div>
+        <ContractAttachmentsField
+          attachments={attachments}
+          uploading={uploading}
+          onFilesChange={(files) => void handleFilesChange(files)}
+          onRemove={handleRemoveAttachment}
+          label="Comprovantes (opcional)"
+        />
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacoes">Observações</Label>
           <Textarea id="observacoes" name="observacoes" defaultValue={defaultValues?.observacoes ?? ""} />

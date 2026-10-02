@@ -50,7 +50,7 @@ export default async function EditarMedicaoPage({
           taskId: measurement.financialTransaction?.taskId,
           descricao: measurement.descricao,
           observacoes: measurement.observacoes,
-          arquivoUrl: measurement.arquivoUrl,
+          attachments: measurement.attachments,
         }}
       />
     </div>

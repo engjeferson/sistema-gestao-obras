@@ -22,7 +22,7 @@ type MeasurementRow = {
   status: string | null;
   financialTransactionId: string | null;
   dataVencimento: Date | null;
-  arquivoUrl: string | null;
+  attachments: { url: string; nome: string }[];
 };
 
 function FinalizeButton({ transactionId, workId }: { transactionId: string; workId: string }) {
@@ -142,16 +142,21 @@ export function MeasurementsTable({
                 )}
               </TableCell>
               <TableCell>
-                {measurement.arquivoUrl ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Ver comprovante"
-                    render={<a href={`/api/files?key=${encodeURIComponent(measurement.arquivoUrl)}`} target="_blank" rel="noopener noreferrer" />}
-                    nativeButton={false}
-                  >
-                    <Paperclip className="size-4" />
-                  </Button>
+                {measurement.attachments.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {measurement.attachments.map((attachment) => (
+                      <Button
+                        key={attachment.url}
+                        variant="ghost"
+                        size="icon"
+                        title={attachment.nome}
+                        render={<a href={`/api/files?key=${encodeURIComponent(attachment.url)}`} target="_blank" rel="noopener noreferrer" />}
+                        nativeButton={false}
+                      >
+                        <Paperclip className="size-4" />
+                      </Button>
+                    ))}
+                  </div>
                 ) : (
                   "—"
                 )}
