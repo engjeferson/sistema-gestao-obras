@@ -12,16 +12,18 @@ export function ContractAttachmentsField({
   uploading,
   onFilesChange,
   onRemove,
+  label = "Arquivos",
 }: {
   attachments: ContractAttachmentValue[];
   uploading: boolean;
   onFilesChange: (files: FileList | null) => void;
   onRemove: (url: string) => void;
+  label?: string;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:col-span-2">
       <input type="hidden" name="attachmentsJson" value={JSON.stringify(attachments)} readOnly />
-      <Label htmlFor="anexos">Arquivos</Label>
+      <Label htmlFor="anexos">{label}</Label>
       <Input
         id="anexos"
         type="file"

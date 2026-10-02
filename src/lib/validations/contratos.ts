@@ -52,7 +52,6 @@ export const measurementFormSchema = z.object({
   taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
   descricao: z.string().trim().optional(),
   observacoes: z.string().trim().optional(),
-  arquivoUrl: z.string().optional(),
   confirmar: z.boolean().optional(),
   formaPagamento: z.enum(paymentMethodValues).optional().or(z.literal("").transform(() => undefined)),
 });

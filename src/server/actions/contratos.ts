@@ -68,7 +68,7 @@ export async function listContracts(workId: string) {
     where: { workId },
     orderBy: { ordem: "asc" },
     include: {
-      measurements: { include: { financialTransaction: true } },
+      measurements: { include: { financialTransaction: true, attachments: { orderBy: { createdAt: "asc" } } } },
       addendums: true,
       attachments: { orderBy: { createdAt: "asc" } },
     },
@@ -92,7 +92,10 @@ export async function getContract(contractId: string) {
   return prisma.contract.findUnique({
     where: { id: contractId },
     include: {
-      measurements: { include: { financialTransaction: true }, orderBy: { numero: "desc" } },
+      measurements: {
+        include: { financialTransaction: true, attachments: { orderBy: { createdAt: "asc" } } },
+        orderBy: { numero: "desc" },
+      },
       addendums: { orderBy: { data: "desc" } },
       attachments: { orderBy: { createdAt: "asc" } },
     },
@@ -214,7 +217,6 @@ function parseMeasurementForm(formData: FormData) {
     taskId: formData.get("taskId") ?? undefined,
     descricao: formData.get("descricao") ?? undefined,
     observacoes: formData.get("observacoes") ?? undefined,
-    arquivoUrl: formData.get("arquivoUrl") ?? undefined,
     confirmar: formData.get("confirmar") === "on",
     formaPagamento: formData.get("formaPagamento") ?? undefined,
   });
@@ -230,6 +232,7 @@ export async function createMeasurement(_prevState: string | undefined, formData
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const attachments = parseAttachments(formData);
 
   const contract = await prisma.contract.findUnique({ where: { id: data.contractId } });
   if (!contract) {
@@ -254,7 +257,7 @@ export async function createMeasurement(_prevState: string | undefined, formData
         descricao: data.descricao || null,
         valor: data.valor,
         observacoes: data.observacoes || null,
-        arquivoUrl: data.arquivoUrl || null,
+        attachments: { create: attachments },
       },
     });
 
@@ -291,7 +294,7 @@ export async function createMeasurement(_prevState: string | undefined, formData
 export async function getMeasurement(measurementId: string) {
   return prisma.contractMeasurement.findUnique({
     where: { id: measurementId },
-    include: { financialTransaction: true, contract: true },
+    include: { financialTransaction: true, contract: true, attachments: { orderBy: { createdAt: "asc" } } },
   });
 }
 
@@ -309,6 +312,7 @@ export async function updateMeasurement(
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const attachments = parseAttachments(formData);
 
   const measurement = await prisma.contractMeasurement.findUnique({
     where: { id: measurementId },
@@ -326,7 +330,7 @@ export async function updateMeasurement(
         descricao: data.descricao || null,
         valor: data.valor,
         observacoes: data.observacoes || null,
-        arquivoUrl: data.arquivoUrl || null,
+        attachments: { deleteMany: {}, create: attachments },
       },
     });
 
