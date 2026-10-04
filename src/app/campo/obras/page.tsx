@@ -31,10 +31,13 @@ export default async function CampoObrasPage() {
                     <Badge variant={WORK_STATUS_BADGE[work.status]}>{WORK_STATUS_LABELS[work.status]}</Badge>
                   </div>
                   <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Progresso geral da obra</span>
+                      <span className="font-semibold">{percent.toFixed(0)}%</span>
+                    </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-success" style={{ width: `${percent}%` }} />
                     </div>
-                    <span className="text-xs text-muted-foreground">{percent.toFixed(0)}% executado</span>
                   </div>
                 </CardContent>
               </Card>

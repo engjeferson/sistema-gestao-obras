@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertRole } from "@/lib/permissions";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
-import { hasAnyTaskInSubtree, computeWeightedAvanco, type WeightedProgress } from "@/lib/planning";
+import { collectLeafPercentages, computeWeightedAvanco } from "@/lib/planning";
 
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -16,21 +16,6 @@ function toDateOnly(date: Date) {
 // depender de CORS do bucket no domínio (que muda a cada preview) pra exibir as fotos.
 function portalFileUrl(token: string, key: string) {
   return `/api/portal-files?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`;
-}
-
-// Percentuais "folha" (com peso) dentro da subárvore de uma etapa: quando ela mesma funciona como
-// "atividade solta" (sem nenhuma tarefa nela ou em qualquer sub dela), conta o percentual da
-// própria etapa; senão, agrega o das tarefas diretas + o que vier recursivamente das sub-etapas,
-// cada uma com seu peso (impacto) — mesma regra do RDO (`listPlanningTasksForPicker`), aplicada
-// aqui pra não zerar o progresso de etapas soltas.
-function collectLeafPercentages(stage: StageTreeNode): WeightedProgress[] {
-  if (!hasAnyTaskInSubtree(stage)) {
-    return [{ percentualExecutado: Number(stage.percentualExecutado), peso: 1 }];
-  }
-  return [
-    ...stage.tasks.map((task) => ({ percentualExecutado: Number(task.percentualExecutado), peso: Number(task.peso) })),
-    ...stage.children.flatMap(collectLeafPercentages),
-  ];
 }
 
 function flattenStages(nodes: StageTreeNode[]): StageTreeNode[] {

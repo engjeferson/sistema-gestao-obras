@@ -8,7 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
-import { getWorkCostSummary } from "@/server/actions/orcamento";
+import { collectLeafPercentages, computeWeightedAvanco } from "@/lib/planning";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
 /**
@@ -165,11 +165,49 @@ export async function listActiveWorksWithProgress() {
     orderBy: { createdAt: "desc" },
   });
 
-  const summaries = await Promise.all(works.map((work) => getWorkCostSummary(work.id)));
+  const workIds = works.map((w) => w.id);
+  const stages = await prisma.planningStage.findMany({
+    where: { workId: { in: workIds } },
+    select: {
+      id: true,
+      workId: true,
+      parentId: true,
+      percentualExecutado: true,
+      tasks: { select: { percentualExecutado: true, peso: true } },
+    },
+  });
 
-  return works.map((work, index) => ({
+  type StageNode = {
+    workId: string;
+    percentualExecutado: number;
+    tasks: { percentualExecutado: number; peso: number }[];
+    children: StageNode[];
+  };
+  const nodeById = new Map<string, StageNode & { parentId: string | null }>();
+  for (const stage of stages) {
+    nodeById.set(stage.id, {
+      workId: stage.workId,
+      parentId: stage.parentId,
+      percentualExecutado: Number(stage.percentualExecutado),
+      tasks: stage.tasks.map((t) => ({ percentualExecutado: Number(t.percentualExecutado), peso: Number(t.peso) })),
+      children: [],
+    });
+  }
+  const rootsByWork = new Map<string, StageNode[]>();
+  for (const node of nodeById.values()) {
+    const parent = node.parentId ? nodeById.get(node.parentId) : undefined;
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      const roots = rootsByWork.get(node.workId) ?? [];
+      roots.push(node);
+      rootsByWork.set(node.workId, roots);
+    }
+  }
+
+  return works.map((work) => ({
     ...work,
-    percentualExecutado: summaries[index]?.avancoFisico ?? 0,
+    percentualExecutado: computeWeightedAvanco((rootsByWork.get(work.id) ?? []).flatMap(collectLeafPercentages)),
   }));
 }
 

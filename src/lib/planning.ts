@@ -39,6 +39,20 @@ export function hasAnyTaskInSubtree<T extends { tasks: unknown[]; children: T[] 
   return stage.tasks.length > 0 || stage.children.some(hasAnyTaskInSubtree);
 }
 
+type ProgressStage = { percentualExecutado: number; tasks: WeightedProgress[]; children: ProgressStage[] };
+
+// Percentuais "folha" (com peso) dentro da subárvore de uma etapa: quando ela mesma funciona como
+// "atividade solta" (sem nenhuma tarefa nela ou em qualquer sub dela), conta o percentual da
+// própria etapa; senão, agrega o das tarefas diretas + o que vier recursivamente das sub-etapas,
+// cada uma com seu peso (impacto). Única fonte do "progresso geral da obra" — usada pelo portal do
+// cliente e pela lista de obras do app de campo, pra nunca divergir entre as duas telas.
+export function collectLeafPercentages<T extends ProgressStage>(stage: T): WeightedProgress[] {
+  if (!hasAnyTaskInSubtree(stage as ProgressStage)) {
+    return [{ percentualExecutado: stage.percentualExecutado, peso: 1 }];
+  }
+  return [...stage.tasks, ...stage.children.flatMap((child) => collectLeafPercentages(child))];
+}
+
 export type TaskForCascade = {
   id: string;
   dataInicioPrevista: Date;
