@@ -8,6 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
+import { hasAnyTaskInSubtree, computeWeightedAvanco, type WeightedProgress } from "@/lib/planning";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
 /**
@@ -150,6 +151,64 @@ export async function listWorks(filters?: { status?: WorkStatus; search?: string
     include: { client: true },
     orderBy: { createdAt: "desc" },
   });
+}
+
+// Mesma regra de avanço ponderado por peso usada na Visão Geral da obra e no portal do cliente
+// (ver `collectLeafPercentages` em server/actions/portal.ts) — aqui batida pra todas as obras
+// ativas de uma vez (2 queries) em vez de uma árvore completa (com predecessores/calendário) por
+// obra, que é mais do que o app de campo precisa só pra mostrar o percentual no card.
+export async function listActiveWorksWithProgress() {
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: {
+      id: workAccess !== null ? { in: workAccess } : undefined,
+      status: { not: "CONCLUIDA" },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const workIds = works.map((w) => w.id);
+  const stages = await prisma.planningStage.findMany({
+    where: { workId: { in: workIds } },
+    select: {
+      id: true,
+      workId: true,
+      parentId: true,
+      percentualExecutado: true,
+      tasks: { select: { percentualExecutado: true, peso: true } },
+    },
+  });
+
+  type StageNode = (typeof stages)[number] & { children: StageNode[] };
+  const nodeById = new Map<string, StageNode>();
+  for (const stage of stages) nodeById.set(stage.id, { ...stage, children: [] });
+  const rootsByWork = new Map<string, StageNode[]>();
+  for (const stage of stages) {
+    const node = nodeById.get(stage.id)!;
+    const parent = stage.parentId ? nodeById.get(stage.parentId) : undefined;
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      const roots = rootsByWork.get(stage.workId) ?? [];
+      roots.push(node);
+      rootsByWork.set(stage.workId, roots);
+    }
+  }
+
+  function collectLeafPercentages(stage: StageNode): WeightedProgress[] {
+    if (!hasAnyTaskInSubtree(stage)) {
+      return [{ percentualExecutado: Number(stage.percentualExecutado), peso: 1 }];
+    }
+    return [
+      ...stage.tasks.map((t) => ({ percentualExecutado: Number(t.percentualExecutado), peso: Number(t.peso) })),
+      ...stage.children.flatMap(collectLeafPercentages),
+    ];
+  }
+
+  return works.map((work) => ({
+    ...work,
+    percentualExecutado: computeWeightedAvanco((rootsByWork.get(work.id) ?? []).flatMap(collectLeafPercentages)),
+  }));
 }
 
 export async function getWork(workId: string) {
