@@ -8,6 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
+import { getWorkCostSummary } from "@/server/actions/orcamento";
 import type { WorkStatus } from "@/generated/prisma/enums";
 
 /**
@@ -150,6 +151,26 @@ export async function listWorks(filters?: { status?: WorkStatus; search?: string
     include: { client: true },
     orderBy: { createdAt: "desc" },
   });
+}
+
+// Mesmo `avancoFisico` exibido na Visão Geral da obra — reaproveita `getWorkCostSummary` em vez
+// de recalcular, pra garantir que o percentual aqui nunca diverge do que já é mostrado lá.
+export async function listActiveWorksWithProgress() {
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: {
+      id: workAccess !== null ? { in: workAccess } : undefined,
+      status: { not: "CONCLUIDA" },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const summaries = await Promise.all(works.map((work) => getWorkCostSummary(work.id)));
+
+  return works.map((work, index) => ({
+    ...work,
+    percentualExecutado: summaries[index]?.avancoFisico ?? 0,
+  }));
 }
 
 export async function getWork(workId: string) {
