@@ -48,9 +48,16 @@ type ProgressStage = { percentualExecutado: number; tasks: WeightedProgress[]; c
 // cliente e pela lista de obras do app de campo, pra nunca divergir entre as duas telas.
 export function collectLeafPercentages<T extends ProgressStage>(stage: T): WeightedProgress[] {
   if (!hasAnyTaskInSubtree(stage as ProgressStage)) {
-    return [{ percentualExecutado: stage.percentualExecutado, peso: 1 }];
+    return [{ percentualExecutado: Number(stage.percentualExecutado), peso: 1 }];
   }
-  return [...stage.tasks, ...stage.children.flatMap((child) => collectLeafPercentages(child))];
+  // `Number(...)` aqui é essencial, não redundante: alguns chamadores (ex: `listStagesWithTasks`)
+  // tipam esses campos como `number` mas em runtime ainda são Decimal do Prisma — sem a conversão,
+  // `peso`/`percentualExecutado` entram como objeto no somatório de `computeWeightedAvanco` e o
+  // resultado vira NaN/0 silenciosamente.
+  return [
+    ...stage.tasks.map((t) => ({ percentualExecutado: Number(t.percentualExecutado), peso: Number(t.peso) })),
+    ...stage.children.flatMap((child) => collectLeafPercentages(child)),
+  ];
 }
 
 export type TaskForCascade = {
