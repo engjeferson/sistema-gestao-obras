@@ -44,6 +44,7 @@ export default async function PreLancamentosPage({
     work: item.work ? { nome: item.work.nome, codigo: item.work.codigo } : null,
     categoria: item.categoria ? { nome: item.categoria.nome } : null,
     attachments: item.attachments.map((a) => ({ url: a.url, nome: a.nome })),
+    qtdItens: Array.isArray(item.itensJson) ? item.itensJson.length : 0,
   }));
 
   return (

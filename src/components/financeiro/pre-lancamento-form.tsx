@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { ContractAttachmentsField, type ContractAttachmentValue } from "@/components/contratos/contract-attachments-field";
+import { InvoiceItemsEditor } from "@/components/notas-fiscais/invoice-items-editor";
 import { uploadFileToR2 } from "@/lib/upload-file";
-import { TRANSACTION_TYPE_LABELS } from "@/lib/status-labels";
+import { TRANSACTION_TYPE_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
 type StageOption = { id: string; codigo: string | null; nome: string };
 
@@ -24,6 +26,8 @@ export type PreLancamentoFormDefaultValues = {
   valor?: number;
   dataVencimento?: string;
   observacao?: string;
+  numeroDocumento?: string;
+  itens?: InvoiceItemValues[];
   attachments?: ContractAttachmentValue[];
 };
 
@@ -33,6 +37,9 @@ export function PreLancamentoForm({
   categorias,
   stagesByWork,
   favorecidosOptions,
+  materials = [],
+  units = [],
+  modo,
   defaultValues,
   submitLabel,
   origem,
@@ -43,6 +50,9 @@ export function PreLancamentoForm({
   categorias: { id: string; nome: string }[];
   stagesByWork: Record<string, StageOption[]>;
   favorecidosOptions: string[];
+  materials?: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
+  units?: { sigla: string; nome: string | null }[];
+  modo: "simples" | "pedido_nf";
   defaultValues?: PreLancamentoFormDefaultValues;
   submitLabel: string;
   origem?: "MANUAL" | "IA";
@@ -52,10 +62,17 @@ export function PreLancamentoForm({
   const [selectedWorkId, setSelectedWorkId] = useState(defaultValues?.workId ?? "");
   const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const [attachments, setAttachments] = useState<ContractAttachmentValue[]>(defaultValues?.attachments ?? []);
+  const [itens, setItens] = useState<InvoiceItemValues[]>(
+    defaultValues?.itens && defaultValues.itens.length > 0
+      ? defaultValues.itens
+      : [{ material: "", quantidade: 0, unidade: units[0]?.sigla ?? "", valorUnitario: 0 }],
+  );
+  const [valorSimples, setValorSimples] = useState<number>(defaultValues?.valor ?? 0);
   const [uploading, setUploading] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   const stagesForWork = stagesByWork[selectedWorkId] ?? [];
+  const valorItens = itens.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
 
   async function handleFilesChange(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -83,6 +100,12 @@ export function PreLancamentoForm({
     <form action={formAction} className="flex flex-col gap-6">
       {origem ? <input type="hidden" name="origem" value={origem} readOnly /> : null}
       {rawInput ? <input type="hidden" name="rawInput" value={rawInput} readOnly /> : null}
+      {modo === "pedido_nf" ? (
+        <>
+          <input type="hidden" name="itensJson" value={JSON.stringify(itens)} readOnly />
+          <input type="hidden" name="valor" value={valorItens} readOnly />
+        </>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
@@ -132,10 +155,17 @@ export function PreLancamentoForm({
             ))}
           </NativeSelect>
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="valor">Valor (R$)</Label>
-          <CurrencyInput id="valor" name="valor" defaultValue={defaultValues?.valor} required />
-        </div>
+        {modo === "simples" ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="valor">Valor (R$)</Label>
+            <CurrencyInput id="valor" name="valor" value={valorSimples} onValueChange={setValorSimples} required />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="numeroDocumento">Nº do pedido/NF (opcional)</Label>
+            <Input id="numeroDocumento" name="numeroDocumento" defaultValue={defaultValues?.numeroDocumento ?? ""} />
+          </div>
+        )}
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="descricao">Descrição</Label>
           <Input id="descricao" name="descricao" defaultValue={defaultValues?.descricao} required />
@@ -180,6 +210,18 @@ export function PreLancamentoForm({
           <Label htmlFor="observacao">Observação</Label>
           <Textarea id="observacao" name="observacao" defaultValue={defaultValues?.observacao ?? ""} />
         </div>
+
+        {modo === "pedido_nf" ? (
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <Label>Itens</Label>
+            <InvoiceItemsEditor items={itens} onChange={setItens} materials={materials} units={units} />
+            <p className="text-xs text-muted-foreground">
+              Cada item vira material no catálogo (se ainda não existir) e entrada em estoque ao aprovar. Valor do
+              lançamento: <strong>{formatCurrencyBRL(valorItens)}</strong>.
+            </p>
+          </div>
+        ) : null}
+
         <ContractAttachmentsField
           attachments={attachments}
           uploading={uploading}

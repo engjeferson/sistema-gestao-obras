@@ -474,6 +474,14 @@ model PreLancamento {
   // Texto colado (WhatsApp/nota) que originou a extração por IA — guardado pra conferência e
   // para re-extrair se o usuário editar e pedir pra tentar de novo.
   rawInput               String?
+  // Número do pedido/NF, quando esse pré-lançamento representa uma compra de material (ver
+  // `itensJson`) — vira o `Invoice.numero` ao aprovar.
+  numeroDocumento        String?
+  // Itens da compra ([{ material, quantidade, unidade, valorUnitario }], mesmo formato de
+  // InvoiceItemValues) — null/vazio significa lançamento financeiro simples; preenchido, ao
+  // aprovar vira uma Nota Fiscal de verdade (Invoice + InvoiceItem + Material + StockMovement),
+  // reaproveitando `createInvoiceWithFinancialEntry` em vez de só criar o FinancialTransaction.
+  itensJson              Json?
   financialTransactionId String?              @unique
   createdById            String
   createdAt              DateTime             @default(now())
