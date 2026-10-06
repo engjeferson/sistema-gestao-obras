@@ -61,6 +61,8 @@ export function PreLancamentoIaFlow({
         observacao: extracted.observacao || undefined,
         numeroDocumento: extracted.numeroDocumento || undefined,
         itens: extracted.itens.length > 0 ? extracted.itens : undefined,
+        valorFrete: extracted.valorFrete,
+        valorDesconto: extracted.valorDesconto,
         attachments: imageKey ? [{ url: imageKey, nome: imageFile!.name }] : [],
       });
       setRawInput(text.trim());

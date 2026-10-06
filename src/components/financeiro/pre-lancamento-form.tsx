@@ -28,6 +28,8 @@ export type PreLancamentoFormDefaultValues = {
   observacao?: string;
   numeroDocumento?: string;
   itens?: InvoiceItemValues[];
+  valorFrete?: number;
+  valorDesconto?: number;
   attachments?: ContractAttachmentValue[];
 };
 
@@ -68,11 +70,14 @@ export function PreLancamentoForm({
       : [{ material: "", quantidade: 0, unidade: units[0]?.sigla ?? "", valorUnitario: 0 }],
   );
   const [valorSimples, setValorSimples] = useState<number>(defaultValues?.valor ?? 0);
+  const [valorFrete, setValorFrete] = useState<number>(defaultValues?.valorFrete ?? 0);
+  const [valorDesconto, setValorDesconto] = useState<number>(defaultValues?.valorDesconto ?? 0);
   const [uploading, setUploading] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   const stagesForWork = stagesByWork[selectedWorkId] ?? [];
   const valorItens = itens.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const valorTotal = Math.max(0, valorItens + valorFrete - valorDesconto);
 
   async function handleFilesChange(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -103,7 +108,9 @@ export function PreLancamentoForm({
       {modo === "pedido_nf" ? (
         <>
           <input type="hidden" name="itensJson" value={JSON.stringify(itens)} readOnly />
-          <input type="hidden" name="valor" value={valorItens} readOnly />
+          <input type="hidden" name="valor" value={valorTotal} readOnly />
+          <input type="hidden" name="valorFrete" value={valorFrete} readOnly />
+          <input type="hidden" name="valorDesconto" value={valorDesconto} readOnly />
         </>
       ) : null}
 
@@ -212,14 +219,24 @@ export function PreLancamentoForm({
         </div>
 
         {modo === "pedido_nf" ? (
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label>Itens</Label>
-            <InvoiceItemsEditor items={itens} onChange={setItens} materials={materials} units={units} />
-            <p className="text-xs text-muted-foreground">
+          <>
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <Label>Itens</Label>
+              <InvoiceItemsEditor items={itens} onChange={setItens} materials={materials} units={units} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="valorFreteInput">Frete (R$)</Label>
+              <CurrencyInput id="valorFreteInput" value={valorFrete} onValueChange={setValorFrete} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="valorDescontoInput">Desconto (R$)</Label>
+              <CurrencyInput id="valorDescontoInput" value={valorDesconto} onValueChange={setValorDesconto} />
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2">
               Cada item vira material no catálogo (se ainda não existir) e entrada em estoque ao aprovar. Valor do
-              lançamento: <strong>{formatCurrencyBRL(valorItens)}</strong>.
+              lançamento (itens + frete − desconto): <strong>{formatCurrencyBRL(valorTotal)}</strong>.
             </p>
-          </div>
+          </>
         ) : null}
 
         <ContractAttachmentsField

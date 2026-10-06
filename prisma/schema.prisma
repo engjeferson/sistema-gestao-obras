@@ -482,6 +482,10 @@ model PreLancamento {
   // aprovar vira uma Nota Fiscal de verdade (Invoice + InvoiceItem + Material + StockMovement),
   // reaproveitando `createInvoiceWithFinancialEntry` em vez de só criar o FinancialTransaction.
   itensJson              Json?
+  // Frete/desconto do pedido/NF — mesmo conceito de `Invoice.valorFrete`/`valorDesconto`: somado
+  // (ou subtraído) do total por fora dos itens, nunca como item de material/estoque.
+  valorFrete             Decimal?             @db.Decimal(14, 2)
+  valorDesconto          Decimal?             @db.Decimal(14, 2)
   financialTransactionId String?              @unique
   createdById            String
   createdAt              DateTime             @default(now())

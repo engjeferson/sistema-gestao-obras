@@ -111,6 +111,8 @@ function parsePreLancamentoForm(formData: FormData) {
     observacao: formData.get("observacao") ?? undefined,
     numeroDocumento: formData.get("numeroDocumento") ?? undefined,
     itens: parsePreLancamentoItens(formData),
+    valorFrete: formData.get("valorFrete") ?? undefined,
+    valorDesconto: formData.get("valorDesconto") ?? undefined,
   });
 }
 
@@ -132,7 +134,9 @@ export async function createPreLancamento(_prevState: string | undefined, formDa
   const origem = formData.get("origem") === "IA" ? "IA" : "MANUAL";
   const rawInput = (formData.get("rawInput") as string) || null;
   const itens = data.itens && data.itens.length > 0 ? data.itens : null;
-  const valor = itens ? sumItens(itens) : data.valor;
+  const valorFrete = itens ? (data.valorFrete ?? 0) : null;
+  const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
+  const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
 
   await prisma.preLancamento.create({
     data: {
@@ -147,6 +151,8 @@ export async function createPreLancamento(_prevState: string | undefined, formDa
       observacao: data.observacao || null,
       numeroDocumento: data.numeroDocumento || null,
       itensJson: itens ?? Prisma.DbNull,
+      valorFrete,
+      valorDesconto,
       origem,
       rawInput,
       createdById: session.user.id,
@@ -170,7 +176,9 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
   const data = parsed.data;
   const attachments = parseAttachments(formData);
   const itens = data.itens && data.itens.length > 0 ? data.itens : null;
-  const valor = itens ? sumItens(itens) : data.valor;
+  const valorFrete = itens ? (data.valorFrete ?? 0) : null;
+  const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
+  const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
 
   await prisma.preLancamento.update({
     where: { id },
@@ -186,6 +194,8 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
       observacao: data.observacao || null,
       numeroDocumento: data.numeroDocumento || null,
       itensJson: itens ?? Prisma.DbNull,
+      valorFrete,
+      valorDesconto,
       attachments: { deleteMany: {}, create: attachments },
     },
   });
@@ -269,8 +279,8 @@ export async function approvePreLancamento(id: string) {
         categoriaId: preLancamento.categoriaId!,
         observacao: preLancamento.observacao ?? undefined,
         items: itens,
-        valorDesconto: 0,
-        valorFrete: 0,
+        valorDesconto: Number(preLancamento.valorDesconto ?? 0),
+        valorFrete: Number(preLancamento.valorFrete ?? 0),
         gerarContaPagar: true,
         contaPaga: false,
         dataVencimento: preLancamento.dataVencimento!.toISOString().slice(0, 10),
@@ -384,6 +394,8 @@ export async function extractPreLancamentoDraft(input: {
     observacao: extracted.observacao ?? "",
     numeroDocumento: extracted.numeroDocumento ?? "",
     itens: extracted.itens ?? [],
+    valorFrete: extracted.valorFrete,
+    valorDesconto: extracted.valorDesconto,
     workId: matchedWork?.id ?? "",
     categoriaId: matchedCategoria?.id ?? "",
   };

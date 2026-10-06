@@ -10,6 +10,8 @@ export type PreLancamentoExtraction = {
   workNome: string | null;
   observacao: string | null;
   numeroDocumento: string | null;
+  valorFrete: number;
+  valorDesconto: number;
   itens: { material: string; quantidade: number; unidade: string; valorUnitario: number }[] | null;
 };
 
@@ -45,9 +47,11 @@ const PEDIDO_TOOL = {
     properties: {
       ...BASE_PROPERTIES,
       numeroDocumento: { type: ["string", "null"], description: "Número do pedido/orçamento/NF, se identificável." },
+      valorFrete: { type: ["number", "null"], description: "Valor de frete/taxa de entrega, se houver — tanto quando aparece como uma linha de item (ex: \"Frete por carga\") quanto quando aparece só no rodapé/total do documento, como numa Nota Fiscal. Nesses casos NÃO inclua o frete em \"itens\" — extraia só aqui. Null se não houver frete." },
+      valorDesconto: { type: ["number", "null"], description: "Valor de desconto aplicado ao total, se houver (geralmente no rodapé/total do documento). Null se não houver desconto." },
       itens: {
         type: "array",
-        description: "Cada item/material da lista, um por linha do documento. Não inclua frete como item de material — some o frete (se houver) proporcionalmente ao valor unitário de cada item, ou, se não der pra ratear, crie um item extra com material \"Frete\".",
+        description: "Cada material/item de verdade da lista, um por linha do documento — não inclua frete nem desconto aqui (ver \"valorFrete\"/\"valorDesconto\").",
         items: {
           type: "object",
           properties: {
@@ -60,7 +64,19 @@ const PEDIDO_TOOL = {
         },
       },
     },
-    required: ["tipo", "descricao", "favorecidoNome", "dataVencimento", "categoriaNome", "workNome", "observacao", "numeroDocumento", "itens"],
+    required: [
+      "tipo",
+      "descricao",
+      "favorecidoNome",
+      "dataVencimento",
+      "categoriaNome",
+      "workNome",
+      "observacao",
+      "numeroDocumento",
+      "valorFrete",
+      "valorDesconto",
+      "itens",
+    ],
   },
 };
 
@@ -81,7 +97,7 @@ Unidades cadastradas (para "itens[].unidade", prefira uma sigla desta lista): ${
 
 Materiais já cadastrados (quando um item do documento corresponder a um destes, use exatamente este nome em "itens[].material" em vez de reescrever): ${materials.length > 0 ? materials.join(", ") : "(nenhum cadastrado)"}
 
-Use a ferramenta "registrar_pedido_nf" com os dados extraídos, listando cada item/material separadamente em "itens". O campo "valor" não existe aqui — o valor total é calculado a partir da soma dos itens. Se não tiver certeza de um campo opcional, retorne null em vez de inventar.`;
+Use a ferramenta "registrar_pedido_nf" com os dados extraídos, listando cada item/material separadamente em "itens". O campo "valor" não existe aqui — o valor total é calculado a partir da soma dos itens mais o frete e menos o desconto. Se não tiver certeza de um campo opcional, retorne null em vez de inventar.`;
 }
 
 function getClient() {
@@ -141,9 +157,10 @@ export async function extractPreLancamento(input: {
   const itens = Array.isArray(raw.itens)
     ? (raw.itens as PreLancamentoExtraction["itens"])
     : null;
-  const valor = input.mode === "pedido_nf"
-    ? (itens ?? []).reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0)
-    : Number(raw.valor ?? 0);
+  const valorFrete = Number(raw.valorFrete ?? 0);
+  const valorDesconto = Number(raw.valorDesconto ?? 0);
+  const itensSum = (itens ?? []).reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
+  const valor = input.mode === "pedido_nf" ? Math.max(0, itensSum + valorFrete - valorDesconto) : Number(raw.valor ?? 0);
 
   return {
     tipo: raw.tipo as PreLancamentoExtraction["tipo"],
@@ -155,6 +172,8 @@ export async function extractPreLancamento(input: {
     workNome: (raw.workNome as string | null) ?? null,
     observacao: (raw.observacao as string | null) ?? null,
     numeroDocumento: (raw.numeroDocumento as string | null) ?? null,
+    valorFrete,
+    valorDesconto,
     itens,
   };
 }

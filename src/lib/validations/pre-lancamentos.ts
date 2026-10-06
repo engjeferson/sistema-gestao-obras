@@ -16,6 +16,8 @@ export const preLancamentoFormSchema = z.object({
   // Presente (não vazio) = pedido/NF: ao aprovar, vira Nota Fiscal com material e estoque em vez
   // de só uma conta a pagar. Ausente/vazio = lançamento financeiro simples (comportamento de hoje).
   itens: z.array(invoiceItemSchema).optional(),
+  valorFrete: z.coerce.number().nonnegative().optional(),
+  valorDesconto: z.coerce.number().nonnegative().optional(),
 });
 
 export type PreLancamentoFormValues = z.infer<typeof preLancamentoFormSchema>;
