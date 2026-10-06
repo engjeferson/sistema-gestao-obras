@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, X, RotateCcw, Trash2, Paperclip, Pencil, Sparkles, User } from "lucide-react";
+import { Check, X, RotateCcw, Trash2, Paperclip, Pencil, Sparkles, User, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -26,6 +26,7 @@ export type PreLancamentoRow = {
   work: { nome: string; codigo: string } | null;
   categoria: { nome: string } | null;
   attachments: { url: string; nome: string }[];
+  qtdItens: number;
 };
 
 function ApproveButton({ id }: { id: string }) {
@@ -181,7 +182,17 @@ export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow
               <TableCell>{formatDateBR(item.createdAt)}</TableCell>
               <TableCell>{item.dataVencimento ? formatDateBR(item.dataVencimento) : "—"}</TableCell>
               <TableCell className="max-w-56 truncate" title={item.descricao}>
-                {item.descricao}
+                <span className="flex items-center gap-1.5">
+                  {item.qtdItens > 0 ? (
+                    <Receipt className="size-3.5 shrink-0 text-muted-foreground" aria-label="Pedido/NF" />
+                  ) : null}
+                  {item.descricao}
+                </span>
+                {item.qtdItens > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {item.qtdItens} {item.qtdItens === 1 ? "item" : "itens"}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell>{item.work ? `${item.work.codigo} — ${item.work.nome}` : "—"}</TableCell>
               <TableCell>{item.favorecidoNome || "—"}</TableCell>

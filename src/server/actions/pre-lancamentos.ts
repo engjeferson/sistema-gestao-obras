@@ -3,12 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { getCurrentModulePermissions } from "@/server/actions/permissions";
 import { preLancamentoFormSchema } from "@/lib/validations/pre-lancamentos";
 import { extractPreLancamento } from "@/lib/ai/pre-lancamento-extraction";
+import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
+import { listActiveMaterials } from "@/server/actions/materiais";
+import { listActiveUnits } from "@/server/actions/unidades";
 import { getObjectBase64 } from "@/lib/r2";
+import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 import type { Role, PreLancamentoStatus } from "@/generated/prisma/enums";
 import type { Session } from "next-auth";
 
@@ -82,6 +87,17 @@ function parseAttachments(formData: FormData): { url: string; nome: string }[] {
   }
 }
 
+function parsePreLancamentoItens(formData: FormData): unknown {
+  const raw = formData.get("itensJson");
+  if (typeof raw !== "string" || !raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function parsePreLancamentoForm(formData: FormData) {
   return preLancamentoFormSchema.safeParse({
     workId: formData.get("workId") ?? undefined,
@@ -93,7 +109,13 @@ function parsePreLancamentoForm(formData: FormData) {
     valor: formData.get("valor"),
     dataVencimento: formData.get("dataVencimento") ?? undefined,
     observacao: formData.get("observacao") ?? undefined,
+    numeroDocumento: formData.get("numeroDocumento") ?? undefined,
+    itens: parsePreLancamentoItens(formData),
   });
+}
+
+function sumItens(itens: InvoiceItemValues[]) {
+  return itens.reduce((sum, item) => sum + item.quantidade * item.valorUnitario, 0);
 }
 
 export async function createPreLancamento(_prevState: string | undefined, formData: FormData) {
@@ -109,6 +131,8 @@ export async function createPreLancamento(_prevState: string | undefined, formDa
   const attachments = parseAttachments(formData);
   const origem = formData.get("origem") === "IA" ? "IA" : "MANUAL";
   const rawInput = (formData.get("rawInput") as string) || null;
+  const itens = data.itens && data.itens.length > 0 ? data.itens : null;
+  const valor = itens ? sumItens(itens) : data.valor;
 
   await prisma.preLancamento.create({
     data: {
@@ -118,9 +142,11 @@ export async function createPreLancamento(_prevState: string | undefined, formDa
       descricao: data.descricao,
       categoriaId: data.categoriaId || null,
       favorecidoNome: data.favorecidoNome || null,
-      valor: data.valor,
+      valor,
       dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
       observacao: data.observacao || null,
+      numeroDocumento: data.numeroDocumento || null,
+      itensJson: itens ?? Prisma.DbNull,
       origem,
       rawInput,
       createdById: session.user.id,
@@ -143,6 +169,8 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
   }
   const data = parsed.data;
   const attachments = parseAttachments(formData);
+  const itens = data.itens && data.itens.length > 0 ? data.itens : null;
+  const valor = itens ? sumItens(itens) : data.valor;
 
   await prisma.preLancamento.update({
     where: { id },
@@ -153,9 +181,11 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
       descricao: data.descricao,
       categoriaId: data.categoriaId || null,
       favorecidoNome: data.favorecidoNome || null,
-      valor: data.valor,
+      valor,
       dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
       observacao: data.observacao || null,
+      numeroDocumento: data.numeroDocumento || null,
+      itensJson: itens ?? Prisma.DbNull,
       attachments: { deleteMany: {}, create: attachments },
     },
   });
@@ -218,49 +248,105 @@ export async function approvePreLancamento(id: string) {
     throw new Error("Preencha o fornecedor/cliente antes de aprovar.");
   }
 
-  const { supplierId, clientId } = await resolveFavorecidoIds(preLancamento.tipo, preLancamento.favorecidoNome);
+  const itens = Array.isArray(preLancamento.itensJson)
+    ? (preLancamento.itensJson as unknown as InvoiceItemValues[])
+    : null;
 
-  await prisma.$transaction(async (tx) => {
-    const transaction = await tx.financialTransaction.create({
-      data: {
+  if (itens && itens.length > 0) {
+    // Pedido/NF: reaproveita o mesmo serviço da tela de Notas Fiscais — cria a Invoice, resolve/cria
+    // os materiais no catálogo, gera a movimentação de estoque (ENTRADA) de cada item e a conta a
+    // pagar, tudo de uma vez. Isso que faz o lançamento "mais completo" em vez de só o valor total.
+    const firstAttachmentUrl = preLancamento.attachments[0]?.url ?? null;
+    const { transactions } = await createInvoiceWithFinancialEntry(
+      {
         workId: preLancamento.workId,
-        tipo: preLancamento.tipo,
-        descricao: preLancamento.descricao,
+        supplierNome: preLancamento.favorecidoNome,
+        nome: undefined,
+        stageId: preLancamento.stageId ?? undefined,
+        taskId: undefined,
+        numero: preLancamento.numeroDocumento ?? undefined,
+        dataEmissao: new Date().toISOString().slice(0, 10),
         categoriaId: preLancamento.categoriaId!,
-        favorecidoNome: preLancamento.favorecidoNome!,
-        supplierId,
-        clientId,
-        stageId: preLancamento.stageId,
-        valor: preLancamento.valor,
-        dataEmissao: new Date(),
-        dataVencimento: preLancamento.dataVencimento!,
-        status: "PENDENTE",
-        observacao: preLancamento.observacao,
-        createdById: session.user.id,
+        observacao: preLancamento.observacao ?? undefined,
+        items: itens,
+        valorDesconto: 0,
+        valorFrete: 0,
+        gerarContaPagar: true,
+        contaPaga: false,
+        dataVencimento: preLancamento.dataVencimento!.toISOString().slice(0, 10),
+        bankAccountId: undefined,
+        parcelar: false,
+        temEntrada: undefined,
+        entrada: undefined,
+        parcelas: undefined,
       },
-    });
-
-    await tx.preLancamento.update({
+      session.user.id,
+      firstAttachmentUrl,
+      null,
+      null,
+    );
+    const transaction = transactions[0];
+    if (!transaction) {
+      throw new Error("Não foi possível criar o lançamento financeiro a partir do pedido/NF.");
+    }
+    await prisma.preLancamento.update({
       where: { id },
       data: { status: "FINALIZADO", financialTransactionId: transaction.id },
     });
-  });
+  } else {
+    const { supplierId, clientId } = await resolveFavorecidoIds(preLancamento.tipo, preLancamento.favorecidoNome);
+
+    await prisma.$transaction(async (tx) => {
+      const transaction = await tx.financialTransaction.create({
+        data: {
+          workId: preLancamento.workId,
+          tipo: preLancamento.tipo,
+          descricao: preLancamento.descricao,
+          categoriaId: preLancamento.categoriaId!,
+          favorecidoNome: preLancamento.favorecidoNome!,
+          supplierId,
+          clientId,
+          stageId: preLancamento.stageId,
+          valor: preLancamento.valor,
+          dataEmissao: new Date(),
+          dataVencimento: preLancamento.dataVencimento!,
+          status: "PENDENTE",
+          observacao: preLancamento.observacao,
+          createdById: session.user.id,
+        },
+      });
+
+      await tx.preLancamento.update({
+        where: { id },
+        data: { status: "FINALIZADO", financialTransactionId: transaction.id },
+      });
+    });
+  }
 
   revalidatePath("/financeiro/pre-lancamentos");
   revalidatePath("/financeiro");
+  revalidatePath("/notas-fiscais");
+  revalidatePath("/estoque");
   if (preLancamento.workId) {
     revalidatePath(`/obras/${preLancamento.workId}/financeiro`);
+    revalidatePath(`/obras/${preLancamento.workId}/materiais`);
   }
 }
 
-export async function extractPreLancamentoDraft(input: { text?: string; imageKey?: string }) {
+export async function extractPreLancamentoDraft(input: {
+  mode: "simples" | "pedido_nf";
+  text?: string;
+  imageKey?: string;
+}) {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
-  const [works, categorias] = await Promise.all([
+  const [works, categorias, materials, units] = await Promise.all([
     prisma.work.findMany({ where: { status: { not: "CONCLUIDA" } }, select: { id: true, nome: true } }),
     prisma.financialCategory.findMany({ where: { ativo: true }, select: { id: true, nome: true } }),
+    input.mode === "pedido_nf" ? listActiveMaterials() : Promise.resolve([]),
+    input.mode === "pedido_nf" ? listActiveUnits() : Promise.resolve([]),
   ]);
 
   let imageBase64: string | undefined;
@@ -272,11 +358,14 @@ export async function extractPreLancamentoDraft(input: { text?: string; imageKey
   }
 
   const extracted = await extractPreLancamento({
+    mode: input.mode,
     text: input.text,
     imageBase64,
     imageMediaType,
     works: works.map((w) => w.nome),
     categorias: categorias.map((c) => c.nome),
+    units: units.map((u) => u.sigla),
+    materials: materials.map((m) => m.nome),
   });
 
   const matchedWork = extracted.workNome
@@ -293,6 +382,8 @@ export async function extractPreLancamentoDraft(input: { text?: string; imageKey
     favorecidoNome: extracted.favorecidoNome ?? "",
     dataVencimento: extracted.dataVencimento ?? "",
     observacao: extracted.observacao ?? "",
+    numeroDocumento: extracted.numeroDocumento ?? "",
+    itens: extracted.itens ?? [],
     workId: matchedWork?.id ?? "",
     categoriaId: matchedCategoria?.id ?? "",
   };
