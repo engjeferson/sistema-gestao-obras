@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Sparkles } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
+import { countPreLancamentosByStatus } from "@/server/actions/pre-lancamentos";
 import { getWork } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
 import { getCurrentFinancePermissions, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
@@ -82,10 +84,11 @@ export default async function FinanceiroPage({
     );
   }
 
-  const [result, summary, work] = await Promise.all([
+  const [result, summary, work, preLancamentosCounts] = await Promise.all([
     listTransactions(filters, page),
     getTransactionsSummary(filters),
     filters.workId ? getWork(filters.workId) : Promise.resolve(null),
+    countPreLancamentosByStatus(),
   ]);
 
   return (
@@ -97,9 +100,17 @@ export default async function FinanceiroPage({
             <p className="text-muted-foreground">Contas a pagar, pagas e receitas de todas as obras.</p>
           </div>
           {canEdit ? (
-            <Button render={<Link href="/financeiro/nova" />} nativeButton={false}>
-              <Plus /> Novo lançamento
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" render={<Link href="/financeiro/pre-lancamentos" />} nativeButton={false}>
+                <Sparkles /> Pré-lançamentos
+                {preLancamentosCounts.PENDENTE > 0 ? (
+                  <Badge variant="warning">{preLancamentosCounts.PENDENTE}</Badge>
+                ) : null}
+              </Button>
+              <Button render={<Link href="/financeiro/nova" />} nativeButton={false}>
+                <Plus /> Novo lançamento
+              </Button>
+            </div>
           ) : null}
         </div>
 
