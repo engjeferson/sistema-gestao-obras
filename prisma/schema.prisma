@@ -136,6 +136,7 @@ model User {
   stockMovements        StockMovement[]
   planningTemplates     PlanningTemplate[]
   assignedWorks         UserWork[]
+  preLancamentos        PreLancamento[]        @relation("PreLancamentoCreatedBy")
 
   @@index([role])
 }
@@ -337,6 +338,7 @@ model FinancialCategory {
 
   financialTransactions FinancialTransaction[]
   invoices              Invoice[]
+  preLancamentos        PreLancamento[]
 }
 
 model Work {
@@ -374,6 +376,7 @@ model Work {
   stockMovementsDestino StockMovement[]        @relation("StockMovementDestino")
   holidays              WorkHoliday[]
   userAssignments       UserWork[]
+  preLancamentos        PreLancamento[]
 
   @@index([status])
 }
@@ -430,12 +433,73 @@ model FinancialTransaction {
   invoice             Invoice?             @relation(fields: [invoiceId], references: [id])
   contractMeasurement ContractMeasurement? @relation(fields: [contractMeasurementId], references: [id])
   createdBy           User                 @relation("FinancialCreatedBy", fields: [createdById], references: [id])
+  preLancamento       PreLancamento?
 
   @@index([workId, status])
   @@index([dataVencimento])
   @@index([parcelaGrupoId])
   @@index([stageId])
   @@index([taskId])
+}
+
+enum PreLancamentoOrigin {
+  MANUAL
+  IA
+}
+
+enum PreLancamentoStatus {
+  PENDENTE
+  RECUSADO
+  FINALIZADO
+}
+
+// Rascunho de lançamento financeiro — criado manualmente ou extraído por IA (texto colado de
+// conversa/nota, ou foto de comprovante) — revisado e completado pelo usuário antes de virar um
+// FinancialTransaction de verdade (ao aprovar). Por isso a maioria dos campos aqui é opcional:
+// a IA pode não capturar tudo, e o rascunho precisa poder ser salvo mesmo incompleto.
+model PreLancamento {
+  id                     String               @id @default(cuid())
+  workId                 String?
+  stageId                String?
+  tipo                   TransactionType
+  descricao              String
+  categoriaId            String?
+  favorecidoNome         String?
+  valor                  Decimal              @db.Decimal(14, 2)
+  dataVencimento         DateTime?            @db.Date
+  observacao             String?
+  origem                 PreLancamentoOrigin  @default(MANUAL)
+  status                 PreLancamentoStatus  @default(PENDENTE)
+  motivoRecusa           String?
+  // Texto colado (WhatsApp/nota) que originou a extração por IA — guardado pra conferência e
+  // para re-extrair se o usuário editar e pedir pra tentar de novo.
+  rawInput               String?
+  financialTransactionId String?              @unique
+  createdById            String
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  work                 Work?                 @relation(fields: [workId], references: [id], onDelete: Cascade)
+  stage                PlanningStage?        @relation(fields: [stageId], references: [id])
+  categoria            FinancialCategory?    @relation(fields: [categoriaId], references: [id])
+  financialTransaction FinancialTransaction? @relation(fields: [financialTransactionId], references: [id])
+  createdBy            User                  @relation("PreLancamentoCreatedBy", fields: [createdById], references: [id])
+  attachments          PreLancamentoAttachment[]
+
+  @@index([workId])
+  @@index([status])
+}
+
+model PreLancamentoAttachment {
+  id              String   @id @default(cuid())
+  preLancamentoId String
+  url             String
+  nome            String
+  createdAt       DateTime @default(now())
+
+  preLancamento PreLancamento @relation(fields: [preLancamentoId], references: [id], onDelete: Cascade)
+
+  @@index([preLancamentoId])
 }
 
 model BankAccount {
@@ -661,6 +725,7 @@ model PlanningStage {
   invoices              Invoice[]
   stockMovements        StockMovement[]
   rdoActivities         RdoActivity[]
+  preLancamentos        PreLancamento[]
 
   @@index([workId])
   @@index([parentId])
