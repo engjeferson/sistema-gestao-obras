@@ -608,6 +608,10 @@ export async function updateStageProgress(stageId: string, workId: string, perce
   await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
 
   revalidatePath(`/obras/${workId}/planejamento`);
+  revalidatePath(`/obras/${workId}/visao-geral`);
+  revalidatePath("/obras");
+  revalidatePath("/campo/obras");
+  revalidatePath("/dashboard");
 }
 
 /** Limpa o código de predecessora "lembrado" numa etapa sem atividades (ver `predecessorRef`). */
