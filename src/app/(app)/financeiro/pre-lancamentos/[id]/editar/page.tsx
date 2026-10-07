@@ -68,6 +68,8 @@ export default async function EditarPreLancamentoPage({ params }: { params: Prom
           observacao: preLancamento.observacao ?? undefined,
           numeroDocumento: preLancamento.numeroDocumento ?? undefined,
           itens,
+          valorFrete: preLancamento.valorFrete !== null ? Number(preLancamento.valorFrete) : undefined,
+          valorDesconto: preLancamento.valorDesconto !== null ? Number(preLancamento.valorDesconto) : undefined,
           attachments: preLancamento.attachments.map((a) => ({ url: a.url, nome: a.nome })),
         }}
       />
