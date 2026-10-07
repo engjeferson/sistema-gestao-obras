@@ -153,19 +153,10 @@ export async function listWorks(filters?: { status?: WorkStatus; search?: string
   });
 }
 
-// Mesmo `avancoFisico` exibido na Visão Geral da obra — reaproveita `getWorkCostSummary` em vez
-// de recalcular, pra garantir que o percentual aqui nunca diverge do que já é mostrado lá.
-export async function listActiveWorksWithProgress() {
-  const workAccess = await getCurrentWorkAccess();
-  const works = await prisma.work.findMany({
-    where: {
-      id: workAccess !== null ? { in: workAccess } : undefined,
-      status: { not: "CONCLUIDA" },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const workIds = works.map((w) => w.id);
+// Mesmo cálculo ponderado (por peso de atividade, respeitando a hierarquia de etapas/sub-etapas)
+// usado em todo o resto do sistema (Planejamento, Orçamento, Visão Geral, Campo) — reaproveitado
+// aqui pra garantir que o percentual nunca diverge entre as telas.
+async function getWeightedProgressByWork(workIds: string[]): Promise<Map<string, number>> {
   const stages = await prisma.planningStage.findMany({
     where: { workId: { in: workIds } },
     select: {
@@ -205,9 +196,29 @@ export async function listActiveWorksWithProgress() {
     }
   }
 
+  return new Map(
+    workIds.map((workId) => [
+      workId,
+      computeWeightedAvanco((rootsByWork.get(workId) ?? []).flatMap(collectLeafPercentages)),
+    ]),
+  );
+}
+
+export async function listActiveWorksWithProgress() {
+  const workAccess = await getCurrentWorkAccess();
+  const works = await prisma.work.findMany({
+    where: {
+      id: workAccess !== null ? { in: workAccess } : undefined,
+      status: { not: "CONCLUIDA" },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const progressoByWork = await getWeightedProgressByWork(works.map((w) => w.id));
+
   return works.map((work) => ({
     ...work,
-    percentualExecutado: computeWeightedAvanco((rootsByWork.get(work.id) ?? []).flatMap(collectLeafPercentages)),
+    percentualExecutado: progressoByWork.get(work.id) ?? 0,
   }));
 }
 
@@ -244,7 +255,7 @@ export async function getObrasDashboard() {
   });
 
   const [
-    progressoAgg,
+    progressoByWork,
     atrasadasAgg,
     custoTotalNaoMaterialAgg,
     materialCosts,
@@ -258,11 +269,7 @@ export async function getObrasDashboard() {
     despesasPagasGlobal,
     receitasRecebidasGlobal,
   ] = await Promise.all([
-    prisma.planningTask.groupBy({
-      by: ["workId"],
-      where: { workId: { in: workIds } },
-      _avg: { percentualExecutado: true },
-    }),
+    getWeightedProgressByWork(workIds),
     prisma.planningTask.groupBy({
       by: ["workId"],
       where: { workId: { in: workIds }, status: "ATRASADA" },
@@ -319,7 +326,6 @@ export async function getObrasDashboard() {
     }),
   ]);
 
-  const progressoByWork = new Map(progressoAgg.map((p) => [p.workId, Number(p._avg.percentualExecutado ?? 0)]));
   const atrasadasByWork = new Map(atrasadasAgg.map((a) => [a.workId, a._count._all]));
   // Custo total = lançamentos financeiros não-material (qualquer categoria, qualquer status) +
   // material via estoque (materialCosts) — mesma fonte usada pela Apropriação, então uma

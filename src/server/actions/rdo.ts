@@ -103,6 +103,9 @@ export async function createRdo(basePath: string, _prevState: string | undefined
   revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
   revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
+  revalidatePath("/obras");
+  revalidatePath("/campo/obras");
+  revalidatePath("/dashboard");
 
   // No Campo (RDO mobile), volta pra lista de RDOs da obra em vez do detalhe — lá dá pra ver,
   // editar, excluir ou voltar pra Minhas Obras, sem precisar navegar de novo até o RDO recém-criado.
@@ -139,6 +142,9 @@ export async function updateRdo(basePath: string, rdoId: string, _prevState: str
   revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
   revalidatePath(`/campo/obras/${parsed.data.workId}/rdo/${rdoId}`);
+  revalidatePath("/obras");
+  revalidatePath("/campo/obras");
+  revalidatePath("/dashboard");
 
   const isMobile = basePath.startsWith("/campo");
   redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
@@ -155,4 +161,7 @@ export async function deleteRdo(rdoId: string, workId: string) {
   revalidatePath(`/obras/${workId}/planejamento`);
   revalidatePath(`/obras/${workId}/visao-geral`);
   revalidatePath(`/campo/obras/${workId}/rdo`);
+  revalidatePath("/obras");
+  revalidatePath("/campo/obras");
+  revalidatePath("/dashboard");
 }
