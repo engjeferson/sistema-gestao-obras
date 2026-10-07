@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const ADMIN_ENGENHEIRO_PREFIXES = ["/financeiro", "/notas-fiscais"];
 const ADMIN_ONLY_PREFIXES = ["/configuracoes"];
@@ -12,11 +13,25 @@ export const authConfig = {
     strategy: "jwt",
   },
   callbacks: {
-    jwt({ token, user }) {
+    // Chamado a cada acesso à sessão (não só no login) — revalida `active`/`role` no banco pra
+    // desativar/mudar permissão de um usuário já logado derrubar a sessão dele na próxima
+    // requisição, em vez de só bloquear logins novos.
+    async jwt({ token, user }) {
       if (user?.id) {
         token.id = user.id;
         token.role = user.role;
       }
+      if (!token.id) {
+        return token;
+      }
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.id as string },
+        select: { active: true, role: true },
+      });
+      if (!dbUser || !dbUser.active) {
+        return null;
+      }
+      token.role = dbUser.role;
       return token;
     },
     session({ session, token }) {
