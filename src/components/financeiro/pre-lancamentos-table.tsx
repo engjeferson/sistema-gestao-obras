@@ -4,17 +4,25 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, X, RotateCcw, Trash2, Paperclip, Pencil, Sparkles, User, Receipt } from "lucide-react";
+import { Check, X, RotateCcw, Trash2, Paperclip, Pencil, Sparkles, User, Receipt, CheckCircle2, Undo2, Undo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { approvePreLancamento, rejectPreLancamento, reopenPreLancamento, deletePreLancamento } from "@/server/actions/pre-lancamentos";
+import {
+  approvePreLancamento,
+  rejectPreLancamento,
+  reopenPreLancamento,
+  deletePreLancamento,
+  revertPreLancamentoApproval,
+} from "@/server/actions/pre-lancamentos";
+import { markAsPago, undoPayment } from "@/server/actions/financeiro";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
 import type { PreLancamentoStatus } from "@/generated/prisma/enums";
 
 export type PreLancamentoRow = {
   id: string;
+  workId: string | null;
   createdAt: Date;
   dataVencimento: Date | null;
   descricao: string;
@@ -27,6 +35,7 @@ export type PreLancamentoRow = {
   categoria: { nome: string } | null;
   attachments: { url: string; nome: string }[];
   qtdItens: number;
+  financialTransaction: { id: string; status: string } | null;
 };
 
 function ApproveButton({ id }: { id: string }) {
@@ -151,6 +160,102 @@ function DeleteButton({ id }: { id: string }) {
   );
 }
 
+function MarkPaidButton({ transactionId, workId }: { transactionId: string; workId: string | null }) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleClick() {
+    startTransition(async () => {
+      try {
+        await markAsPago(transactionId, workId);
+        toast.success("Conta marcada como paga.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível marcar como paga.");
+      }
+    });
+  }
+
+  return (
+    <Button variant="ghost" size="icon" title="Marcar como pago" disabled={isPending} onClick={handleClick}>
+      <CheckCircle2 className="size-4" />
+    </Button>
+  );
+}
+
+function UndoPaymentButton({ transactionId, workId }: { transactionId: string; workId: string | null }) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleClick() {
+    startTransition(async () => {
+      try {
+        await undoPayment(transactionId, workId);
+        toast.success("Pagamento desfeito — o lançamento voltou para pendente.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível desfazer o pagamento.");
+      }
+    });
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title="Desfazer pagamento (volta para pendente, sem excluir o lançamento)"
+      disabled={isPending}
+      onClick={handleClick}
+    >
+      <Undo2 className="size-4" />
+    </Button>
+  );
+}
+
+function RevertApprovalButton({ id }: { id: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const router = useRouter();
+
+  function handleConfirm() {
+    startTransition(async () => {
+      try {
+        await revertPreLancamentoApproval(id);
+        toast.success("Aprovação revertida — o lançamento voltou para Recusados.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível reverter a aprovação.");
+      } finally {
+        setConfirming(false);
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Reverter aprovação (remove o lançamento financeiro criado e manda pra Recusados)"
+        disabled={isPending}
+        onClick={() => setConfirming(true)}
+      >
+        <Undo className="size-4" />
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Reverter aprovação"
+        description="Isso remove o lançamento financeiro (e a nota fiscal/estoque, se for um pedido) criado ao aprovar, e manda este pré-lançamento pra Recusados — de lá dá pra reabrir ou excluir. Não é possível se o lançamento já foi pago."
+        confirmLabel="Reverter"
+        onConfirm={handleConfirm}
+        isPending={isPending}
+        destructive
+      />
+    </>
+  );
+}
+
 export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow[]; status: PreLancamentoStatus }) {
   if (items.length === 0) {
     return (
@@ -257,6 +362,16 @@ export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow
                         <Pencil className="size-4" />
                       </Button>
                       <DeleteButton id={item.id} />
+                    </>
+                  ) : null}
+                  {status === "FINALIZADO" && item.financialTransaction ? (
+                    <>
+                      {item.financialTransaction.status === "PAGO" ? (
+                        <UndoPaymentButton transactionId={item.financialTransaction.id} workId={item.workId} />
+                      ) : (
+                        <MarkPaidButton transactionId={item.financialTransaction.id} workId={item.workId} />
+                      )}
+                      <RevertApprovalButton id={item.id} />
                     </>
                   ) : null}
                 </div>

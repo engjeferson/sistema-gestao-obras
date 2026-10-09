@@ -10,6 +10,7 @@ import { getCurrentModulePermissions } from "@/server/actions/permissions";
 import { preLancamentoFormSchema } from "@/lib/validations/pre-lancamentos";
 import { extractPreLancamento } from "@/lib/ai/pre-lancamento-extraction";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
+import { deleteInvoice } from "@/server/actions/notas-fiscais";
 import { listActiveMaterials } from "@/server/actions/materiais";
 import { listActiveUnits } from "@/server/actions/unidades";
 import { getObjectBase64 } from "@/lib/r2";
@@ -45,7 +46,13 @@ export async function listPreLancamentos(status: PreLancamentoStatus, page = 1) 
   const [items, totalCount] = await Promise.all([
     prisma.preLancamento.findMany({
       where,
-      include: { work: true, stage: true, categoria: true, attachments: true },
+      include: {
+        work: true,
+        stage: true,
+        categoria: true,
+        attachments: true,
+        financialTransaction: { select: { id: true, status: true } },
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -332,6 +339,53 @@ export async function approvePreLancamento(id: string) {
       });
     });
   }
+
+  revalidatePath("/financeiro/pre-lancamentos");
+  revalidatePath("/financeiro");
+  revalidatePath("/notas-fiscais");
+  revalidatePath("/estoque");
+  if (preLancamento.workId) {
+    revalidatePath(`/obras/${preLancamento.workId}/financeiro`);
+    revalidatePath(`/obras/${preLancamento.workId}/materiais`);
+  }
+}
+
+// Desfaz uma aprovação: remove o lançamento financeiro criado (e a Nota Fiscal/estoque junto,
+// se era um pedido/NF — reaproveita `deleteInvoice`, que já cuida disso) e volta o pré-lançamento
+// pra Recusados, de onde dá pra reabrir ou excluir normalmente.
+export async function revertPreLancamentoApproval(id: string) {
+  const session = await auth();
+  assertRole(session, FINANCEIRO_EDIT_ROLES);
+  await assertCanEditFinanceiro(session);
+
+  const preLancamento = await prisma.preLancamento.findUnique({ where: { id } });
+  if (!preLancamento) {
+    throw new Error("Pré-lançamento não encontrado.");
+  }
+  if (preLancamento.status !== "FINALIZADO") {
+    throw new Error("Este pré-lançamento não está finalizado.");
+  }
+
+  if (preLancamento.financialTransactionId) {
+    const transaction = await prisma.financialTransaction.findUnique({
+      where: { id: preLancamento.financialTransactionId },
+    });
+    if (transaction) {
+      if (transaction.status === "PAGO") {
+        throw new Error("O lançamento já foi pago. Desfaça o pagamento no Financeiro antes de reverter a aprovação.");
+      }
+      if (transaction.invoiceId) {
+        await deleteInvoice(transaction.invoiceId, preLancamento.workId);
+      } else {
+        await prisma.financialTransaction.delete({ where: { id: transaction.id } });
+      }
+    }
+  }
+
+  await prisma.preLancamento.update({
+    where: { id },
+    data: { status: "RECUSADO", motivoRecusa: "Aprovação revertida.", financialTransactionId: null },
+  });
 
   revalidatePath("/financeiro/pre-lancamentos");
   revalidatePath("/financeiro");
