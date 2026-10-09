@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paymentMethodValues } from "@/lib/validations/financeiro";
 
 export const ESTOQUE_GERAL_VALUE = "__estoque_geral__";
 
@@ -41,6 +42,8 @@ export const invoiceFormSchema = z
     gerarContaPagar: z.boolean().optional(),
     contaPaga: z.boolean().optional(),
     dataVencimento: z.string().optional(),
+    dataPagamento: z.string().optional(),
+    formaPagamento: z.enum(paymentMethodValues).optional().or(z.literal("").transform(() => undefined)),
     bankAccountId: z.string().optional().or(z.literal("").transform(() => undefined)),
     parcelar: z.boolean().optional(),
     temEntrada: z.boolean().optional(),

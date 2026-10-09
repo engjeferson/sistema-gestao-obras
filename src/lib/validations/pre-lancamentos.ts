@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { transactionTypeValues } from "@/lib/validations/financeiro";
+import { transactionTypeValues, paymentMethodValues } from "@/lib/validations/financeiro";
 import { invoiceItemSchema } from "@/lib/validations/notas-fiscais";
 
 export const preLancamentoFormSchema = z.object({
@@ -18,6 +18,12 @@ export const preLancamentoFormSchema = z.object({
   itens: z.array(invoiceItemSchema).optional(),
   valorFrete: z.coerce.number().nonnegative().optional(),
   valorDesconto: z.coerce.number().nonnegative().optional(),
+  // Forma de pagamento já definida na revisão — ao aprovar, vai direto pro FinancialTransaction
+  // (ou pra Invoice, se for pedido/NF) em vez de precisar editar de novo depois.
+  bankAccountId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  formaPagamento: z.enum(paymentMethodValues).optional().or(z.literal("").transform(() => undefined)),
+  contaPaga: z.boolean().optional(),
+  dataPagamento: z.string().optional().or(z.literal("").transform(() => undefined)),
 });
 
 export type PreLancamentoFormValues = z.infer<typeof preLancamentoFormSchema>;

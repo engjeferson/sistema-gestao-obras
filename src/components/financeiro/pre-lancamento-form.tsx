@@ -11,7 +11,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { ContractAttachmentsField, type ContractAttachmentValue } from "@/components/contratos/contract-attachments-field";
 import { InvoiceItemsEditor } from "@/components/notas-fiscais/invoice-items-editor";
 import { uploadFileToR2 } from "@/lib/upload-file";
-import { TRANSACTION_TYPE_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
+import { TRANSACTION_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatCurrencyBRL } from "@/lib/status-labels";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
 type StageOption = { id: string; codigo: string | null; nome: string };
@@ -30,6 +30,10 @@ export type PreLancamentoFormDefaultValues = {
   itens?: InvoiceItemValues[];
   valorFrete?: number;
   valorDesconto?: number;
+  bankAccountId?: string;
+  formaPagamento?: string;
+  contaPaga?: boolean;
+  dataPagamento?: string;
   attachments?: ContractAttachmentValue[];
 };
 
@@ -41,6 +45,7 @@ export function PreLancamentoForm({
   favorecidosOptions,
   materials = [],
   units = [],
+  bankAccounts = [],
   modo,
   defaultValues,
   submitLabel,
@@ -54,6 +59,7 @@ export function PreLancamentoForm({
   favorecidosOptions: string[];
   materials?: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
   units?: { sigla: string; nome: string | null }[];
+  bankAccounts?: { id: string; nome: string }[];
   modo: "simples" | "pedido_nf";
   defaultValues?: PreLancamentoFormDefaultValues;
   submitLabel: string;
@@ -72,6 +78,7 @@ export function PreLancamentoForm({
   const [valorSimples, setValorSimples] = useState<number>(defaultValues?.valor ?? 0);
   const [valorFrete, setValorFrete] = useState<number>(defaultValues?.valorFrete ?? 0);
   const [valorDesconto, setValorDesconto] = useState<number>(defaultValues?.valorDesconto ?? 0);
+  const [contaPaga, setContaPaga] = useState<boolean>(defaultValues?.contaPaga ?? false);
   const [uploading, setUploading] = useState(false);
   const draftId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
@@ -212,6 +219,52 @@ export function PreLancamentoForm({
             defaultValue={defaultValues?.dataVencimento}
           />
           <p className="text-xs text-muted-foreground">Precisa estar preenchida pra poder aprovar.</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="bankAccountId">Conta bancária</Label>
+          <NativeSelect id="bankAccountId" name="bankAccountId" defaultValue={defaultValues?.bankAccountId ?? ""}>
+            <option value="">—</option>
+            {bankAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.nome}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="formaPagamento">Forma de pagamento</Label>
+          <NativeSelect id="formaPagamento" name="formaPagamento" defaultValue={defaultValues?.formaPagamento ?? ""}>
+            <option value="">—</option>
+            {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              name="contaPaga"
+              value="true"
+              checked={contaPaga}
+              onChange={(e) => setContaPaga(e.target.checked)}
+              className="size-4"
+            />
+            Já foi pago
+          </label>
+          {contaPaga ? (
+            <div className="flex flex-col gap-2 sm:max-w-xs">
+              <Label htmlFor="dataPagamento">Data de pagamento</Label>
+              <Input
+                id="dataPagamento"
+                name="dataPagamento"
+                type="date"
+                defaultValue={defaultValues?.dataPagamento}
+              />
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
           <Label htmlFor="observacao">Observação</Label>
