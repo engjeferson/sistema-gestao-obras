@@ -418,7 +418,8 @@ export async function extractPreLancamentoDraft(input: {
   if (input.imageKey) {
     imageBase64 = await getObjectBase64(input.imageKey);
     const ext = input.imageKey.split(".").pop()?.toLowerCase();
-    imageMediaType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    imageMediaType =
+      ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
   }
 
   const extracted = await extractPreLancamento({

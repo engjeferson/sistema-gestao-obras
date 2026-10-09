@@ -40,7 +40,7 @@ export function PreLancamentoIaFlow({
 
   async function handleExtract() {
     if (!text.trim() && !imageFile) {
-      toast.error("Cole o texto da conversa ou anexe uma foto do comprovante/pedido.");
+      toast.error("Cole o texto da conversa ou anexe uma foto ou PDF do comprovante/pedido.");
       return;
     }
     setExtracting(true);
@@ -149,12 +149,12 @@ export function PreLancamentoIaFlow({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="foto-ia">
-          Ou anexe a foto do comprovante{modo === "pedido_nf" ? "/pedido/nota fiscal" : "/nota fiscal"}
+          Ou anexe a foto ou o PDF do comprovante{modo === "pedido_nf" ? "/pedido/nota fiscal" : "/nota fiscal"}
         </Label>
         <Input
           id="foto-ia"
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
         />
         {imageFile ? (

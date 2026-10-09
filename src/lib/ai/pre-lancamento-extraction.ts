@@ -121,7 +121,7 @@ export async function extractPreLancamento(input: {
   materials?: string[];
 }): Promise<PreLancamentoExtraction> {
   if (!input.text?.trim() && !input.imageBase64) {
-    throw new Error("Cole o texto da conversa ou anexe uma foto do comprovante/pedido.");
+    throw new Error("Cole o texto da conversa ou anexe uma foto ou PDF do comprovante/pedido.");
   }
 
   const client = getClient();
@@ -129,14 +129,21 @@ export async function extractPreLancamento(input: {
 
   const content: Anthropic.MessageParam["content"] = [];
   if (input.imageBase64 && input.imageMediaType) {
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: input.imageMediaType as "image/jpeg", data: input.imageBase64 },
-    });
+    if (input.imageMediaType === "application/pdf") {
+      content.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: input.imageBase64 },
+      });
+    } else {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: input.imageMediaType as "image/jpeg", data: input.imageBase64 },
+      });
+    }
   }
   content.push({
     type: "text",
-    text: input.text?.trim() || "Extraia os dados do comprovante/pedido/nota fiscal na imagem anexada.",
+    text: input.text?.trim() || "Extraia os dados do comprovante/pedido/nota fiscal no arquivo anexado.",
   });
 
   const message = await client.messages.create({
