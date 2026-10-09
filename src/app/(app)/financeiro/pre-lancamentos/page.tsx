@@ -33,6 +33,7 @@ export default async function PreLancamentosPage({
 
   const items = result.items.map((item) => ({
     id: item.id,
+    workId: item.workId,
     createdAt: item.createdAt,
     dataVencimento: item.dataVencimento,
     descricao: item.descricao,
@@ -45,6 +46,9 @@ export default async function PreLancamentosPage({
     categoria: item.categoria ? { nome: item.categoria.nome } : null,
     attachments: item.attachments.map((a) => ({ url: a.url, nome: a.nome })),
     qtdItens: Array.isArray(item.itensJson) ? item.itensJson.length : 0,
+    financialTransaction: item.financialTransaction
+      ? { id: item.financialTransaction.id, status: item.financialTransaction.status }
+      : null,
   }));
 
   return (
