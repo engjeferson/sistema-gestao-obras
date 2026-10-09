@@ -22,6 +22,7 @@ export function PreLancamentoIaFlow({
   favorecidosOptions,
   materials,
   units,
+  bankAccounts,
 }: {
   works: { id: string; nome: string; codigo: string }[];
   categorias: { id: string; nome: string }[];
@@ -29,6 +30,7 @@ export function PreLancamentoIaFlow({
   favorecidosOptions: string[];
   materials: { nome: string; unidadePadrao: string | null; precoUnitario: number | null }[];
   units: { sigla: string; nome: string | null }[];
+  bankAccounts: { id: string; nome: string }[];
 }) {
   const [modo, setModo] = useState<Modo>("simples");
   const [text, setText] = useState("");
@@ -92,6 +94,7 @@ export function PreLancamentoIaFlow({
           favorecidosOptions={favorecidosOptions}
           materials={materials}
           units={units}
+          bankAccounts={bankAccounts}
           modo={modo}
           defaultValues={draft}
           submitLabel="Salvar pré-lançamento"

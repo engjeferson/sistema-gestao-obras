@@ -5,10 +5,11 @@ import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 import { listActiveMaterials } from "@/server/actions/materiais";
 import { listActiveUnits } from "@/server/actions/unidades";
+import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
 import { PreLancamentoIaFlow } from "@/components/financeiro/pre-lancamento-ia-flow";
 
 export default async function NovoPreLancamentoIaPage() {
-  const [works, categorias, stagesByWork, suppliers, clients, materials, units] = await Promise.all([
+  const [works, categorias, stagesByWork, suppliers, clients, materials, units, bankAccounts] = await Promise.all([
     listWorks(),
     listFinancialCategories(),
     listStagesForAllWorks(),
@@ -16,6 +17,7 @@ export default async function NovoPreLancamentoIaPage() {
     listClients(),
     listActiveMaterials(),
     listActiveUnits(),
+    listActiveBankAccounts(),
   ]);
   const worksOptions = works.map((work) => ({ id: work.id, nome: work.nome, codigo: work.codigo }));
   const favorecidosOptions = [...new Set([...suppliers.map((s) => s.nome), ...clients.map((c) => c.nome)])];
@@ -40,6 +42,7 @@ export default async function NovoPreLancamentoIaPage() {
         favorecidosOptions={favorecidosOptions}
         materials={materialsOptions}
         units={units}
+        bankAccounts={bankAccounts}
       />
     </div>
   );

@@ -486,6 +486,13 @@ model PreLancamento {
   // (ou subtraído) do total por fora dos itens, nunca como item de material/estoque.
   valorFrete             Decimal?             @db.Decimal(14, 2)
   valorDesconto          Decimal?             @db.Decimal(14, 2)
+  // Forma de pagamento/conta/status já definidos na revisão, antes de aprovar — mesmo conceito de
+  // FinancialTransaction.bankAccountId/formaPagamento/status/dataPagamento. Ao aprovar, o
+  // lançamento já sai "fechado" em vez de precisar editar de novo depois.
+  bankAccountId          String?
+  formaPagamento         PaymentMethod?
+  contaPaga              Boolean              @default(false)
+  dataPagamento          DateTime?            @db.Date
   financialTransactionId String?              @unique
   createdById            String
   createdAt              DateTime             @default(now())
@@ -494,6 +501,7 @@ model PreLancamento {
   work                 Work?                 @relation(fields: [workId], references: [id], onDelete: Cascade)
   stage                PlanningStage?        @relation(fields: [stageId], references: [id])
   categoria            FinancialCategory?    @relation(fields: [categoriaId], references: [id])
+  bankAccount          BankAccount?          @relation(fields: [bankAccountId], references: [id])
   financialTransaction FinancialTransaction? @relation(fields: [financialTransactionId], references: [id])
   createdBy            User                  @relation("PreLancamentoCreatedBy", fields: [createdById], references: [id])
   attachments          PreLancamentoAttachment[]
@@ -532,6 +540,7 @@ model BankAccount {
   updatedAt     DateTime        @updatedAt
 
   financialTransactions FinancialTransaction[]
+  preLancamentos        PreLancamento[]
 }
 
 model Invoice {

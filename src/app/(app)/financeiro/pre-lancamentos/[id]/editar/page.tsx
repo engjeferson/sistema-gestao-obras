@@ -6,22 +6,25 @@ import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 import { listActiveMaterials } from "@/server/actions/materiais";
 import { listActiveUnits } from "@/server/actions/unidades";
+import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
 import { getPreLancamento, updatePreLancamento } from "@/server/actions/pre-lancamentos";
 import { PreLancamentoForm } from "@/components/financeiro/pre-lancamento-form";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
 
 export default async function EditarPreLancamentoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [preLancamento, works, categorias, stagesByWork, suppliers, clients, materials, units] = await Promise.all([
-    getPreLancamento(id),
-    listWorks(),
-    listFinancialCategories(),
-    listStagesForAllWorks(),
-    listSuppliers(),
-    listClients(),
-    listActiveMaterials(),
-    listActiveUnits(),
-  ]);
+  const [preLancamento, works, categorias, stagesByWork, suppliers, clients, materials, units, bankAccounts] =
+    await Promise.all([
+      getPreLancamento(id),
+      listWorks(),
+      listFinancialCategories(),
+      listStagesForAllWorks(),
+      listSuppliers(),
+      listClients(),
+      listActiveMaterials(),
+      listActiveUnits(),
+      listActiveBankAccounts(),
+    ]);
 
   if (!preLancamento) {
     notFound();
@@ -54,6 +57,7 @@ export default async function EditarPreLancamentoPage({ params }: { params: Prom
         favorecidosOptions={favorecidosOptions}
         materials={materialsOptions}
         units={units}
+        bankAccounts={bankAccounts}
         modo={modo}
         submitLabel="Salvar alterações"
         defaultValues={{
@@ -70,6 +74,10 @@ export default async function EditarPreLancamentoPage({ params }: { params: Prom
           itens,
           valorFrete: preLancamento.valorFrete !== null ? Number(preLancamento.valorFrete) : undefined,
           valorDesconto: preLancamento.valorDesconto !== null ? Number(preLancamento.valorDesconto) : undefined,
+          bankAccountId: preLancamento.bankAccountId ?? undefined,
+          formaPagamento: preLancamento.formaPagamento ?? undefined,
+          contaPaga: preLancamento.contaPaga,
+          dataPagamento: preLancamento.dataPagamento?.toISOString().slice(0, 10),
           attachments: preLancamento.attachments.map((a) => ({ url: a.url, nome: a.nome })),
         }}
       />
