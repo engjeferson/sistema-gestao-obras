@@ -162,7 +162,7 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
           },
         },
       },
-      orderBy: { dataVencimento: "asc" },
+      orderBy: { dataVencimento: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
