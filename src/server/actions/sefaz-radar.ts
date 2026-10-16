@@ -126,6 +126,9 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
   try {
     for (let i = 0; i < MAX_LOTES_POR_SYNC; i++) {
       const retorno = await buscarLoteDistribuicao({ cnpj: company.cnpj, uf: company.uf, ultNsu });
+      console.log(
+        `[sefaz-radar] lote ${i}: cStat=${retorno.cStat} xMotivo="${retorno.xMotivo}" docs=${retorno.docs.length} ultNSU=${retorno.ultNSU} maxNSU=${retorno.maxNSU} (ultNsu enviado=${ultNsu})`,
+      );
 
       if (retorno.cStat !== "138" && retorno.cStat !== "137") {
         return { status: "error", message: `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}` };
@@ -182,10 +185,23 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
     };
   }
 
+  console.log(`[sefaz-radar] sync concluído: novos=${novos} ultNsuFinal=${ultNsu}`);
+
   await completarPendentes(company.cnpj, company.uf);
 
   revalidatePath("/notas-fiscais/radar");
   return { status: "ok", novos };
+}
+
+// Pra tela mostrar quando foi a última consulta real à SEFAZ e quando a próxima é liberada, em
+// vez do usuário só descobrir via toast de erro clicando "Atualizar agora" durante o cooldown.
+export async function getSefazSyncStatus() {
+  const company = await prisma.companySettings.findFirst({ select: { sefazUltimaTentativaEm: true } });
+  if (!company?.sefazUltimaTentativaEm) {
+    return { ultimaTentativaEm: null, proximaLiberadaEm: null };
+  }
+  const proximaLiberadaEm = new Date(company.sefazUltimaTentativaEm.getTime() + SYNC_COOLDOWN_MINUTOS * 60000);
+  return { ultimaTentativaEm: company.sefazUltimaTentativaEm, proximaLiberadaEm };
 }
 
 export async function syncIncomingNFes(): Promise<string | undefined> {
