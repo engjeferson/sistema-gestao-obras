@@ -1,6 +1,9 @@
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   listIncomingNFes,
   countPendingIncomingNFes,
+  getSefazSyncStatus,
   type IncomingNFeFiltros,
 } from "@/server/actions/sefaz-radar";
 import { RadarSyncButton } from "@/components/notas-fiscais/radar-sync-button";
@@ -35,10 +38,19 @@ export default async function RadarNFePage({
     nfeCompleta: nfeCompleta === "sim" || nfeCompleta === "nao" ? nfeCompleta : undefined,
   };
 
-  const [result, pendentes] = await Promise.all([
+  const [result, pendentes, syncStatus] = await Promise.all([
     listIncomingNFes(page, pageSize, filtros),
     countPendingIncomingNFes(),
+    getSefazSyncStatus(),
   ]);
+
+  const agora = new Date();
+  const proximaLiberada = syncStatus.proximaLiberadaEm && syncStatus.proximaLiberadaEm <= agora;
+  const syncStatusLabel = !syncStatus.ultimaTentativaEm
+    ? null
+    : proximaLiberada
+      ? `Última consulta à SEFAZ ${formatDistanceToNow(syncStatus.ultimaTentativaEm, { locale: ptBR, addSuffix: true })} — pode atualizar de novo.`
+      : `Última consulta à SEFAZ ${formatDistanceToNow(syncStatus.ultimaTentativaEm, { locale: ptBR, addSuffix: true })} — próxima liberada ${formatDistanceToNow(syncStatus.proximaLiberadaEm!, { locale: ptBR, addSuffix: true })}.`;
 
   const itemsOptions = result.items.map((item) => ({
     id: item.id,
@@ -72,6 +84,7 @@ export default async function RadarNFePage({
             Notas fiscais emitidas contra o CNPJ da empresa, consultadas direto na SEFAZ.
             {pendentes > 0 ? ` ${pendentes} nova(s) aguardando revisão.` : ""}
           </p>
+          {syncStatusLabel ? <p className="text-xs text-muted-foreground">{syncStatusLabel}</p> : null}
         </div>
         <RadarSyncButton />
       </div>

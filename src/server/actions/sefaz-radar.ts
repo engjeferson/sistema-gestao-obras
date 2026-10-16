@@ -193,6 +193,17 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
   return { status: "ok", novos };
 }
 
+// Pra tela mostrar quando foi a última consulta real à SEFAZ e quando a próxima é liberada, em
+// vez do usuário só descobrir via toast de erro clicando "Atualizar agora" durante o cooldown.
+export async function getSefazSyncStatus() {
+  const company = await prisma.companySettings.findFirst({ select: { sefazUltimaTentativaEm: true } });
+  if (!company?.sefazUltimaTentativaEm) {
+    return { ultimaTentativaEm: null, proximaLiberadaEm: null };
+  }
+  const proximaLiberadaEm = new Date(company.sefazUltimaTentativaEm.getTime() + SYNC_COOLDOWN_MINUTOS * 60000);
+  return { ultimaTentativaEm: company.sefazUltimaTentativaEm, proximaLiberadaEm };
+}
+
 export async function syncIncomingNFes(): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
