@@ -126,6 +126,9 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
   try {
     for (let i = 0; i < MAX_LOTES_POR_SYNC; i++) {
       const retorno = await buscarLoteDistribuicao({ cnpj: company.cnpj, uf: company.uf, ultNsu });
+      console.log(
+        `[sefaz-radar] lote ${i}: cStat=${retorno.cStat} xMotivo="${retorno.xMotivo}" docs=${retorno.docs.length} ultNSU=${retorno.ultNSU} maxNSU=${retorno.maxNSU} (ultNsu enviado=${ultNsu})`,
+      );
 
       if (retorno.cStat !== "138" && retorno.cStat !== "137") {
         return { status: "error", message: `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}` };
@@ -181,6 +184,8 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
       message: error instanceof Error ? error.message : "Não foi possível consultar a SEFAZ.",
     };
   }
+
+  console.log(`[sefaz-radar] sync concluído: novos=${novos} ultNsuFinal=${ultNsu}`);
 
   await completarPendentes(company.cnpj, company.uf);
 
