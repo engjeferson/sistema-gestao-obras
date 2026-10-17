@@ -16,6 +16,7 @@ import {
   computeCustoFinalEstimado,
   computeMargemProjetada,
   computeMargemIndicador,
+  computeMargemAtual,
   buildStageAlerts,
 } from "@/lib/budget";
 import { budgetItemFormSchema } from "@/lib/validations/orcamento";
@@ -173,6 +174,7 @@ export async function getWorkCostSummary(workId: string) {
   const margemProjetada = computeMargemProjetada({ contrato, custoFinalEstimado });
   const diferencaMargem = margemProjetada - margemPrevista;
   const indicadorMargem = computeMargemIndicador(diferencaMargem);
+  const margemAtual = computeMargemAtual({ contrato, realizado });
 
   const avancoFisico = stages.length > 0 ? stages.reduce((sum, s) => sum + s.avancoFisico, 0) / stages.length : 0;
   const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido, orcado });
@@ -192,6 +194,7 @@ export async function getWorkCostSummary(workId: string) {
     margemProjetada,
     diferencaMargem,
     indicadorMargem,
+    margemAtual,
     avancoFisico,
     avancoFinanceiro,
     stages,

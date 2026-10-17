@@ -8,6 +8,14 @@ export function computeMargemPrevista({ contrato, orcado }: { contrato: number; 
   return { lucroPrevisto, margemPrevista };
 }
 
+// Margem de lucro "até o momento": receita do contrato menos só o que já foi gasto de fato
+// (não o custo final estimado, que já conta com o que ainda falta pagar) — diferente de
+// `computeMargemProjetada`, que projeta até o fim da obra.
+export function computeMargemAtual({ contrato, realizado }: { contrato: number; realizado: number }) {
+  if (contrato <= 0) return 0;
+  return ((contrato - realizado) / contrato) * 100;
+}
+
 export function computeCustoPorM2({ orcado, areaConstruida }: { orcado: number; areaConstruida: number | null }) {
   if (!areaConstruida || areaConstruida <= 0) return null;
   return orcado / areaConstruida;

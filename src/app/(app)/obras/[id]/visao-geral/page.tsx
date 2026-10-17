@@ -52,8 +52,8 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
   // Custo comprometido, Saldo do orçamento) saíram por serem redundantes com os que ficaram e,
   // sem orçamento cadastrado, exibiam números que não faziam sentido (ex: Lucro previsto ==
   // Valor do contrato, Saldo do orçamento == -Custo realizado). "Margem de lucro" usa
-  // `margemProjetada` (contrato - custo final estimado) — é a margem final da obra, não uma
-  // comparação com o que foi orçado, por isso não leva mais o rótulo "(piorou/melhorou)".
+  // `margemAtual` (contrato - custo realizado até agora) — margem de hoje, não uma projeção
+  // nem uma comparação com o que foi orçado.
   const financeiroKpis: { icon: typeof FileSignature; label: string; value: string; tone?: "default" | "success" | "destructive" }[] = [
     { icon: FileSignature, label: "Valor do contrato", value: formatCurrencyBRL(summary.contrato) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(summary.realizado) },
@@ -63,8 +63,8 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
     {
       icon: TrendingUp,
       label: "Margem de lucro",
-      value: `${summary.margemProjetada.toFixed(1)}%`,
-      tone: (summary.margemProjetada >= 0 ? "success" : "destructive") as "success" | "destructive",
+      value: `${summary.margemAtual.toFixed(1)}%`,
+      tone: (summary.margemAtual >= 0 ? "success" : "destructive") as "success" | "destructive",
     },
   ];
 
