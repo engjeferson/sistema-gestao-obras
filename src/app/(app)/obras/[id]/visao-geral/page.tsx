@@ -5,7 +5,6 @@ import {
   TrendingUp,
   Wallet,
   ArrowDownCircle,
-  PiggyBank,
   HardHat,
   Gauge,
   CalendarDays,
@@ -49,33 +48,23 @@ export default async function VisaoGeralPage({ params }: { params: Promise<{ id:
 
   const { work, diasDeObra, ultimosRdos } = overview;
 
-  const margemTone = summary.indicadorMargem === "MELHOROU" ? "success" : summary.indicadorMargem === "PIOROU" ? "destructive" : "default";
-  const margemLabel = summary.indicadorMargem === "MELHOROU" ? "melhorou" : summary.indicadorMargem === "PIOROU" ? "piorou" : "estável";
-
   // Só os essenciais do dia a dia — os demais (Lucro previsto, Margem prevista, Custo orçado,
-  // Custo comprometido) saíram por serem redundantes com os que ficaram e, sem orçamento
-  // cadastrado, exibiam números que não faziam sentido (ex: Lucro previsto == Valor do contrato).
+  // Custo comprometido, Saldo do orçamento) saíram por serem redundantes com os que ficaram e,
+  // sem orçamento cadastrado, exibiam números que não faziam sentido (ex: Lucro previsto ==
+  // Valor do contrato, Saldo do orçamento == -Custo realizado). "Margem de lucro" usa
+  // `margemProjetada` (contrato - custo final estimado) — é a margem final da obra, não uma
+  // comparação com o que foi orçado, por isso não leva mais o rótulo "(piorou/melhorou)".
   const financeiroKpis: { icon: typeof FileSignature; label: string; value: string; tone?: "default" | "success" | "destructive" }[] = [
     { icon: FileSignature, label: "Valor do contrato", value: formatCurrencyBRL(summary.contrato) },
     { icon: Wallet, label: "Custo realizado", value: formatCurrencyBRL(summary.realizado) },
     ...(perms.verSaidas
       ? [{ icon: ArrowDownCircle, label: "Contas a pagar", value: formatCurrencyBRL(summary.aPagar), tone: "destructive" as const }]
       : []),
-    ...(perms.verSaldo
-      ? [
-          {
-            icon: PiggyBank,
-            label: "Saldo do orçamento",
-            value: formatCurrencyBRL(summary.saldoOrcamento),
-            tone: (summary.saldoOrcamento < 0 ? "destructive" : "success") as "destructive" | "success",
-          },
-        ]
-      : []),
     {
       icon: TrendingUp,
-      label: "Margem projetada",
-      value: `${summary.margemProjetada.toFixed(1)}% (${margemLabel})`,
-      tone: margemTone as "default" | "success" | "destructive",
+      label: "Margem de lucro",
+      value: `${summary.margemProjetada.toFixed(1)}%`,
+      tone: (summary.margemProjetada >= 0 ? "success" : "destructive") as "success" | "destructive",
     },
   ];
 
