@@ -31,11 +31,19 @@ async function assertCanEditFinanceiro(session: Session) {
 async function resolveFavorecidoIds(tipo: "PAGAR" | "RECEBER", nome: string) {
   const trimmed = nome.trim();
   if (!trimmed) return { supplierId: null, clientId: null };
+  // Ordena por ativo e mais antigo primeiro: se houver mais de um registro batendo o nome
+  // (duplicata ainda não limpa), sempre reaproveita o canônico de forma determinística.
   if (tipo === "PAGAR") {
-    const existing = await prisma.supplier.findFirst({ where: { nome: { equals: trimmed, mode: "insensitive" } } });
+    const existing = await prisma.supplier.findFirst({
+      where: { nome: { equals: trimmed, mode: "insensitive" } },
+      orderBy: [{ ativo: "desc" }, { createdAt: "asc" }],
+    });
     return { supplierId: existing?.id ?? null, clientId: null };
   }
-  const existing = await prisma.client.findFirst({ where: { nome: { equals: trimmed, mode: "insensitive" } } });
+  const existing = await prisma.client.findFirst({
+    where: { nome: { equals: trimmed, mode: "insensitive" } },
+    orderBy: [{ ativo: "desc" }, { createdAt: "asc" }],
+  });
   return { supplierId: null, clientId: existing?.id ?? null };
 }
 
