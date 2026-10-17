@@ -88,10 +88,10 @@ function parseTransactionForm(formData: FormData) {
 async function resolveFavorecidoIds(tipo: "PAGAR" | "RECEBER", nome: string) {
   const trimmed = nome.trim();
   if (tipo === "PAGAR") {
-    const existing = await prisma.supplier.findFirst({ where: { nome: trimmed } });
+    const existing = await prisma.supplier.findFirst({ where: { nome: { equals: trimmed, mode: "insensitive" } } });
     return { supplierId: existing?.id ?? null, clientId: null };
   }
-  const existing = await prisma.client.findFirst({ where: { nome: trimmed } });
+  const existing = await prisma.client.findFirst({ where: { nome: { equals: trimmed, mode: "insensitive" } } });
   return { supplierId: null, clientId: existing?.id ?? null };
 }
 

@@ -8,6 +8,7 @@ import { assertRole } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
+import { findOrCreateSupplierId } from "@/server/services/suppliers";
 
 function parseContractForm(formData: FormData) {
   return contractFormSchema.safeParse({
@@ -21,17 +22,6 @@ function parseContractForm(formData: FormData) {
     data: formData.get("data"),
     observacoes: formData.get("observacoes") ?? undefined,
   });
-}
-
-// Resolve pelo nome — se já existe um fornecedor com esse nome, reaproveita; senão cria um novo
-// já classificado como "Serviços" (mesma ideia de `findOrCreateSupplierId` da Nota Fiscal, mas
-// essa tela lida majoritariamente com prestadores de serviço, não material).
-async function findOrCreateSupplierId(nome: string) {
-  const trimmed = nome.trim();
-  const existing = await prisma.supplier.findFirst({ where: { nome: trimmed } });
-  if (existing) return existing.id;
-  const created = await prisma.supplier.create({ data: { nome: trimmed, categoria: "SERVICOS" } });
-  return created.id;
 }
 
 // Resolve contratante/contratado de acordo com a direção do contrato: despesa (PAGAR) tem a
@@ -54,7 +44,7 @@ async function resolveContractParties(data: {
     };
   }
 
-  const contratadoSupplierId = await findOrCreateSupplierId(data.contratadoNome!);
+  const contratadoSupplierId = await findOrCreateSupplierId(data.contratadoNome!, "SERVICOS");
   return {
     contratante: companySettings.nome,
     contratanteClientId: null as string | null,

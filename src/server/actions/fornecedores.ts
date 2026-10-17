@@ -40,10 +40,16 @@ export async function createSupplier(_prevState: string | undefined, formData: F
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const nome = data.nome.toUpperCase();
+
+  const existing = await prisma.supplier.findFirst({ where: { nome: { equals: nome, mode: "insensitive" } } });
+  if (existing) {
+    return "Já existe um fornecedor com esse nome.";
+  }
 
   await prisma.supplier.create({
     data: {
-      nome: data.nome,
+      nome,
       nomeFantasia: data.nomeFantasia || null,
       documento: data.documento || null,
       telefone: data.telefone || null,
@@ -69,11 +75,19 @@ export async function updateSupplier(supplierId: string, _prevState: string | un
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  const nome = data.nome.toUpperCase();
+
+  const existing = await prisma.supplier.findFirst({
+    where: { nome: { equals: nome, mode: "insensitive" }, id: { not: supplierId } },
+  });
+  if (existing) {
+    return "Já existe um fornecedor com esse nome.";
+  }
 
   await prisma.supplier.update({
     where: { id: supplierId },
     data: {
-      nome: data.nome,
+      nome,
       nomeFantasia: data.nomeFantasia || null,
       documento: data.documento || null,
       telefone: data.telefone || null,
