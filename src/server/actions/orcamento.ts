@@ -16,6 +16,7 @@ import {
   computeCustoFinalEstimado,
   computeMargemProjetada,
   computeMargemIndicador,
+  computeMargemAtual,
   buildStageAlerts,
 } from "@/lib/budget";
 import { budgetItemFormSchema } from "@/lib/validations/orcamento";
@@ -70,7 +71,7 @@ export async function getBudgetVsActualByStage(workId: string) {
     return sumTx((t) => filter(t) && t.categoriaId === categoriaId, ["PAGO", "PENDENTE", "VENCIDO"]);
   }
 
-  return stages.map((stage) => {
+  const stageRows = stages.map((stage) => {
     const tasks = stage.tasks.map((task) => {
       const orcado = orcadoByTask.get(task.id) ?? 0;
       const material = materialCosts.totalByTask.get(task.id) ?? 0;
@@ -144,6 +145,38 @@ export async function getBudgetVsActualByStage(workId: string) {
       tasks,
     };
   });
+
+  // Lançamento (ou movimentação de material) com a obra preenchida mas sem etapa escolhida —
+  // antes ficava de fora de tudo aqui, já que o resumo é montado de baixo pra cima a partir das
+  // etapas. Só entra na lista se houver algo de fato (não polui obras sem esse caso).
+  const materialSemEtapa = materialCosts.totalByWorkSemEtapa.get(workId) ?? 0;
+  const realizadoSemEtapa = sumTx((t) => t.stageId === null && naoMaterial(t), ["PAGO"]) + materialSemEtapa;
+  const aPagarSemEtapa = sumTx((t) => t.stageId === null, ["PENDENTE", "VENCIDO"]);
+  const aPagarNaoMaterialSemEtapa = sumTx((t) => t.stageId === null && naoMaterial(t), ["PENDENTE", "VENCIDO"]);
+
+  if (realizadoSemEtapa > 0 || aPagarSemEtapa > 0) {
+    const projetadoSemEtapa = computeProjetado({ realizado: realizadoSemEtapa, aPagar: aPagarNaoMaterialSemEtapa });
+    stageRows.push({
+      id: "__sem_etapa__",
+      codigo: null,
+      nome: "Despesas gerais da obra (sem etapa)",
+      orcado: 0,
+      realizado: realizadoSemEtapa,
+      aPagar: aPagarSemEtapa,
+      aPagarNaoMaterial: aPagarNaoMaterialSemEtapa,
+      projetado: projetadoSemEtapa,
+      saldo: computeSaldo({ orcado: 0, projetado: projetadoSemEtapa }),
+      maoDeObra: sumTxCategoria((t) => t.stageId === null, maoDeObraCategoriaId),
+      material: materialSemEtapa,
+      avancoFisico: 0,
+      avancoFinanceiro: 0,
+      diferenca: 0,
+      status: "DENTRO_DO_ESPERADO",
+      tasks: [],
+    });
+  }
+
+  return stageRows;
 }
 
 export async function getWorkCostSummary(workId: string) {
@@ -173,8 +206,15 @@ export async function getWorkCostSummary(workId: string) {
   const margemProjetada = computeMargemProjetada({ contrato, custoFinalEstimado });
   const diferencaMargem = margemProjetada - margemPrevista;
   const indicadorMargem = computeMargemIndicador(diferencaMargem);
+  const margemAtual = computeMargemAtual({ contrato, realizado });
 
-  const avancoFisico = stages.length > 0 ? stages.reduce((sum, s) => sum + s.avancoFisico, 0) / stages.length : 0;
+  // "Despesas gerais da obra (sem etapa)" não tem avanço físico próprio — fica de fora da média
+  // pra não puxar o avanço físico da obra pra baixo com um 0% que não representa nada.
+  const stagesComAvancoFisico = stages.filter((s) => s.id !== "__sem_etapa__");
+  const avancoFisico =
+    stagesComAvancoFisico.length > 0
+      ? stagesComAvancoFisico.reduce((sum, s) => sum + s.avancoFisico, 0) / stagesComAvancoFisico.length
+      : 0;
   const avancoFinanceiro = computeAvancoFinanceiroPercent({ comprometido, orcado });
 
   return {
@@ -192,6 +232,7 @@ export async function getWorkCostSummary(workId: string) {
     margemProjetada,
     diferencaMargem,
     indicadorMargem,
+    margemAtual,
     avancoFisico,
     avancoFinanceiro,
     stages,
