@@ -408,6 +408,10 @@ export type MaterialCostBreakdown = {
   totalByWork: Map<string, number>;
   totalByStage: Map<string, number>;
   totalByTask: Map<string, number>;
+  // Parte de `totalByWork` que não está em nenhuma etapa/atividade (stageId/taskId nulos) — ex:
+  // material lançado direto na obra, sem etapa escolhida. Sem isso, esse custo some do "Realizado"
+  // da obra, já que o resumo por etapa é construído de baixo pra cima, só a partir das etapas.
+  totalByWorkSemEtapa: Map<string, number>;
 };
 
 /**
@@ -423,8 +427,9 @@ export async function getMaterialCostBreakdown(workIds: string[]): Promise<Mater
   const totalByWork = new Map<string, number>();
   const totalByStage = new Map<string, number>();
   const totalByTask = new Map<string, number>();
+  const totalByWorkSemEtapa = new Map<string, number>();
   if (workIds.length === 0) {
-    return { totalByWork, totalByStage, totalByTask };
+    return { totalByWork, totalByStage, totalByTask, totalByWorkSemEtapa };
   }
 
   const movements = await prisma.stockMovement.findMany({
@@ -440,6 +445,9 @@ export async function getMaterialCostBreakdown(workIds: string[]): Promise<Mater
     );
     for (const workId of workIdsTocados) {
       totalByWork.set(workId, (totalByWork.get(workId) ?? 0) + valor);
+      if (!m.taskId && !m.stageId) {
+        totalByWorkSemEtapa.set(workId, (totalByWorkSemEtapa.get(workId) ?? 0) + valor);
+      }
     }
     if (m.taskId) {
       totalByTask.set(m.taskId, (totalByTask.get(m.taskId) ?? 0) + valor);
@@ -448,7 +456,7 @@ export async function getMaterialCostBreakdown(workIds: string[]): Promise<Mater
     }
   }
 
-  return { totalByWork, totalByStage, totalByTask };
+  return { totalByWork, totalByStage, totalByTask, totalByWorkSemEtapa };
 }
 
 export type AppropriationMaterial = {
