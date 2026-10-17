@@ -259,7 +259,6 @@ export async function getObrasDashboard() {
     atrasadasAgg,
     custoTotalNaoMaterialAgg,
     materialCosts,
-    despesasPagasAgg,
     receitasRecebidasAgg,
     rdosRecentes,
     despesasDoDia,
@@ -285,11 +284,6 @@ export async function getObrasDashboard() {
       _sum: { valor: true },
     }),
     getMaterialCostBreakdown(workIds),
-    prisma.financialTransaction.groupBy({
-      by: ["workId"],
-      where: { workId: { in: workIds }, tipo: "PAGAR", status: "PAGO" },
-      _sum: { valor: true },
-    }),
     prisma.financialTransaction.groupBy({
       by: ["workId"],
       where: { workId: { in: workIds }, tipo: "RECEBER", status: "PAGO" },
@@ -339,7 +333,6 @@ export async function getObrasDashboard() {
       return [workId, naoMaterial + material] as const;
     }),
   );
-  const despesasPagasByWork = new Map(despesasPagasAgg.map((d) => [d.workId, Number(d._sum.valor ?? 0)]));
   const receitasRecebidasByWork = new Map(receitasRecebidasAgg.map((r) => [r.workId, Number(r._sum.valor ?? 0)]));
 
   const efetivosByWork = new Map<string, number>();
@@ -351,7 +344,7 @@ export async function getObrasDashboard() {
 
   const rows = works.map((work) => {
     const receitas = receitasRecebidasByWork.get(work.id) ?? 0;
-    const despesasPagas = despesasPagasByWork.get(work.id) ?? 0;
+    const custoTotal = custoTotalByWork.get(work.id) ?? 0;
     const diasDecorridos = Math.max(
       0,
       Math.floor((hoje.getTime() - work.dataInicio.getTime()) / (1000 * 60 * 60 * 24)),
@@ -367,8 +360,11 @@ export async function getObrasDashboard() {
       dataPrevistaTermino: work.dataPrevistaTermino,
       percentualExecutado: progressoByWork.get(work.id) ?? 0,
       diasDecorridos,
-      saudeFinanceira: receitas - despesasPagas,
-      custoTotal: custoTotalByWork.get(work.id) ?? 0,
+      // Mesma base de custo do campo "Custo total da obra" logo abaixo (não-material qualquer
+      // status + material via estoque) — antes usava só despesas pagas (sem material nenhum),
+      // dando um valor de Saúde financeira inconsistente com o Custo total exibido no mesmo card.
+      saudeFinanceira: receitas - custoTotal,
+      custoTotal,
       atividadesAtrasadas: atrasadasByWork.get(work.id) ?? 0,
       efetivosNaObra: efetivosByWork.get(work.id) ?? 0,
     };
