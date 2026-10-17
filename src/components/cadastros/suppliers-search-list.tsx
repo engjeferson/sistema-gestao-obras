@@ -13,6 +13,7 @@ type SupplierRow = {
   email: string | null;
   categoria: string | null;
   ativo: boolean;
+  usado: boolean;
 };
 
 export function SuppliersSearchList({ suppliers }: { suppliers: SupplierRow[] }) {

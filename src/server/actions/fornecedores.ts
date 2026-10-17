@@ -9,7 +9,14 @@ import { assertModuleWrite } from "@/server/actions/permissions";
 import { supplierFormSchema } from "@/lib/validations/fornecedores";
 
 export async function listSuppliers() {
-  return prisma.supplier.findMany({ orderBy: { nome: "asc" } });
+  const suppliers = await prisma.supplier.findMany({
+    orderBy: { nome: "asc" },
+    include: { _count: { select: { invoices: true, financialTransactions: true, contracts: true } } },
+  });
+  return suppliers.map(({ _count, ...supplier }) => ({
+    ...supplier,
+    usado: _count.invoices > 0 || _count.financialTransactions > 0 || _count.contracts > 0,
+  }));
 }
 
 export async function getSupplier(supplierId: string) {
@@ -109,6 +116,27 @@ export async function toggleSupplierActive(supplierId: string, ativo: boolean) {
   await assertModuleWrite("cadastrosSomenteLeitura");
 
   await prisma.supplier.update({ where: { id: supplierId }, data: { ativo } });
+  revalidatePath("/cadastros/fornecedores");
+}
+
+// Só pode ser excluído fornecedor que nunca entrou em nenhuma NF, lançamento financeiro ou
+// contrato — se já foi usado em algum lugar, só desativar. Serve pra limpar duplicatas (ex: um
+// fornecedor cadastrado duas vezes com maiúsculas diferentes) depois de reatribuir os lançamentos.
+export async function deleteSupplier(supplierId: string) {
+  const session = await auth();
+  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  await assertModuleWrite("cadastrosSomenteLeitura");
+
+  const [invoicesCount, transactionsCount, contractsCount] = await Promise.all([
+    prisma.invoice.count({ where: { supplierId } }),
+    prisma.financialTransaction.count({ where: { supplierId } }),
+    prisma.contract.count({ where: { contratadoSupplierId: supplierId } }),
+  ]);
+  if (invoicesCount > 0 || transactionsCount > 0 || contractsCount > 0) {
+    throw new Error("Este fornecedor já foi utilizado e não pode ser excluído. Desative-o em vez disso.");
+  }
+
+  await prisma.supplier.delete({ where: { id: supplierId } });
   revalidatePath("/cadastros/fornecedores");
 }
 
