@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toggleSupplierActive } from "@/server/actions/fornecedores";
+import { toggleSupplierActive, deleteSupplier } from "@/server/actions/fornecedores";
 import { SUPPLIER_CATEGORY_LABELS } from "@/lib/status-labels";
 
 type SupplierRow = {
@@ -17,6 +20,7 @@ type SupplierRow = {
   email: string | null;
   categoria: string | null;
   ativo: boolean;
+  usado: boolean;
 };
 
 function ToggleButton({ supplier }: { supplier: SupplierRow }) {
@@ -37,6 +41,44 @@ function ToggleButton({ supplier }: { supplier: SupplierRow }) {
     >
       {supplier.ativo ? "Desativar" : "Ativar"}
     </Button>
+  );
+}
+
+function DeleteButton({ supplier }: { supplier: SupplierRow }) {
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const router = useRouter();
+
+  function handleDelete() {
+    startTransition(async () => {
+      try {
+        await deleteSupplier(supplier.id);
+        toast.success("Fornecedor excluído.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } finally {
+        setConfirming(false);
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" title="Excluir" disabled={isPending} onClick={() => setConfirming(true)}>
+        <Trash2 className="size-4" />
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Excluir fornecedor"
+        description={`Tem certeza que deseja excluir "${supplier.nome}"? Essa ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        onConfirm={handleDelete}
+        isPending={isPending}
+        destructive
+      />
+    </>
   );
 }
 
@@ -86,6 +128,7 @@ export function SuppliersTable({ suppliers }: { suppliers: SupplierRow[] }) {
                     Editar
                   </Button>
                   <ToggleButton supplier={supplier} />
+                  {!supplier.usado ? <DeleteButton supplier={supplier} /> : null}
                 </div>
               </TableCell>
             </TableRow>

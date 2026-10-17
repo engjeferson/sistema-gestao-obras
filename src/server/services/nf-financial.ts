@@ -1,14 +1,7 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { findOrCreateSupplierId } from "@/server/services/suppliers";
 import type { InvoiceFormValues } from "@/lib/validations/notas-fiscais";
-
-async function findOrCreateSupplierId(nome: string) {
-  const trimmed = nome.trim();
-  const existing = await prisma.supplier.findFirst({ where: { nome: trimmed } });
-  if (existing) return existing.id;
-  const created = await prisma.supplier.create({ data: { nome: trimmed } });
-  return created.id;
-}
 
 async function findOrCreateMaterialId(
   nome: string,
