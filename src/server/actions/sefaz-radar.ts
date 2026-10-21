@@ -131,6 +131,15 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
       );
 
       if (retorno.cStat !== "138" && retorno.cStat !== "137") {
+        // A SEFAZ devolve o ultNSU correto mesmo em erro (ex: 656 "Consumo Indevido" avisando
+        // que o ultNSU enviado está desatualizado). Sem salvar isso aqui, o próximo sync repete
+        // o mesmo ultNSU velho e trava num loop de erro permanente, mesmo depois do cooldown.
+        if (retorno.ultNSU && retorno.ultNSU !== ultNsu) {
+          await prisma.companySettings.update({
+            where: { id: company.id },
+            data: { sefazUltimoNsu: retorno.ultNSU },
+          });
+        }
         return { status: "error", message: `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}` };
       }
 
