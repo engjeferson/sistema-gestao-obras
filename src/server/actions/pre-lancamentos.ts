@@ -15,7 +15,7 @@ import { listActiveMaterials } from "@/server/actions/materiais";
 import { listActiveUnits } from "@/server/actions/unidades";
 import { getObjectBase64 } from "@/lib/r2";
 import type { InvoiceItemValues } from "@/lib/validations/notas-fiscais";
-import type { Role, PreLancamentoStatus } from "@/generated/prisma/enums";
+import type { Role, PreLancamentoStatus, TransactionType } from "@/generated/prisma/enums";
 import type { Session } from "next-auth";
 
 const FINANCEIRO_EDIT_ROLES: Role[] = ["ADMINISTRADOR", "FINANCEIRO", "ENGENHEIRO"];
@@ -49,8 +49,36 @@ async function resolveFavorecidoIds(tipo: "PAGAR" | "RECEBER", nome: string) {
 
 const PAGE_SIZE = 20;
 
-export async function listPreLancamentos(status: PreLancamentoStatus, page = 1) {
-  const where = { status };
+export type PreLancamentoFilters = {
+  workId?: string;
+  tipo?: TransactionType;
+  dataInicio?: string;
+  dataFim?: string;
+};
+
+export type PreLancamentoSort = {
+  sortBy?: "createdAt" | "dataVencimento";
+  sortDir?: "asc" | "desc";
+};
+
+export async function listPreLancamentos(
+  status: PreLancamentoStatus,
+  page = 1,
+  filters: PreLancamentoFilters = {},
+  sort: PreLancamentoSort = {},
+) {
+  const where = {
+    status,
+    workId: filters.workId || undefined,
+    tipo: filters.tipo,
+    dataVencimento: {
+      gte: filters.dataInicio ? new Date(filters.dataInicio) : undefined,
+      lte: filters.dataFim ? new Date(filters.dataFim) : undefined,
+    },
+  };
+  const sortBy = sort.sortBy ?? "createdAt";
+  const sortDir = sort.sortDir ?? "desc";
+
   const [items, totalCount] = await Promise.all([
     prisma.preLancamento.findMany({
       where,
@@ -61,7 +89,7 @@ export async function listPreLancamentos(status: PreLancamentoStatus, page = 1) 
         attachments: true,
         financialTransaction: { select: { id: true, status: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { [sortBy]: sortDir },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
