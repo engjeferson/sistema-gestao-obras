@@ -15,7 +15,7 @@ export default async function NovaSaidaPage({
     listWorks(),
     listStagesForAllWorks(),
   ]);
-  const materialsOptions = materials.map((m) => ({ id: m.id, nome: m.nome }));
+  const materialsOptions = materials.map((m) => ({ id: m.id, nome: m.nome, unidadePadrao: m.unidadePadrao }));
   const worksOptions = works.map((w) => ({ id: w.id, nome: w.nome, codigo: w.codigo }));
   const balances = await getStockBalancesAllLocations(works.map((w) => w.id));
 

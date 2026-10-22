@@ -19,7 +19,7 @@ export function StockSaidaForm({
   stagesByWork,
   defaultWorkId,
 }: {
-  materials: { id: string; nome: string }[];
+  materials: { id: string; nome: string; unidadePadrao: string | null }[];
   works: { id: string; nome: string; codigo: string }[];
   balances: Record<string, Record<string, { saldo: number; custoMedio: number }>>;
   stagesByWork: Record<string, StageOption[]>;
@@ -51,7 +51,10 @@ export function StockSaidaForm({
           <Combobox
             value={materialId}
             onChange={setMaterialId}
-            options={materialOptions.map((m) => ({ value: m.id, label: m.nome }))}
+            options={materialOptions.map((m) => ({
+              value: m.id,
+              label: `${m.nome} — ${saldosLocal[m.id]?.saldo ?? 0}${m.unidadePadrao ? ` ${m.unidadePadrao}` : ""} em estoque`,
+            }))}
             placeholder="Buscar material com estoque..."
             emptyMessage="Nenhum material com saldo nesta origem."
           />
