@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,31 +29,33 @@ export function StockSaidaForm({
   const [origemWorkId, setOrigemWorkId] = useState(defaultWorkId ?? "");
   const [materialId, setMaterialId] = useState("");
   const [stageId, setStageId] = useState("");
-  const saldoAtual = balances[origemWorkId || "geral"]?.[materialId]?.saldo ?? 0;
+  const saldosLocal = balances[origemWorkId || "geral"] ?? {};
+  const saldoAtual = saldosLocal[materialId]?.saldo ?? 0;
   const stagesForWork = stagesByWork[origemWorkId] ?? [];
   const tasksForStage = stagesForWork.find((s) => s.id === stageId)?.tasks ?? [];
+
+  // Só lista materiais com saldo > 0 na origem selecionada — buscar entre os sem estoque ali não
+  // ajuda em nada numa saída. Mantém o material já selecionado na lista mesmo que a origem mude
+  // e ele zere, pra não sumir a seleção debaixo do usuário.
+  const materiaisComSaldo = materials.filter((m) => (saldosLocal[m.id]?.saldo ?? 0) > 0);
+  const materialOptions =
+    materialId && !materiaisComSaldo.some((m) => m.id === materialId)
+      ? [...materials.filter((m) => m.id === materialId), ...materiaisComSaldo]
+      : materiaisComSaldo;
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="materialId">Material</Label>
-          <NativeSelect
-            id="materialId"
-            name="materialId"
+          <Combobox
             value={materialId}
-            onChange={(e) => setMaterialId(e.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Selecione o material
-            </option>
-            {materials.map((material) => (
-              <option key={material.id} value={material.id}>
-                {material.nome}
-              </option>
-            ))}
-          </NativeSelect>
+            onChange={setMaterialId}
+            options={materialOptions.map((m) => ({ value: m.id, label: m.nome }))}
+            placeholder="Buscar material com estoque..."
+            emptyMessage="Nenhum material com saldo nesta origem."
+          />
+          <input type="hidden" name="materialId" value={materialId} />
           {materialId ? (
             <p className="text-xs text-muted-foreground">Saldo disponível na origem: {saldoAtual}</p>
           ) : null}
