@@ -177,15 +177,19 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
       }
 
       const newUltNsu = retorno.ultNSU ?? ultNsu;
+      const avancou = newUltNsu !== ultNsu;
       await prisma.companySettings.update({
         where: { id: company.id },
         data: { sefazUltimoNsu: newUltNsu },
       });
+      // Atualiza antes de checar a condição de parada — senão o log final abaixo usa o ultNsu
+      // do lote anterior mesmo quando já alcançamos o maxNSU, mascarando até onde o sync
+      // realmente chegou.
+      ultNsu = newUltNsu;
 
-      if (!retorno.maxNSU || newUltNsu === ultNsu || newUltNsu >= retorno.maxNSU) {
+      if (!retorno.maxNSU || !avancou || newUltNsu >= retorno.maxNSU) {
         break;
       }
-      ultNsu = newUltNsu;
     }
   } catch (error) {
     return {
