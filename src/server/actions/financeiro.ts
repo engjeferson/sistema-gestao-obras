@@ -49,13 +49,17 @@ async function calcularVencimentoCartao(
 
 export type TransactionFilters = {
   workId?: string;
+  stageId?: string;
   tipo?: TransactionType;
   categoriaId?: string;
   categoriaIdIn?: string[];
   status?: TransactionStatus | "EM_ABERTO";
   favorecido?: string;
   supplierId?: string;
+  supplierIdIn?: string[];
+  clientIdIn?: string[];
   bankAccountId?: string;
+  formaPagamento?: PaymentMethod;
   dataInicio?: string;
   dataFim?: string;
   dataPagamentoInicio?: string;
@@ -109,14 +113,17 @@ async function buildTransactionWhere(filters?: TransactionFilters) {
   const workAccess = await getCurrentWorkAccess();
   return {
     workId: filters?.workId ?? (workAccess !== null ? { in: workAccess } : undefined),
+    stageId: filters?.stageId,
     tipo: filters?.tipo,
     categoriaId: filters?.categoriaIdIn ? { in: filters.categoriaIdIn } : filters?.categoriaId,
     status:
       filters?.status === "EM_ABERTO"
         ? { in: ["PENDENTE", "VENCIDO"] as TransactionStatus[] }
         : filters?.status,
-    supplierId: filters?.supplierId,
+    supplierId: filters?.supplierIdIn ? { in: filters.supplierIdIn } : filters?.supplierId,
+    clientId: filters?.clientIdIn ? { in: filters.clientIdIn } : undefined,
     bankAccountId: filters?.bankAccountId,
+    formaPagamento: filters?.formaPagamento,
     favorecidoNome: filters?.favorecido ? { contains: filters.favorecido, mode: "insensitive" as const } : undefined,
     dataVencimento: {
       gte: filters?.dataInicio ? new Date(filters.dataInicio) : undefined,

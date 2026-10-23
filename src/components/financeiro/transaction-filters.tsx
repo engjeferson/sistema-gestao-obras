@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Input } from "@/components/ui/input";
+import { MultiCombobox } from "@/components/ui/multi-combobox";
 import { PeriodoFilter } from "@/components/ui/periodo-filter";
-import { TRANSACTION_STATUS_LABELS } from "@/lib/status-labels";
+import { TRANSACTION_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/status-labels";
 
 const BANK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
   CORRENTE: "Conta corrente",
@@ -15,13 +14,21 @@ const BANK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
   OUTRA: "Outra",
 };
 
+type StageOption = { id: string; codigo: string | null; nome: string };
+
 export function TransactionFilters({
   categorias,
-  favorecidos = [],
+  suppliers = [],
+  clients = [],
+  works = [],
+  stagesByWork = {},
   bankAccounts = [],
 }: {
   categorias: { id: string; nome: string }[];
-  favorecidos?: string[];
+  suppliers?: { id: string; nome: string }[];
+  clients?: { id: string; nome: string }[];
+  works?: { id: string; nome: string; codigo: string }[];
+  stagesByWork?: Record<string, StageOption[]>;
   bankAccounts?: {
     id: string;
     nome: string;
@@ -34,8 +41,6 @@ export function TransactionFilters({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [favorecidoInput, setFavorecidoInput] = useState(searchParams.get("favorecido") ?? "");
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   function setParam(key: string, value: string) {
     setParams({ [key]: value });
@@ -72,20 +77,27 @@ export function TransactionFilters({
     setParams({ periodo: "personalizado", dataInicio: dataStr, dataFim: dataStr });
   }
 
-  const suggestions = useMemo(() => {
-    const q = favorecidoInput.trim().toLowerCase();
-    if (!q) return [];
-    return favorecidos.filter((nome) => nome.toLowerCase().includes(q)).slice(0, 8);
-  }, [favorecidoInput, favorecidos]);
+  const workId = searchParams.get("workId") ?? "";
+  const stagesForWork = stagesByWork[workId] ?? [];
+  const supplierIds = (searchParams.get("supplierIds") ?? "").split(",").filter(Boolean);
+  const clientIds = (searchParams.get("clientIds") ?? "").split(",").filter(Boolean);
 
-  function selectFavorecido(nome: string) {
-    setFavorecidoInput(nome);
-    setShowSuggestions(false);
-    setParam("favorecido", nome);
+  function handleWorkChange(value: string) {
+    // Trocar de obra invalida a etapa escolhida — ela pode não existir na nova obra.
+    setParams({ workId: value, stageId: undefined });
   }
 
   return (
     <div className="flex flex-wrap gap-3">
+      <NativeSelect
+        className="w-auto"
+        defaultValue={searchParams.get("tipo") ?? ""}
+        onChange={(e) => setParam("tipo", e.target.value)}
+      >
+        <option value="">Pagar e receber</option>
+        <option value="PAGAR">A pagar (despesa)</option>
+        <option value="RECEBER">A receber (receita)</option>
+      </NativeSelect>
       <NativeSelect
         className="w-auto"
         defaultValue={searchParams.get("status") ?? ""}
@@ -111,37 +123,46 @@ export function TransactionFilters({
           </option>
         ))}
       </NativeSelect>
-      <div className="relative w-80">
-        <Input
-          placeholder="Fornecedor / cliente"
-          className="w-full"
-          value={favorecidoInput}
-          onChange={(e) => {
-            setFavorecidoInput(e.target.value);
-            setShowSuggestions(true);
-          }}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={(e) => {
-            setShowSuggestions(false);
-            setParam("favorecido", e.target.value);
-          }}
-        />
-        {showSuggestions && suggestions.length > 0 ? (
-          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
-            {suggestions.map((nome) => (
-              <button
-                key={nome}
-                type="button"
-                className="block w-full truncate px-3 py-1.5 text-left text-sm hover:bg-muted"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectFavorecido(nome)}
-              >
-                {nome}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <NativeSelect className="w-auto" value={workId} onChange={(e) => handleWorkChange(e.target.value)}>
+        <option value="">Todos os centros de custo</option>
+        {works.map((work) => (
+          <option key={work.id} value={work.id}>
+            {work.codigo} — {work.nome}
+          </option>
+        ))}
+      </NativeSelect>
+      {workId && stagesForWork.length > 0 ? (
+        <NativeSelect
+          className="w-auto"
+          defaultValue={searchParams.get("stageId") ?? ""}
+          onChange={(e) => setParam("stageId", e.target.value)}
+          key={workId}
+        >
+          <option value="">Todas as etapas</option>
+          {stagesForWork.map((stage) => (
+            <option key={stage.id} value={stage.id}>
+              {stage.codigo ? `${stage.codigo} — ` : ""}
+              {stage.nome}
+            </option>
+          ))}
+        </NativeSelect>
+      ) : null}
+      <MultiCombobox
+        values={supplierIds}
+        onChange={(values) => setParam("supplierIds", values.join(","))}
+        options={suppliers.map((s) => ({ value: s.id, label: s.nome }))}
+        placeholder="Fornecedor..."
+        emptyMessage="Nenhum fornecedor encontrado."
+        className="w-64"
+      />
+      <MultiCombobox
+        values={clientIds}
+        onChange={(values) => setParam("clientIds", values.join(","))}
+        options={clients.map((c) => ({ value: c.id, label: c.nome }))}
+        placeholder="Cliente..."
+        emptyMessage="Nenhum cliente encontrado."
+        className="w-64"
+      />
       <NativeSelect
         className="w-auto"
         defaultValue={searchParams.get("bankAccountId") ?? ""}
@@ -152,6 +173,18 @@ export function TransactionFilters({
           <option key={account.id} value={account.id}>
             {account.nome}
             {account.banco ? ` — ${account.banco}` : ""} ({BANK_ACCOUNT_TYPE_LABELS[account.tipo] ?? account.tipo})
+          </option>
+        ))}
+      </NativeSelect>
+      <NativeSelect
+        className="w-auto"
+        defaultValue={searchParams.get("formaPagamento") ?? ""}
+        onChange={(e) => setParam("formaPagamento", e.target.value)}
+      >
+        <option value="">Todas as formas de pagamento</option>
+        {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
           </option>
         ))}
       </NativeSelect>
