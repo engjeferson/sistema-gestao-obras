@@ -2,11 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { MaterialStockPicker } from "@/components/estoque/material-stock-picker";
 import { createStockSaida } from "@/server/actions/estoque";
 
 type TaskOption = { id: string; codigo: string | null; nome: string };
@@ -45,20 +45,6 @@ export function StockSaidaForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <Label>Material</Label>
-        <MaterialStockPicker
-          materials={materialOptions}
-          saldosLocal={saldosLocal}
-          materialId={materialId}
-          onSelect={setMaterialId}
-        />
-        <input type="hidden" name="materialId" value={materialId} />
-        {materialId ? (
-          <p className="text-xs text-muted-foreground">Saldo disponível na origem: {saldoAtual}</p>
-        ) : null}
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="origemWorkId">Origem</Label>
@@ -127,6 +113,38 @@ export function StockSaidaForm({
           <Input id="motivo" name="motivo" placeholder="Ex: Uso na obra, perda, descarte" />
         </div>
       </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Material</Label>
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-muted-foreground">
+              <tr>
+                <th className="p-2 font-medium">Material</th>
+                <th className="p-2 font-medium">Saldo na origem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t">
+                <td className="p-2">
+                  <Combobox
+                    value={materialId}
+                    onChange={setMaterialId}
+                    options={materialOptions.map((m) => ({ value: m.id, label: m.nome }))}
+                    placeholder="Buscar material..."
+                    emptyMessage="Nenhum material com saldo nesta origem."
+                    className="min-w-[28rem]"
+                  />
+                </td>
+                <td className="p-2 whitespace-nowrap text-muted-foreground">
+                  {materialId ? saldoAtual : "—"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <input type="hidden" name="materialId" value={materialId} />
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 
