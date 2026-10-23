@@ -66,7 +66,11 @@ export function StockSaidaItemsEditor({
                   <td className="p-2">
                     <Combobox
                       value={item.materialId}
-                      onChange={(materialId) => updateItem(index, { materialId })}
+                      onChange={(materialId) =>
+                        // Já puxa o custo médio registrado do material como valor sugerido —
+                        // o usuário ainda pode editar se a baixa for por um valor diferente.
+                        updateItem(index, { materialId, valorUnitario: saldosOrigem[materialId]?.custoMedio ?? 0 })
+                      }
                       options={optionsFor(item.materialId).map((m) => ({ value: m.id, label: m.nome }))}
                       placeholder="Buscar material..."
                       emptyMessage="Nenhum material com saldo nesta origem."
