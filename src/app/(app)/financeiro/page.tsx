@@ -3,10 +3,11 @@ import { Plus, X, Sparkles } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listTransactions, listFinancialCategories, getTransactionsSummary } from "@/server/actions/financeiro";
 import { countPreLancamentosByStatus } from "@/server/actions/pre-lancamentos";
-import { getWork } from "@/server/actions/obras";
+import { getWork, listWorks } from "@/server/actions/obras";
 import { listSuppliers } from "@/server/actions/fornecedores";
 import { listClients } from "@/server/actions/clientes";
 import { listActiveBankAccounts } from "@/server/actions/contas-bancarias";
+import { listStagesForAllWorks } from "@/server/actions/planejamento";
 import { getCurrentFinancePermissions, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { restrictTransactionFilters } from "@/lib/finance-permissions";
 import { Badge } from "@/components/ui/badge";
@@ -14,18 +15,22 @@ import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/financeiro/transactions-table";
 import { TransactionFilters } from "@/components/financeiro/transaction-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
-import type { TransactionStatus, TransactionType } from "@/generated/prisma/enums";
+import type { PaymentMethod, TransactionStatus, TransactionType } from "@/generated/prisma/enums";
 
 export default async function FinanceiroPage({
   searchParams,
 }: {
   searchParams: Promise<{
     workId?: string;
+    stageId?: string;
     status?: string;
     tipo?: string;
     categoriaId?: string;
     favorecido?: string;
+    supplierIds?: string;
+    clientIds?: string;
     bankAccountId?: string;
+    formaPagamento?: string;
     dataInicio?: string;
     dataFim?: string;
     dataPagamentoInicio?: string;
@@ -37,26 +42,33 @@ export default async function FinanceiroPage({
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
   const requestedFilters = {
     workId: params.workId || undefined,
+    stageId: params.stageId || undefined,
     status: params.status as TransactionStatus | "EM_ABERTO" | undefined,
     tipo: params.tipo as TransactionType | undefined,
     categoriaId: params.categoriaId || undefined,
     favorecido: params.favorecido || undefined,
+    supplierIdIn: params.supplierIds ? params.supplierIds.split(",").filter(Boolean) : undefined,
+    clientIdIn: params.clientIds ? params.clientIds.split(",").filter(Boolean) : undefined,
     bankAccountId: params.bankAccountId || undefined,
+    formaPagamento: (params.formaPagamento || undefined) as PaymentMethod | undefined,
     dataInicio: params.dataInicio || undefined,
     dataFim: params.dataFim || undefined,
     dataPagamentoInicio: params.dataPagamentoInicio || undefined,
     dataPagamentoFim: params.dataPagamentoFim || undefined,
   };
 
-  const [session, perms, modulePerms, allCategorias, suppliers, clients, bankAccounts] = await Promise.all([
-    auth(),
-    getCurrentFinancePermissions(),
-    getCurrentModulePermissions(),
-    listFinancialCategories(),
-    listSuppliers(),
-    listClients(),
-    listActiveBankAccounts(),
-  ]);
+  const [session, perms, modulePerms, allCategorias, suppliers, clients, bankAccounts, works, stagesByWork] =
+    await Promise.all([
+      auth(),
+      getCurrentFinancePermissions(),
+      getCurrentModulePermissions(),
+      listFinancialCategories(),
+      listSuppliers(),
+      listClients(),
+      listActiveBankAccounts(),
+      listWorks(),
+      listStagesForAllWorks(),
+    ]);
   const canEdit =
     session?.user.role === "ADMINISTRADOR" ||
     session?.user.role === "FINANCEIRO" ||
@@ -66,9 +78,6 @@ export default async function FinanceiroPage({
   const categorias = perms.categoriasPermitidasIds
     ? allCategorias.filter((c) => perms.categoriasPermitidasIds!.includes(c.id))
     : allCategorias;
-  const favorecidos = Array.from(new Set([...suppliers, ...clients].map((f) => f.nome))).sort((a, b) =>
-    a.localeCompare(b, "pt-BR"),
-  );
 
   if (!hasAccess) {
     return (
@@ -116,7 +125,15 @@ export default async function FinanceiroPage({
 
         <TransactionFilters
           categorias={categorias}
-          favorecidos={favorecidos}
+          suppliers={suppliers.map((s) => ({ id: s.id, nome: s.nome }))}
+          clients={clients.map((c) => ({ id: c.id, nome: c.nome }))}
+          works={works.map((w) => ({ id: w.id, nome: w.nome, codigo: w.codigo }))}
+          stagesByWork={Object.fromEntries(
+            Object.entries(stagesByWork).map(([workId, stages]) => [
+              workId,
+              stages.map((s) => ({ id: s.id, codigo: s.codigo, nome: s.nome })),
+            ]),
+          )}
           bankAccounts={bankAccounts.map((b) => ({
             id: b.id,
             nome: b.nome,

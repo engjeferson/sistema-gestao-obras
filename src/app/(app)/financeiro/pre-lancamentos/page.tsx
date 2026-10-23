@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Plus, Sparkles, PenLine } from "lucide-react";
 import { listPreLancamentos, countPreLancamentosByStatus } from "@/server/actions/pre-lancamentos";
+import { listWorks } from "@/server/actions/obras";
 import { Button } from "@/components/ui/button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PreLancamentosTable } from "@/components/financeiro/pre-lancamentos-table";
+import { PreLancamentoFilters } from "@/components/financeiro/pre-lancamento-filters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { PreLancamentoStatus } from "@/generated/prisma/enums";
+import type { PreLancamentoStatus, TransactionType } from "@/generated/prisma/enums";
 
 const TABS: { status: PreLancamentoStatus; label: string }[] = [
   { status: "PENDENTE", label: "Pendentes" },
@@ -22,14 +24,37 @@ const TABS: { status: PreLancamentoStatus; label: string }[] = [
 export default async function PreLancamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    page?: string;
+    workId?: string;
+    tipo?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    sort?: string;
+    dir?: string;
+  }>;
 }) {
-  const { status: statusParam, page: pageParam } = await searchParams;
+  const params = await searchParams;
   const status: PreLancamentoStatus =
-    statusParam === "RECUSADO" || statusParam === "FINALIZADO" ? statusParam : "PENDENTE";
-  const page = Number(pageParam) > 0 ? Number(pageParam) : 1;
+    params.status === "RECUSADO" || params.status === "FINALIZADO" ? params.status : "PENDENTE";
+  const page = Number(params.page) > 0 ? Number(params.page) : 1;
+  const filters = {
+    workId: params.workId || undefined,
+    tipo: params.tipo === "PAGAR" || params.tipo === "RECEBER" ? (params.tipo as TransactionType) : undefined,
+    dataInicio: params.dataInicio || undefined,
+    dataFim: params.dataFim || undefined,
+  };
+  const sort = {
+    sortBy: params.sort === "dataVencimento" ? ("dataVencimento" as const) : ("createdAt" as const),
+    sortDir: params.dir === "asc" ? ("asc" as const) : ("desc" as const),
+  };
 
-  const [result, counts] = await Promise.all([listPreLancamentos(status, page), countPreLancamentosByStatus()]);
+  const [result, counts, works] = await Promise.all([
+    listPreLancamentos(status, page, filters, sort),
+    countPreLancamentosByStatus(),
+    listWorks(),
+  ]);
 
   const items = result.items.map((item) => ({
     id: item.id,
@@ -82,7 +107,10 @@ export default async function PreLancamentosPage({
           {TABS.map((tab) => (
             <Link
               key={tab.status}
-              href={`/financeiro/pre-lancamentos?status=${tab.status}`}
+              href={{
+                pathname: "/financeiro/pre-lancamentos",
+                query: { ...params, status: tab.status, page: undefined },
+              }}
               className={cn(
                 "shrink-0 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
                 status === tab.status
@@ -95,6 +123,8 @@ export default async function PreLancamentosPage({
           ))}
         </div>
       </div>
+
+      <PreLancamentoFilters works={works.map((w) => ({ id: w.id, nome: w.nome, codigo: w.codigo }))} />
 
       <PreLancamentosTable items={items} status={status} />
       <PaginationControls page={result.page} totalPages={result.totalPages} />

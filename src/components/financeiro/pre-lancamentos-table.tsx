@@ -2,9 +2,25 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Check, X, RotateCcw, Trash2, Paperclip, Pencil, Sparkles, User, Receipt, CheckCircle2, Undo2, Undo } from "lucide-react";
+import {
+  Check,
+  X,
+  RotateCcw,
+  Trash2,
+  Paperclip,
+  Pencil,
+  Sparkles,
+  User,
+  Receipt,
+  CheckCircle2,
+  Undo2,
+  Undo,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -256,6 +272,39 @@ function RevertApprovalButton({ id }: { id: string }) {
   );
 }
 
+function SortableHeader({ label, sortKey }: { label: string; sortKey: "createdAt" | "dataVencimento" }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSort = searchParams.get("sort") ?? "createdAt";
+  const currentDir = searchParams.get("dir") ?? "desc";
+  const isActive = currentSort === sortKey;
+  const nextDir = isActive && currentDir === "desc" ? "asc" : "desc";
+
+  function handleClick() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("sort", sortKey);
+    params.set("dir", nextDir);
+    params.delete("page");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  return (
+    <button type="button" onClick={handleClick} className="flex items-center gap-1 hover:text-foreground">
+      {label}
+      {isActive ? (
+        currentDir === "desc" ? (
+          <ArrowDown className="size-3.5" />
+        ) : (
+          <ArrowUp className="size-3.5" />
+        )
+      ) : (
+        <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
+      )}
+    </button>
+  );
+}
+
 export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow[]; status: PreLancamentoStatus }) {
   if (items.length === 0) {
     return (
@@ -270,11 +319,16 @@ export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Criação</TableHead>
-            <TableHead>Vencimento</TableHead>
+            <TableHead>
+              <SortableHeader label="Criação" sortKey="createdAt" />
+            </TableHead>
+            <TableHead>
+              <SortableHeader label="Vencimento" sortKey="dataVencimento" />
+            </TableHead>
             <TableHead>Descrição</TableHead>
             <TableHead>Centro de custo</TableHead>
-            <TableHead>Fornecedor/Cliente</TableHead>
+            <TableHead>Fornecedor</TableHead>
+            <TableHead>Cliente</TableHead>
             <TableHead>Valor (R$)</TableHead>
             <TableHead>Origem</TableHead>
             <TableHead>Anexos</TableHead>
@@ -300,7 +354,8 @@ export function PreLancamentosTable({ items, status }: { items: PreLancamentoRow
                 ) : null}
               </TableCell>
               <TableCell>{item.work ? `${item.work.codigo} — ${item.work.nome}` : "—"}</TableCell>
-              <TableCell>{item.favorecidoNome || "—"}</TableCell>
+              <TableCell>{item.tipo === "PAGAR" ? item.favorecidoNome || "—" : "—"}</TableCell>
+              <TableCell>{item.tipo === "RECEBER" ? item.favorecidoNome || "—" : "—"}</TableCell>
               <TableCell className={item.tipo === "PAGAR" ? "text-destructive" : "text-success"}>
                 {item.tipo === "PAGAR" ? "-" : ""}
                 {formatCurrencyBRL(item.valor)}
