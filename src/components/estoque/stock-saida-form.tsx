@@ -2,11 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { MaterialStockPicker } from "@/components/estoque/material-stock-picker";
 import { createStockSaida } from "@/server/actions/estoque";
 
 type TaskOption = { id: string; codigo: string | null; nome: string };
@@ -45,24 +45,21 @@ export function StockSaidaForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Label>Material</Label>
+        <MaterialStockPicker
+          materials={materialOptions}
+          saldosLocal={saldosLocal}
+          materialId={materialId}
+          onSelect={setMaterialId}
+        />
+        <input type="hidden" name="materialId" value={materialId} />
+        {materialId ? (
+          <p className="text-xs text-muted-foreground">Saldo disponível na origem: {saldoAtual}</p>
+        ) : null}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="materialId">Material</Label>
-          <Combobox
-            value={materialId}
-            onChange={setMaterialId}
-            options={materialOptions.map((m) => ({
-              value: m.id,
-              label: `${m.nome} — ${saldosLocal[m.id]?.saldo ?? 0}${m.unidadePadrao ? ` ${m.unidadePadrao}` : ""} em estoque`,
-            }))}
-            placeholder="Buscar material com estoque..."
-            emptyMessage="Nenhum material com saldo nesta origem."
-          />
-          <input type="hidden" name="materialId" value={materialId} />
-          {materialId ? (
-            <p className="text-xs text-muted-foreground">Saldo disponível na origem: {saldoAtual}</p>
-          ) : null}
-        </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="origemWorkId">Origem</Label>
           <NativeSelect
