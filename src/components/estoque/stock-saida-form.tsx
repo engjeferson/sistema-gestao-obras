@@ -2,12 +2,12 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
-import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { StockSaidaItemsEditor } from "@/components/estoque/stock-saida-items-editor";
 import { createStockSaida } from "@/server/actions/estoque";
+import type { StockSaidaItemValues } from "@/lib/validations/estoque";
 
 type TaskOption = { id: string; codigo: string | null; nome: string };
 type StageOption = { id: string; codigo: string | null; nome: string; tasks: TaskOption[] };
@@ -27,24 +27,16 @@ export function StockSaidaForm({
 }) {
   const [errorMessage, formAction, isPending] = useActionState(createStockSaida, undefined);
   const [origemWorkId, setOrigemWorkId] = useState(defaultWorkId ?? "");
-  const [materialId, setMaterialId] = useState("");
   const [stageId, setStageId] = useState("");
-  const saldosLocal = balances[origemWorkId || "geral"] ?? {};
-  const saldoAtual = saldosLocal[materialId]?.saldo ?? 0;
+  const [items, setItems] = useState<StockSaidaItemValues[]>([{ materialId: "", quantidade: 0 }]);
+  const saldosOrigem = balances[origemWorkId || "geral"] ?? {};
   const stagesForWork = stagesByWork[origemWorkId] ?? [];
   const tasksForStage = stagesForWork.find((s) => s.id === stageId)?.tasks ?? [];
 
-  // Só lista materiais com saldo > 0 na origem selecionada — buscar entre os sem estoque ali não
-  // ajuda em nada numa saída. Mantém o material já selecionado na lista mesmo que a origem mude
-  // e ele zere, pra não sumir a seleção debaixo do usuário.
-  const materiaisComSaldo = materials.filter((m) => (saldosLocal[m.id]?.saldo ?? 0) > 0);
-  const materialOptions =
-    materialId && !materiaisComSaldo.some((m) => m.id === materialId)
-      ? [...materials.filter((m) => m.id === materialId), ...materiaisComSaldo]
-      : materiaisComSaldo;
-
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <input type="hidden" name="itensJson" value={JSON.stringify(items)} readOnly />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="origemWorkId">Origem</Label>
@@ -97,14 +89,6 @@ export function StockSaidaForm({
           </div>
         ) : null}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="quantidade">Quantidade</Label>
-          <Input id="quantidade" name="quantidade" type="number" step="0.001" min="0.001" required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="valorUnitario">Valor unitário</Label>
-          <CurrencyInput id="valorUnitario" name="valorUnitario" />
-        </div>
-        <div className="flex flex-col gap-2">
           <Label htmlFor="data">Data</Label>
           <Input id="data" name="data" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
         </div>
@@ -116,35 +100,8 @@ export function StockSaidaForm({
 
       <div className="flex flex-col gap-2">
         <Label>Material</Label>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-muted-foreground">
-              <tr>
-                <th className="p-2 font-medium">Material</th>
-                <th className="p-2 font-medium">Saldo na origem</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t">
-                <td className="p-2">
-                  <Combobox
-                    value={materialId}
-                    onChange={setMaterialId}
-                    options={materialOptions.map((m) => ({ value: m.id, label: m.nome }))}
-                    placeholder="Buscar material..."
-                    emptyMessage="Nenhum material com saldo nesta origem."
-                    className="min-w-[28rem]"
-                  />
-                </td>
-                <td className="p-2 whitespace-nowrap text-muted-foreground">
-                  {materialId ? saldoAtual : "—"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <StockSaidaItemsEditor items={items} onChange={setItems} materials={materials} saldosOrigem={saldosOrigem} />
       </div>
-      <input type="hidden" name="materialId" value={materialId} />
 
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
 

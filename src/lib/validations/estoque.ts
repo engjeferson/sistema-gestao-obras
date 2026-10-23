@@ -11,15 +11,19 @@ export const stockEntradaSchema = z.object({
   motivo: z.string().trim().optional(),
 });
 
-export const stockSaidaSchema = z.object({
+export const stockSaidaItemSchema = z.object({
   materialId: z.string().min(1, "Selecione o material."),
+  quantidade: z.coerce.number().positive("Informe uma quantidade maior que zero."),
+  valorUnitario: z.coerce.number().nonnegative().optional(),
+});
+
+export const stockSaidaSchema = z.object({
   origemWorkId: z.string().optional().or(z.literal("").transform(() => undefined)),
   stageId: z.string().optional().or(z.literal("").transform(() => undefined)),
   taskId: z.string().optional().or(z.literal("").transform(() => undefined)),
-  quantidade: z.coerce.number().positive("Informe uma quantidade maior que zero."),
-  valorUnitario: z.coerce.number().nonnegative().optional(),
   data: z.string().min(1, "Informe a data."),
   motivo: z.string().trim().optional(),
+  itens: z.array(stockSaidaItemSchema).min(1, "Adicione ao menos um item para dar baixa."),
 });
 
 export const stockTransferItemSchema = z.object({
@@ -44,5 +48,6 @@ export const stockTransferenciaSchema = z
 
 export type StockEntradaFormValues = z.infer<typeof stockEntradaSchema>;
 export type StockSaidaFormValues = z.infer<typeof stockSaidaSchema>;
+export type StockSaidaItemValues = z.infer<typeof stockSaidaItemSchema>;
 export type StockTransferItemValues = z.infer<typeof stockTransferItemSchema>;
 export type StockTransferenciaFormValues = z.infer<typeof stockTransferenciaSchema>;

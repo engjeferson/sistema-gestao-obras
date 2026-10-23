@@ -253,15 +253,20 @@ export async function createStockSaida(_prevState: string | undefined, formData:
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
+  let itensParsed: unknown;
+  try {
+    itensParsed = JSON.parse(String(formData.get("itensJson") ?? "[]"));
+  } catch {
+    return "Itens inválidos.";
+  }
+
   const parsed = stockSaidaSchema.safeParse({
-    materialId: formData.get("materialId"),
     origemWorkId: formData.get("origemWorkId") ?? undefined,
     stageId: formData.get("stageId") ?? undefined,
     taskId: formData.get("taskId") ?? undefined,
-    quantidade: formData.get("quantidade"),
-    valorUnitario: formData.get("valorUnitario") || undefined,
     data: formData.get("data"),
     motivo: formData.get("motivo") ?? undefined,
+    itens: itensParsed,
   });
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
@@ -269,25 +274,31 @@ export async function createStockSaida(_prevState: string | undefined, formData:
   const data = parsed.data;
   const origem = data.origemWorkId || null;
 
-  const saldoAtual = await getSaldoAtual(data.materialId, origem);
-  if (saldoAtual < data.quantidade) {
-    return `Saldo insuficiente. Saldo atual: ${saldoAtual}.`;
+  for (const item of data.itens) {
+    const saldoAtual = await getSaldoAtual(item.materialId, origem);
+    if (saldoAtual < item.quantidade) {
+      return `Saldo insuficiente na origem para este material. Saldo atual: ${saldoAtual}.`;
+    }
   }
 
-  await prisma.stockMovement.create({
-    data: {
-      materialId: data.materialId,
-      tipo: "SAIDA",
-      origemWorkId: origem,
-      stageId: origem ? data.stageId || null : null,
-      taskId: origem ? data.taskId || null : null,
-      quantidade: data.quantidade,
-      valorUnitario: data.valorUnitario ?? null,
-      data: new Date(data.data),
-      motivo: data.motivo || null,
-      createdById: session.user.id,
-    },
-  });
+  await prisma.$transaction(
+    data.itens.map((item) =>
+      prisma.stockMovement.create({
+        data: {
+          materialId: item.materialId,
+          tipo: "SAIDA",
+          origemWorkId: origem,
+          stageId: origem ? data.stageId || null : null,
+          taskId: origem ? data.taskId || null : null,
+          quantidade: item.quantidade,
+          valorUnitario: item.valorUnitario ?? null,
+          data: new Date(data.data),
+          motivo: data.motivo || null,
+          createdById: session.user.id,
+        },
+      }),
+    ),
+  );
 
   revalidatePath("/estoque");
   redirect("/estoque");
