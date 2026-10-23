@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus, Pencil, FileSignature, Wallet, PiggyBank, Percent } from "lucide-react";
+import { Plus, Pencil, FileSignature, Wallet, PiggyBank, Percent, FileDown } from "lucide-react";
 import { getContract } from "@/server/actions/contratos";
 import { getCurrentSensitiveValuesAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { Button } from "@/components/ui/button";
@@ -83,26 +83,36 @@ export default async function ContractDetailPage({
             · {formatDateBR(contract.data)}
           </p>
         </div>
-        {canEdit ? (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              render={<Link href={`/obras/${id}/contratos/${contractId}/editar`} />}
-              nativeButton={false}
-            >
-              <Pencil /> Editar
-            </Button>
-            <AddAddendumDialog contractId={contractId} workId={id} />
-            <Button
-              size="sm"
-              render={<Link href={`/obras/${id}/contratos/${contractId}/medicoes/nova`} />}
-              nativeButton={false}
-            >
-              <Plus /> Nova medição
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            render={<a href={`/api/obras/${id}/contratos/${contractId}/pdf`} target="_blank" rel="noopener noreferrer" />}
+            nativeButton={false}
+          >
+            <FileDown /> Relatório PDF
+          </Button>
+          {canEdit ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                render={<Link href={`/obras/${id}/contratos/${contractId}/editar`} />}
+                nativeButton={false}
+              >
+                <Pencil /> Editar
+              </Button>
+              <AddAddendumDialog contractId={contractId} workId={id} />
+              <Button
+                size="sm"
+                render={<Link href={`/obras/${id}/contratos/${contractId}/medicoes/nova`} />}
+                nativeButton={false}
+              >
+                <Plus /> Nova medição
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
