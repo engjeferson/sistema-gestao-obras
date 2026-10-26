@@ -64,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Contrato-${contract.nome.replace(/[^a-zA-Z0-9-_]+/g, "-")}.pdf"`,
+      "Content-Disposition": `inline; filename="Contrato-${contract.nome.replace(/[^a-zA-Z0-9-_]+/g, "-")}.pdf"`,
     },
   });
 }

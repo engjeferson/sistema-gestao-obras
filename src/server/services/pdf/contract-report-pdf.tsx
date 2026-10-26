@@ -7,12 +7,17 @@ const NAVY = "#0e1a2a";
 const TEAL = "#22776e";
 
 const styles = StyleSheet.create({
-  page: { fontSize: 10, fontFamily: "Montserrat", color: "#1a1a1a" },
+  // paddingTop/paddingBottom vão direto no Page (não num View interno) — é a única forma do
+  // react-pdf reservar essa margem em TODA página gerada pela paginação automática; um View só
+  // aplica esse padding uma vez (início/fim do fluxo todo), então um contrato com muitas medições
+  // acabava com conteúdo colado na borda de cima das páginas seguintes e invadindo o rodapé fixo.
+  page: { fontSize: 10, fontFamily: "Montserrat", color: "#1a1a1a", paddingTop: 24, paddingBottom: 56 },
   headerBand: {
     backgroundColor: NAVY,
     paddingTop: 24,
     paddingBottom: 20,
     paddingHorizontal: 32,
+    marginBottom: 18,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -23,7 +28,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: 700, color: "#ffffff", marginTop: 10 },
   subtitle: { fontSize: 9, color: "#b7c2cf", marginTop: 2 },
 
-  body: { paddingHorizontal: 32, paddingTop: 18, paddingBottom: 40 },
+  body: { paddingHorizontal: 32 },
 
   metaRow: {
     flexDirection: "row",
@@ -178,7 +183,7 @@ export function ContractReportPdfDocument({ contract, company, logoBase64, origi
               <Text style={[styles.th, styles.colStatus]}>Status</Text>
             </View>
             {measurements.map((m) => (
-              <View key={m.id} style={styles.tableRow}>
+              <View key={m.id} style={styles.tableRow} wrap={false}>
                 <Text style={[styles.td, styles.colNumero]}>#{m.numero}</Text>
                 <Text style={[styles.td, styles.colData]}>{formatDateBR(m.data)}</Text>
                 <Text style={[styles.td, styles.colDescricao]}>{m.descricao || "—"}</Text>
