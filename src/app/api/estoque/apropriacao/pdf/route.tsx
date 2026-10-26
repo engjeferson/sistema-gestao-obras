@@ -73,7 +73,7 @@ export async function GET(request: Request) {
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Apropriacao-${work.codigo}-${modo}.pdf"`,
+      "Content-Disposition": `inline; filename="Apropriacao-${work.codigo}-${modo}.pdf"`,
     },
   });
 }
