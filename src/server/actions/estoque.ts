@@ -500,6 +500,11 @@ export type AppropriationNode = {
  * direto lá, saída de uso, ou transferência com destino lá), mão de obra via
  * FinancialTransaction da categoria "Mão de obra" (qualquer status — reflete
  * o total comprometido, não só o já pago).
+ *
+ * Exceção: uma entrada lançada direto numa etapa (ENTRADA com destinoWorkId
+ * = esta obra) é depletada em FIFO por transferências de saída desse mesmo
+ * material daqui pra outra obra — senão o material "apropriado" continuava
+ * contando aqui pra sempre mesmo depois de sair fisicamente pra outra obra.
  */
 export async function getStockAppropriationTree(workId: string): Promise<AppropriationNode[]> {
   const [stages, movements, maoDeObraCategoria] = await Promise.all([
@@ -514,11 +519,17 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
         NOT: { stageId: null, taskId: null },
       },
       select: {
+        id: true,
         materialId: true,
+        tipo: true,
+        origemWorkId: true,
+        destinoWorkId: true,
         stageId: true,
         taskId: true,
         quantidade: true,
         valorUnitario: true,
+        data: true,
+        createdAt: true,
         material: { select: { nome: true, unidadePadrao: true, categoria: true } },
       },
     }),
@@ -548,9 +559,46 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
 
   type Mov = (typeof movements)[number];
 
+  // Uma transferência de saída desta obra tira fisicamente o material que tinha chegado aqui já
+  // direto numa etapa/atividade (ENTRADA com destinoWorkId = esta obra) — sem isso, o valor
+  // continuava "apropriado" aqui pra sempre mesmo depois do material ir embora pra outra obra,
+  // dobrando a contagem (aqui e na obra de destino). Depleta em FIFO (entrada mais antiga primeiro)
+  // a quantidade que saiu por transferência, por material.
+  const entradasPorMaterial = new Map<string, Mov[]>();
+  const transferidoPorMaterial = new Map<string, number>();
+  for (const m of movements) {
+    if (m.tipo === "ENTRADA" && m.destinoWorkId === workId) {
+      const list = entradasPorMaterial.get(m.materialId) ?? [];
+      list.push(m);
+      entradasPorMaterial.set(m.materialId, list);
+    } else if (m.tipo === "TRANSFERENCIA" && m.origemWorkId === workId) {
+      transferidoPorMaterial.set(m.materialId, (transferidoPorMaterial.get(m.materialId) ?? 0) + Number(m.quantidade));
+    }
+  }
+
+  const quantidadeEfetivaPorEntradaId = new Map<string, number>();
+  for (const [materialId, entradas] of entradasPorMaterial) {
+    let restante = transferidoPorMaterial.get(materialId) ?? 0;
+    const ordenadas = [...entradas].sort(
+      (a, b) => a.data.getTime() - b.data.getTime() || a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+    for (const entrada of ordenadas) {
+      const qtd = Number(entrada.quantidade);
+      const consumida = Math.min(qtd, restante);
+      quantidadeEfetivaPorEntradaId.set(entrada.id, qtd - consumida);
+      restante -= consumida;
+    }
+  }
+
+  function quantidadeEfetiva(m: Mov): number {
+    return quantidadeEfetivaPorEntradaId.get(m.id) ?? Number(m.quantidade);
+  }
+
   function aggregateMateriais(movs: Mov[]): AppropriationMaterial[] {
     const byMaterial = new Map<string, AppropriationMaterial>();
     for (const m of movs) {
+      const qtd = quantidadeEfetiva(m);
+      if (qtd === 0) continue;
       const existing = byMaterial.get(m.materialId) ?? {
         materialId: m.materialId,
         nome: m.material.nome,
@@ -559,8 +607,8 @@ export async function getStockAppropriationTree(workId: string): Promise<Appropr
         quantidade: 0,
         valor: 0,
       };
-      existing.quantidade += Number(m.quantidade);
-      existing.valor += Number(m.quantidade) * Number(m.valorUnitario ?? 0);
+      existing.quantidade += qtd;
+      existing.valor += qtd * Number(m.valorUnitario ?? 0);
       byMaterial.set(m.materialId, existing);
     }
     return Array.from(byMaterial.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
