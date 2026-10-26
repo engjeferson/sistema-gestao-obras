@@ -28,7 +28,7 @@ export default async function EstoqueApropriacaoPage({
       />
 
       {workId ? (
-        <AppropriationView nodes={nodes} />
+        <AppropriationView nodes={nodes} workId={workId} />
       ) : (
         <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           Selecione uma obra pra ver a apropriação de material.

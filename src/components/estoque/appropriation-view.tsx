@@ -1,10 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Wallet, HardHat } from "lucide-react";
+import { Wallet, HardHat, FileDown } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AppropriationFilters, type AppropriationViewMode } from "@/components/estoque/appropriation-filters";
 import { AppropriationTree } from "@/components/estoque/appropriation-tree";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import type { AppropriationNode } from "@/server/actions/estoque";
 
@@ -22,7 +29,7 @@ function collectMateriais(nodes: AppropriationNode[]): { id: string; nome: strin
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
-export function AppropriationView({ nodes }: { nodes: AppropriationNode[] }) {
+export function AppropriationView({ nodes, workId }: { nodes: AppropriationNode[]; workId: string }) {
   const [search, setSearch] = useState("");
   const [materialId, setMaterialId] = useState("");
   const [viewMode, setViewMode] = useState<AppropriationViewMode>("arvore");
@@ -33,9 +40,44 @@ export function AppropriationView({ nodes }: { nodes: AppropriationNode[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <KpiCard icon={Wallet} label="Valor total em material apropriado" value={formatCurrencyBRL(valorTotal)} />
-        <KpiCard icon={HardHat} label="Valor total em mão de obra" value={formatCurrencyBRL(maoDeObraTotal)} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="grid flex-1 gap-4 sm:grid-cols-2">
+          <KpiCard icon={Wallet} label="Valor total em material apropriado" value={formatCurrencyBRL(valorTotal)} />
+          <KpiCard icon={HardHat} label="Valor total em mão de obra" value={formatCurrencyBRL(maoDeObraTotal)} />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="outline" size="sm">
+                <FileDown /> Relatório PDF
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              render={
+                <a
+                  href={`/api/estoque/apropriacao/pdf?workId=${workId}&modo=resumo`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              }
+            >
+              Resumo (materiais finais)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              render={
+                <a
+                  href={`/api/estoque/apropriacao/pdf?workId=${workId}&modo=completo`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              }
+            >
+              Completo (por etapa e atividade)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <AppropriationFilters
         materials={materials}
