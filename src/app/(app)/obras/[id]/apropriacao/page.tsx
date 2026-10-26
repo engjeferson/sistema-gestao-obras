@@ -5,5 +5,5 @@ export default async function ObraApropriacaoPage({ params }: { params: Promise<
   const { id } = await params;
   const nodes = await getStockAppropriationTree(id);
 
-  return <AppropriationView nodes={nodes} />;
+  return <AppropriationView nodes={nodes} workId={id} />;
 }
