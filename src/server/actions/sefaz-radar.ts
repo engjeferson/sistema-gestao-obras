@@ -153,9 +153,20 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
           resumo = parseProcNFeSummary(doc.xml);
           xmlCompleto = doc.xml;
         } else {
+          // Visibilidade do que a SEFAZ manda além de NF-e (eventos, cancelamentos etc.) — sem
+          // isso não dá pra distinguir "não é nota mesmo" de "schema novo que não reconhecemos".
+          console.log(`[sefaz-radar] doc NSU=${doc.nsu} ignorado: schema não reconhecido "${doc.schema}"`);
           continue;
         }
-        if (!resumo) continue;
+        if (!resumo) {
+          // Documento batia o schema esperado (resNFe/procNFe) mas não achamos a chave de acesso
+          // no XML — provável mudança de formato (ex: namespace diferente) que a extração por
+          // regex não cobre. Loga o começo do XML pra diagnosticar sem precisar reproduzir.
+          console.log(
+            `[sefaz-radar] doc NSU=${doc.nsu} schema="${doc.schema}" falhou ao extrair chNFe — início do XML: ${doc.xml.slice(0, 500)}`,
+          );
+          continue;
+        }
 
         await prisma.incomingNFe.upsert({
           where: { chaveAcesso: resumo.chaveAcesso },
