@@ -67,6 +67,7 @@ export function PreLancamentoForm({
   rawInput?: string;
 }) {
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [tipo, setTipo] = useState<string>(defaultValues?.tipo ?? "PAGAR");
   const [selectedWorkId, setSelectedWorkId] = useState(defaultValues?.workId ?? "");
   const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const [attachments, setAttachments] = useState<ContractAttachmentValue[]>(defaultValues?.attachments ?? []);
@@ -161,7 +162,7 @@ export function PreLancamentoForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="tipo">Tipo</Label>
-          <NativeSelect id="tipo" name="tipo" defaultValue={defaultValues?.tipo ?? "PAGAR"}>
+          <NativeSelect id="tipo" name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             {Object.entries(TRANSACTION_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -197,7 +198,7 @@ export function PreLancamentoForm({
           <p className="text-xs text-muted-foreground">Precisa estar preenchida pra poder aprovar.</p>
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="favorecidoNome">Fornecedor / Cliente</Label>
+          <Label htmlFor="favorecidoNome">{tipo === "RECEBER" ? "Cliente" : "Fornecedor"}</Label>
           <Input
             id="favorecidoNome"
             name="favorecidoNome"

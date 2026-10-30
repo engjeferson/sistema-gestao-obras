@@ -65,6 +65,7 @@ export function TransactionForm({
   const [parcelar, setParcelar] = useState(false);
   const [numeroParcelas, setNumeroParcelas] = useState(2);
   const [valor, setValor] = useState<number>(defaultValues?.valor ?? 0);
+  const [tipo, setTipo] = useState<string>(defaultValues?.tipo ?? "PAGAR");
   const [selectedWorkId, setSelectedWorkId] = useState(defaultValues?.workId ?? defaultWorkId ?? "");
   const [selectedStageId, setSelectedStageId] = useState(defaultValues?.stageId ?? "");
   const [formaPagamento, setFormaPagamento] = useState<string>(defaultValues?.formaPagamento ?? "");
@@ -172,7 +173,7 @@ export function TransactionForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="tipo">Tipo</Label>
-          <NativeSelect id="tipo" name="tipo" defaultValue={defaultValues?.tipo ?? "PAGAR"}>
+          <NativeSelect id="tipo" name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             {Object.entries(TRANSACTION_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -198,7 +199,7 @@ export function TransactionForm({
           </NativeSelect>
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="favorecidoNome">Fornecedor / Cliente</Label>
+          <Label htmlFor="favorecidoNome">{tipo === "RECEBER" ? "Cliente" : "Fornecedor"}</Label>
           <Input
             id="favorecidoNome"
             name="favorecidoNome"
