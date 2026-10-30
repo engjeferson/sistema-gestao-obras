@@ -160,7 +160,7 @@ async function healOverdueTransactions(filters?: TransactionFilters) {
   }
 }
 
-export async function listTransactions(filters?: TransactionFilters, page = 1) {
+export async function listTransactions(filters?: TransactionFilters, page = 1, pageSize = PAGE_SIZE) {
   await healOverdueTransactions(filters);
 
   const where = await buildTransactionWhere(filters);
@@ -178,8 +178,8 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
         },
       },
       orderBy: { dataVencimento: "asc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.financialTransaction.count({ where }),
   ]);
@@ -200,7 +200,7 @@ export async function listTransactions(filters?: TransactionFilters, page = 1) {
       : null,
   }));
 
-  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), page };
+  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)), page, pageSize };
 }
 
 export async function getTransactionsSummary(filters?: TransactionFilters) {

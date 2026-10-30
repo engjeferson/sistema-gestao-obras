@@ -36,10 +36,12 @@ export default async function FinanceiroPage({
     dataPagamentoInicio?: string;
     dataPagamentoFim?: string;
     page?: string;
+    pageSize?: string;
   }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
+  const pageSize = Number(params.pageSize) > 0 ? Number(params.pageSize) : 20;
   const requestedFilters = {
     workId: params.workId || undefined,
     stageId: params.stageId || undefined,
@@ -94,7 +96,7 @@ export default async function FinanceiroPage({
   }
 
   const [result, summary, work, preLancamentosCounts] = await Promise.all([
-    listTransactions(filters, page),
+    listTransactions(filters, page, pageSize),
     getTransactionsSummary(filters),
     filters.workId ? getWork(filters.workId) : Promise.resolve(null),
     countPreLancamentosByStatus(),
@@ -165,7 +167,9 @@ export default async function FinanceiroPage({
           transactions={result.items}
           canEdit={canEdit}
           selectable
-          pagination={<PaginationControls page={result.page} totalPages={result.totalPages} />}
+          pagination={
+            <PaginationControls page={result.page} totalPages={result.totalPages} pageSize={result.pageSize} />
+          }
           footerTotals={{
             totalAPagar: summary.totalAPagar,
             totalPagas: summary.totalPagas,
