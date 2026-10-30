@@ -190,7 +190,6 @@ export function ContractsTable({
               <div className="flex items-center gap-1">
                 {canEdit ? (
                   <Button
-                    variant="outline"
                     size="sm"
                     render={<Link href={`/obras/${workId}/contratos/${contract.id}/medicoes/nova`} />}
                     nativeButton={false}
