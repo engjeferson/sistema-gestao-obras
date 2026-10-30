@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, FileText, ChevronRight, GripVertical } from "lucide-react";
+import { Trash2, FileText, ChevronRight, GripVertical, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -188,6 +188,15 @@ export function ContractsTable({
                 </Link>
               </div>
               <div className="flex items-center gap-1">
+                {canEdit ? (
+                  <Button
+                    size="sm"
+                    render={<Link href={`/obras/${workId}/contratos/${contract.id}/medicoes/nova`} />}
+                    nativeButton={false}
+                  >
+                    <Plus /> Lançar medição
+                  </Button>
+                ) : null}
                 {contract.attachments.length === 1 ? (
                   <Button
                     variant="ghost"
