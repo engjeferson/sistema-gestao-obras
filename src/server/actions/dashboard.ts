@@ -162,8 +162,13 @@ export async function getCompanyOverview() {
   const custoTotalOrcado = valid.reduce((sum, w) => sum + w.orcado, 0);
   const custoRealizado = valid.reduce((sum, w) => sum + w.realizado, 0);
   const contasAPagarTotal = valid.reduce((sum, w) => sum + w.aPagar, 0);
-  const margemMediaProjetada =
-    valid.length > 0 ? valid.reduce((sum, w) => sum + w.margemProjetada, 0) / valid.length : 0;
+  // Ponderada pelo valor do contrato (lucro projetado total / contrato total), não a média
+  // simples das porcentagens — senão uma obra com contrato de placeholder (ex: R$1, cadastro
+  // ainda incompleto) pesa igual a uma de R$400 mil e distorce a média pra qualquer lado.
+  const obrasComContrato = valid.filter((w) => w.contrato > 0);
+  const contratoTotalParaMargem = obrasComContrato.reduce((sum, w) => sum + w.contrato, 0);
+  const lucroProjetadoTotal = obrasComContrato.reduce((sum, w) => sum + (w.contrato - w.custoFinalEstimado), 0);
+  const margemMediaProjetada = contratoTotalParaMargem > 0 ? (lucroProjetadoTotal / contratoTotalParaMargem) * 100 : 0;
 
   const obrasRows = valid.map((w) => ({
     id: w.work.id,
