@@ -193,11 +193,11 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
               <TableCell className="whitespace-nowrap">
                 {row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className={row.invoiceLink ? "text-success" : "text-muted-foreground"}>
                 {row.invoiceLink ? (
                   <span
                     title={row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL}
-                    className="block max-w-[160px] truncate"
+                    className="block max-w-[160px] truncate font-medium"
                   >
                     {row.invoiceLink.workLabel ?? OE_FALLBACK_LABEL}
                   </span>
