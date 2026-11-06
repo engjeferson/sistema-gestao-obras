@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { buildKey, presignPut } from "@/lib/r2";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { canAccessWork } from "@/lib/work-access";
 
 const ALLOWED_CATEGORIES = [
   "rdo-fotos",
@@ -31,6 +33,13 @@ export async function POST(request: Request) {
 
   if (!ALLOWED_CATEGORIES.includes(category) || !entityId || !filename || !contentType) {
     return NextResponse.json({ error: "Parâmetros inválidos." }, { status: 400 });
+  }
+
+  if (workId) {
+    const workAccess = await getCurrentWorkAccess();
+    if (!canAccessWork(workAccess, workId)) {
+      return NextResponse.json({ error: "Obra não encontrada." }, { status: 404 });
+    }
   }
 
   const key = buildKey(category, workId, entityId, filename);
