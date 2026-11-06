@@ -115,13 +115,24 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
     }
   }
 
-  await prisma.companySettings.update({
-    where: { id: company.id },
+  // Update condicional (compara o timestamp antigo) em vez de um update cego: se duas chamadas
+  // passarem no check de cooldown quase ao mesmo tempo (ex: duas abas, ou o clique manual
+  // cruzando com o auto-sync da página), só a primeira consegue "reservar" a tentativa — a
+  // segunda recebe count=0 e desiste sem nunca chamar a SEFAZ. Sem isso, as duas podiam disparar
+  // a mesma consulta em paralelo, uma delas levava 656 da SEFAZ e a outra tinha seu avanço de
+  // cursor sobrescrito pela resposta de erro da primeira — avançando o NSU sem as notas terem
+  // sido processadas de fato.
+  const reserva = await prisma.companySettings.updateMany({
+    where: { id: company.id, sefazUltimaTentativaEm: company.sefazUltimaTentativaEm },
     data: { sefazUltimaTentativaEm: new Date() },
   });
+  if (reserva.count === 0) {
+    return { status: "skipped", minutosRestantes: SYNC_COOLDOWN_MINUTOS };
+  }
 
   let ultNsu = company.sefazUltimoNsu ?? "0";
   let novos = 0;
+  let teveSucesso = false;
 
   try {
     for (let i = 0; i < MAX_LOTES_POR_SYNC; i++) {
@@ -131,17 +142,20 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
       );
 
       if (retorno.cStat !== "138" && retorno.cStat !== "137") {
-        // A SEFAZ devolve o ultNSU correto mesmo em erro (ex: 656 "Consumo Indevido" avisando
-        // que o ultNSU enviado está desatualizado). Sem salvar isso aqui, o próximo sync repete
-        // o mesmo ultNSU velho e trava num loop de erro permanente, mesmo depois do cooldown.
-        if (retorno.ultNSU && retorno.ultNSU !== ultNsu) {
-          await prisma.companySettings.update({
-            where: { id: company.id },
-            data: { sefazUltimoNsu: retorno.ultNSU },
-          });
+        // 656 "Consumo Indevido" exige usar o ultNSU sugerido na PRÓXIMA solicitação — mas isso
+        // não significa que os documentos até esse ponto já foram de fato entregues. Em vez de
+        // gravar esse valor como se já tivéssemos processado tudo até ali (o que já causou
+        // notas reais ficando "puladas" e nunca mais reconsultadas), só muda o ultNSU em
+        // memória e tenta de novo agora mesmo, dentro desta mesma chamada — o cursor salvo no
+        // banco só avança quando uma resposta de sucesso confirma o que foi realmente recebido.
+        if (retorno.cStat === "656" && retorno.ultNSU && retorno.ultNSU !== ultNsu) {
+          ultNsu = retorno.ultNSU;
+          continue;
         }
         return { status: "error", message: `SEFAZ retornou erro (${retorno.cStat}): ${retorno.xMotivo}` };
       }
+
+      teveSucesso = true;
 
       for (const doc of retorno.docs) {
         let resumo: ResNFeSummary | null = null;
@@ -209,6 +223,13 @@ async function runIncomingNFeSync(): Promise<SyncResult> {
     };
   }
 
+  if (!teveSucesso) {
+    // Esgotou as tentativas de retry do 656 sem nenhuma resposta de sucesso — não é um "ok" com
+    // zero notas novas, é a SEFAZ recusando repetidamente. Reportar como erro em vez de sucesso
+    // evita mascarar isso pro usuário.
+    return { status: "error", message: "SEFAZ recusou a consulta repetidamente (Consumo Indevido). Tente novamente mais tarde." };
+  }
+
   console.log(`[sefaz-radar] sync concluído: novos=${novos} ultNsuFinal=${ultNsu}`);
 
   await completarPendentes(company.cnpj, company.uf);
@@ -255,6 +276,14 @@ export async function autoSyncIncomingNFesIfDue(): Promise<boolean> {
   if (!session?.user) return false;
   const result = await runIncomingNFeSync();
   return result.status === "ok" && result.novos > 0;
+}
+
+/**
+ * Chamada pelo cron job (ver /api/cron/sefaz-radar) — sem sessão de usuário, roda sozinha em
+ * segundo plano pra lista ficar em dia mesmo em dias que ninguém abre a tela do Radar.
+ */
+export async function cronSyncIncomingNFes(): Promise<SyncResult> {
+  return runIncomingNFeSync();
 }
 
 export async function ignoreIncomingNFe(id: string) {
