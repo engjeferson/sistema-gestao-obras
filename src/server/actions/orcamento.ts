@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import {
   sumBudgetItems,
   computeMargemPrevista,
@@ -346,6 +347,7 @@ export async function createBudgetItem(_prevState: string | undefined, formData:
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
 
   const valorTotalPrevisto =
     data.quantidadePrevista !== undefined && data.valorUnitarioPrevisto !== undefined
@@ -375,6 +377,12 @@ export async function createBudgetItem(_prevState: string | undefined, formData:
 export async function deleteBudgetItem(itemId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const item = await prisma.budgetItem.findUnique({ where: { id: itemId }, select: { workId: true } });
+  if (!item) {
+    throw new Error("Item de orçamento não encontrado.");
+  }
+  assertWorkAccess(await getCurrentWorkAccess(), item.workId);
 
   await prisma.budgetItem.delete({ where: { id: itemId } });
   revalidatePath(`/obras/${workId}/orcamento`);

@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, ForbiddenError } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { transactionFormSchema } from "@/lib/validations/financeiro";
 import { getCurrentWorkAccess, getCurrentModulePermissions } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
@@ -235,6 +235,11 @@ export async function batchMarkAsPago(transactionIds: string[], formaPagamento?:
     select: { workId: true },
   });
 
+  const workAccess = await getCurrentWorkAccess();
+  for (const t of transactions) {
+    if (t.workId) assertWorkAccess(workAccess, t.workId);
+  }
+
   await prisma.financialTransaction.updateMany({
     where: { id: { in: transactionIds } },
     data: { status: "PAGO", dataPagamento: new Date(), formaPagamento },
@@ -365,6 +370,9 @@ export async function createTransaction(_prevState: string | undefined, formData
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  if (data.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  }
   const { supplierId, clientId } = await resolveFavorecidoIds(data.tipo, data.favorecidoNome);
   const dataVencimentoCalculada = await calcularVencimentoCartao(
     data.formaPagamento,
@@ -450,11 +458,22 @@ export async function updateTransaction(
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
+  const existing = await prisma.financialTransaction.findUnique({
+    where: { id: transactionId },
+    select: { workId: true },
+  });
+  if (!existing) {
+    return "Lançamento não encontrado.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  if (existing.workId) assertWorkAccess(workAccess, existing.workId);
+
   const parsed = parseTransactionForm(formData);
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  if (data.workId) assertWorkAccess(workAccess, data.workId);
   const { supplierId, clientId } = await resolveFavorecidoIds(data.tipo, data.favorecidoNome);
 
   await prisma.financialTransaction.update({
@@ -493,6 +512,17 @@ export async function markAsPago(transactionId: string, workId: string | null, f
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
+  const transaction = await prisma.financialTransaction.findUnique({
+    where: { id: transactionId },
+    select: { workId: true },
+  });
+  if (!transaction) {
+    throw new Error("Lançamento não encontrado.");
+  }
+  if (transaction.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
+  }
+
   await prisma.financialTransaction.update({
     where: { id: transactionId },
     data: {
@@ -514,6 +544,17 @@ export async function undoPayment(transactionId: string, workId: string | null) 
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
+
+  const transaction = await prisma.financialTransaction.findUnique({
+    where: { id: transactionId },
+    select: { workId: true },
+  });
+  if (!transaction) {
+    throw new Error("Lançamento não encontrado.");
+  }
+  if (transaction.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
+  }
 
   await prisma.financialTransaction.update({
     where: { id: transactionId },
@@ -544,6 +585,9 @@ export async function partialPayTransaction(
   const original = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) {
     throw new Error("Lançamento não encontrado.");
+  }
+  if (original.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), original.workId);
   }
   if (original.status === "PAGO") {
     throw new Error("Esta conta já está paga.");
@@ -614,7 +658,13 @@ export async function deleteTransaction(transactionId: string, workId: string | 
   await assertCanEditFinanceiro(session);
 
   const transaction = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
-  if (transaction?.invoiceId) {
+  if (!transaction) {
+    throw new Error("Lançamento não encontrado.");
+  }
+  if (transaction.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
+  }
+  if (transaction.invoiceId) {
     throw new Error("Esta conta está vinculada a uma nota fiscal. Remova o vínculo antes de excluir.");
   }
 

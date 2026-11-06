@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
-import { assertModuleWrite } from "@/server/actions/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { createTemplateSchema, applyTemplateSchema, saveAsTemplateSchema } from "@/lib/validations/planejamento-templates";
 
 export async function listPlanningTemplates() {
@@ -276,6 +276,7 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
 
   const stages = await prisma.planningStage.findMany({
     where: { workId: data.workId },
@@ -370,6 +371,7 @@ export async function applyPlanningTemplate(_prevState: string | undefined, form
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
 
   const template = await prisma.planningTemplate.findUnique({
     where: { id: data.templateId },

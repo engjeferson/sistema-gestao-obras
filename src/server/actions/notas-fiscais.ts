@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
 import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
 import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
@@ -133,6 +133,9 @@ export async function createInvoice(_prevState: string | undefined, formData: Fo
     return result.error;
   }
   const data = result.data;
+  if (data.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  }
 
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
   const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
@@ -198,11 +201,19 @@ export async function updateInvoice(invoiceId: string, _prevState: string | unde
     return editability.reason;
   }
 
+  const existingInvoice = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { workId: true } });
+  if (!existingInvoice) {
+    return "Nota fiscal não encontrada.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  if (existingInvoice.workId) assertWorkAccess(workAccess, existingInvoice.workId);
+
   const result = parseInvoiceForm(formData);
   if ("error" in result) {
     return result.error;
   }
   const data = result.data;
+  if (data.workId) assertWorkAccess(workAccess, data.workId);
 
   const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
   const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
@@ -239,6 +250,12 @@ export async function deleteInvoice(invoiceId: string, workId: string | null) {
     where: { id: invoiceId },
     include: { financialTransactions: true },
   });
+  if (!invoice) {
+    throw new Error("Nota fiscal não encontrada.");
+  }
+  if (invoice.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), invoice.workId);
+  }
 
   if (invoice?.financialTransactions.some((t) => t.status === "PAGO")) {
     throw new Error("A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de excluir.");

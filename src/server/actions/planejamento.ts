@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
-import { assertModuleWrite } from "@/server/actions/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
 import { computeCriticalPath } from "@/lib/critical-path";
 import { addWorkingDays, countWorkingDays, toDateOnlyString, type WorkCalendar } from "@/lib/schedule-dates";
@@ -117,6 +117,7 @@ export async function setPlanningBaseline(workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const tasks = await prisma.planningTask.findMany({
     where: { workId },
@@ -272,6 +273,7 @@ export async function addPlanningDependencyByCode(
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const roots = await listStagesWithTasks(workId);
   const predecessor = findEntityByCode(roots, predecessorCode.trim());
@@ -336,6 +338,7 @@ export async function removeGroupedDependency(
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const roots = await listStagesWithTasks(workId);
   const predecessorTaskIds = predecessorTaskId
@@ -554,6 +557,7 @@ export async function createStage(_prevState: string | undefined, formData: Form
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
   const parentId = data.parentId ?? null;
 
   const ordem = parentId ? await nextChildOrdem(prisma, data.workId, parentId) : await nextStageOrdem(prisma, data.workId, null);
@@ -565,10 +569,27 @@ export async function createStage(_prevState: string | undefined, formData: Form
   return undefined;
 }
 
+async function assertStageAccess(stageId: string) {
+  const stage = await prisma.planningStage.findUnique({ where: { id: stageId }, select: { workId: true } });
+  if (!stage) {
+    throw new Error("Etapa não encontrada.");
+  }
+  assertWorkAccess(await getCurrentWorkAccess(), stage.workId);
+}
+
+async function assertTaskAccess(taskId: string) {
+  const task = await prisma.planningTask.findUnique({ where: { id: taskId }, select: { workId: true } });
+  if (!task) {
+    throw new Error("Atividade não encontrada.");
+  }
+  assertWorkAccess(await getCurrentWorkAccess(), task.workId);
+}
+
 export async function updateStageName(stageId: string, workId: string, nome: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertStageAccess(stageId);
 
   const trimmed = nome.trim();
   if (!trimmed) return;
@@ -585,6 +606,7 @@ export async function updateStageDates(stageId: string, workId: string, start: s
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertStageAccess(stageId);
 
   await prisma.planningStage.update({
     where: { id: stageId },
@@ -603,6 +625,7 @@ export async function updateStageProgress(stageId: string, workId: string, perce
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertStageAccess(stageId);
 
   const clamped = Math.min(100, Math.max(0, percentual));
   await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
@@ -619,6 +642,7 @@ export async function clearStagePredecessorRef(stageId: string, workId: string) 
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertStageAccess(stageId);
 
   await prisma.planningStage.update({ where: { id: stageId }, data: { predecessorRef: null } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -628,6 +652,7 @@ export async function deleteStage(stageId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertStageAccess(stageId);
 
   await prisma.planningStage.delete({ where: { id: stageId } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -646,6 +671,7 @@ export async function reorderChildren(
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   await prisma.$transaction(
     orderedItems.map((item, index) =>
@@ -666,6 +692,8 @@ export async function moveTaskToStage(taskId: string, workId: string, newStageId
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertTaskAccess(taskId);
+  await assertStageAccess(newStageId);
 
   const ordem = await nextChildOrdem(prisma, workId, newStageId);
   await prisma.planningTask.update({
@@ -692,6 +720,7 @@ export async function createTask(_prevState: string | undefined, formData: FormD
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
 
   const ordem = await nextChildOrdem(prisma, data.workId, data.stageId);
   await prisma.planningTask.create({
@@ -719,6 +748,7 @@ export async function updateTaskPeso(taskId: string, workId: string, peso: numbe
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertTaskAccess(taskId);
 
   const clamped = Math.max(0, peso);
   await prisma.planningTask.update({ where: { id: taskId }, data: { peso: clamped } });
@@ -730,6 +760,7 @@ export async function updateTaskName(taskId: string, workId: string, nome: strin
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertTaskAccess(taskId);
 
   const trimmed = nome.trim();
   if (!trimmed) return;
@@ -742,6 +773,7 @@ export async function deleteTask(taskId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertTaskAccess(taskId);
 
   await prisma.planningTask.delete({ where: { id: taskId } });
   revalidatePath(`/obras/${workId}/planejamento`);
@@ -751,6 +783,7 @@ export async function updatePlanningTaskDates(taskId: string, workId: string, st
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("planejamentoSomenteLeitura");
+  await assertTaskAccess(taskId);
 
   await prisma.$transaction(async (tx) => {
     await tx.planningTask.update({
@@ -780,6 +813,7 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
 
   const etapaRows = data.rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = data.rows.filter((r) => r.tipo === "ATIVIDADE");

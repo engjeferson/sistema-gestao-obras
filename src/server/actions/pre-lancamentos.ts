@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
-import { assertRole, ForbiddenError } from "@/lib/permissions";
-import { getCurrentModulePermissions } from "@/server/actions/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
+import { getCurrentModulePermissions, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { preLancamentoFormSchema } from "@/lib/validations/pre-lancamentos";
 import { extractPreLancamento } from "@/lib/ai/pre-lancamento-extraction";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
@@ -177,6 +177,9 @@ export async function createPreLancamento(_prevState: string | undefined, formDa
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  if (data.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  }
   const attachments = parseAttachments(formData);
   const origem = formData.get("origem") === "IA" ? "IA" : "MANUAL";
   const rawInput = (formData.get("rawInput") as string) || null;
@@ -220,11 +223,19 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
+  const existing = await prisma.preLancamento.findUnique({ where: { id }, select: { workId: true } });
+  if (!existing) {
+    return "Pré-lançamento não encontrado.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  if (existing.workId) assertWorkAccess(workAccess, existing.workId);
+
   const parsed = parsePreLancamentoForm(formData);
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  if (data.workId) assertWorkAccess(workAccess, data.workId);
   const attachments = parseAttachments(formData);
   const itens = data.itens && data.itens.length > 0 ? data.itens : null;
   const valorFrete = itens ? (data.valorFrete ?? 0) : null;
@@ -259,10 +270,21 @@ export async function updatePreLancamento(id: string, _prevState: string | undef
   redirect("/financeiro/pre-lancamentos");
 }
 
+async function assertPreLancamentoAccess(id: string) {
+  const preLancamento = await prisma.preLancamento.findUnique({ where: { id }, select: { workId: true } });
+  if (!preLancamento) {
+    throw new Error("Pré-lançamento não encontrado.");
+  }
+  if (preLancamento.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
+  }
+}
+
 export async function deletePreLancamento(id: string) {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
+  await assertPreLancamentoAccess(id);
 
   await prisma.preLancamento.delete({ where: { id } });
   revalidatePath("/financeiro/pre-lancamentos");
@@ -272,6 +294,7 @@ export async function rejectPreLancamento(id: string, motivo?: string) {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
+  await assertPreLancamentoAccess(id);
 
   await prisma.preLancamento.update({
     where: { id },
@@ -284,6 +307,7 @@ export async function reopenPreLancamento(id: string) {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
+  await assertPreLancamentoAccess(id);
 
   await prisma.preLancamento.update({ where: { id }, data: { status: "PENDENTE", motivoRecusa: null } });
   revalidatePath("/financeiro/pre-lancamentos");
@@ -299,6 +323,9 @@ export async function approvePreLancamento(id: string) {
   const preLancamento = await prisma.preLancamento.findUnique({ where: { id }, include: { attachments: true } });
   if (!preLancamento) {
     throw new Error("Pré-lançamento não encontrado.");
+  }
+  if (preLancamento.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
   }
   if (preLancamento.status === "FINALIZADO") {
     throw new Error("Este pré-lançamento já foi finalizado.");
@@ -414,6 +441,9 @@ export async function revertPreLancamentoApproval(id: string) {
   const preLancamento = await prisma.preLancamento.findUnique({ where: { id } });
   if (!preLancamento) {
     throw new Error("Pré-lançamento não encontrado.");
+  }
+  if (preLancamento.workId) {
+    assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
   }
   if (preLancamento.status !== "FINALIZADO") {
     throw new Error("Este pré-lançamento não está finalizado.");

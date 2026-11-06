@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
@@ -86,6 +86,7 @@ export async function createWork(_prevState: string | undefined, formData: FormD
 export async function updateWork(workId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const parsed = parseWorkForm(formData);
   if (!parsed.success) {
@@ -127,6 +128,7 @@ export async function updateWork(workId: string, _prevState: string | undefined,
 export async function updateWorkStatus(workId: string, status: WorkStatus) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   await prisma.work.update({ where: { id: workId }, data: { status } });
   revalidatePath("/obras");

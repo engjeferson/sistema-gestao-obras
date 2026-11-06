@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 
 export async function toggleWorkingWeekday(workId: string, weekday: number, value: boolean) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const work = await prisma.work.findUniqueOrThrow({ where: { id: workId }, select: { workingWeekdays: true } });
   const next = value
@@ -28,6 +30,7 @@ export async function addWorkHoliday(_prevState: string | undefined, formData: F
   const descricao = String(formData.get("descricao") ?? "").trim() || null;
 
   if (!workId || !data) return "Informe a data.";
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   try {
     await prisma.workHoliday.create({ data: { workId, data: new Date(data), descricao } });
@@ -43,6 +46,12 @@ export async function addWorkHoliday(_prevState: string | undefined, formData: F
 export async function removeWorkHoliday(holidayId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+
+  const holiday = await prisma.workHoliday.findUnique({ where: { id: holidayId }, select: { workId: true } });
+  if (!holiday) {
+    throw new Error("Feriado não encontrado.");
+  }
+  assertWorkAccess(await getCurrentWorkAccess(), holiday.workId);
 
   await prisma.workHoliday.delete({ where: { id: holidayId } });
   revalidatePath(`/obras/${workId}/calendario`);
