@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { getRdo } from "@/server/actions/rdo";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
+import { canAccessWork } from "@/lib/work-access";
 import { getObjectBase64 } from "@/lib/r2";
 import { RdoPdfDocument } from "@/server/services/pdf/rdo-pdf";
 
@@ -27,9 +30,19 @@ async function getDefaultLogoBase64(origin: string): Promise<string | null> {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const { id } = await params;
   const rdo = await getRdo(id);
   if (!rdo) {
+    return NextResponse.json({ error: "RDO não encontrado." }, { status: 404 });
+  }
+
+  const workAccess = await getCurrentWorkAccess();
+  if (!canAccessWork(workAccess, rdo.workId)) {
     return NextResponse.json({ error: "RDO não encontrado." }, { status: 404 });
   }
 
