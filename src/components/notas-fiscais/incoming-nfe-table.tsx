@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ignoreIncomingNFe, restoreIncomingNFe, manifestarIncomingNFe } from "@/server/actions/sefaz-radar";
 import { TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao-tipos";
 import { formatCurrencyBRL, formatDateBR } from "@/lib/status-labels";
+import { formatDocumento } from "@/lib/masks";
 
 type IncomingNFeRow = {
   id: string;
@@ -153,10 +154,9 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Status</TableHead>
+            <TableHead>Série / Nº NF</TableHead>
+            <TableHead>Emissão</TableHead>
             <TableHead>Emitente</TableHead>
-            <TableHead>NF / Série</TableHead>
-            <TableHead>Data</TableHead>
             <TableHead>Valor</TableHead>
             <TableHead>OE</TableHead>
             <TableHead>PDF</TableHead>
@@ -167,11 +167,22 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
           {items.map((row) => (
             <TableRow key={row.id}>
               <TableCell>
-                <Badge variant={STATUS_BADGE[row.status]}>{STATUS_LABELS[row.status]}</Badge>
+                <span className="font-medium">
+                  {row.serie ?? "—"} / {row.numero ?? "—"}
+                </span>
+                <Badge variant={STATUS_BADGE[row.status]} className="mt-1 block w-fit">
+                  {STATUS_LABELS[row.status]}
+                </Badge>
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"}
               </TableCell>
               <TableCell className="font-medium">
-                <span title={row.emitenteNome ?? undefined} className="block max-w-[180px] truncate">
+                <span title={row.emitenteNome ?? undefined} className="block max-w-[200px] truncate">
                   {row.emitenteNome ?? "—"}
+                </span>
+                <span className="block text-xs font-normal text-muted-foreground">
+                  {row.emitenteCnpj ? formatDocumento(row.emitenteCnpj) : "—"}
                 </span>
                 {!row.xmlCompleto && !row.manifestadoEm && row.manifestacaoErro ? (
                   <p className="mt-0.5 max-w-56 truncate text-xs font-normal text-destructive" title={row.manifestacaoErro}>
@@ -179,11 +190,9 @@ export function IncomingNFeTable({ items }: { items: IncomingNFeRow[] }) {
                   </p>
                 ) : null}
               </TableCell>
-              <TableCell>
-                {row.numero ?? "—"} / {row.serie ?? "—"}
+              <TableCell className="whitespace-nowrap">
+                {row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}
               </TableCell>
-              <TableCell>{row.dataEmissao ? formatDateBR(row.dataEmissao) : "—"}</TableCell>
-              <TableCell>{row.valorTotal !== null ? formatCurrencyBRL(row.valorTotal) : "—"}</TableCell>
               <TableCell className="text-muted-foreground">
                 {row.invoiceLink ? (
                   <span
