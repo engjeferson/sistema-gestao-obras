@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
-import { assertModuleWrite } from "@/server/actions/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
 import { findOrCreateSupplierId } from "@/server/services/suppliers";
@@ -116,6 +116,7 @@ export async function createContract(_prevState: string | undefined, formData: F
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
   const attachments = parseAttachments(formData);
   const [parties, contratosCount] = await Promise.all([
     resolveContractParties(data),
@@ -145,6 +146,7 @@ export async function reorderContracts(workId: string, orderedIds: string[]) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("contratosSomenteLeitura");
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   await prisma.$transaction(
     orderedIds.map((id, index) => prisma.contract.updateMany({ where: { id, workId }, data: { ordem: index } })),
@@ -158,11 +160,19 @@ export async function updateContract(contractId: string, _prevState: string | un
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("contratosSomenteLeitura");
 
+  const existingContract = await prisma.contract.findUnique({ where: { id: contractId }, select: { workId: true } });
+  if (!existingContract) {
+    return "Contrato não encontrado.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  assertWorkAccess(workAccess, existingContract.workId);
+
   const parsed = parseContractForm(formData);
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(workAccess, data.workId);
   const attachments = parseAttachments(formData);
   const parties = await resolveContractParties(data);
 
@@ -222,11 +232,15 @@ export async function createMeasurement(_prevState: string | undefined, formData
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
   const attachments = parseAttachments(formData);
 
   const contract = await prisma.contract.findUnique({ where: { id: data.contractId } });
   if (!contract) {
     return "Contrato não encontrado.";
+  }
+  if (contract.workId !== data.workId) {
+    return "Contrato não pertence a esta obra.";
   }
 
   const favorecidoNome = contract.direcao === "PAGAR" ? contract.contratado : contract.contratante;
@@ -297,20 +311,23 @@ export async function updateMeasurement(
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
   await assertModuleWrite("contratosSomenteLeitura");
 
+  const measurement = await prisma.contractMeasurement.findUnique({
+    where: { id: measurementId },
+    include: { financialTransaction: true, contract: { select: { workId: true } } },
+  });
+  if (!measurement) {
+    return "Medição não encontrada.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  assertWorkAccess(workAccess, measurement.contract.workId);
+
   const parsed = parseMeasurementForm(formData);
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(workAccess, data.workId);
   const attachments = parseAttachments(formData);
-
-  const measurement = await prisma.contractMeasurement.findUnique({
-    where: { id: measurementId },
-    include: { financialTransaction: true },
-  });
-  if (!measurement) {
-    return "Medição não encontrada.";
-  }
 
   await prisma.$transaction(async (tx) => {
     await tx.contractMeasurement.update({
@@ -394,6 +411,11 @@ export async function createContractAddendum(_prevState: string | undefined, for
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  const contract = await prisma.contract.findUnique({ where: { id: data.contractId }, select: { workId: true } });
+  if (!contract || contract.workId !== data.workId) {
+    return "Contrato não encontrado.";
+  }
 
   await prisma.contractAddendum.create({
     data: {

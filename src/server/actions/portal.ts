@@ -4,7 +4,8 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
 import { collectLeafPercentages, computeWeightedAvanco } from "@/lib/planning";
 
@@ -220,6 +221,7 @@ export async function getPortalGallery(token: string) {
 export async function regeneratePortalToken(workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  assertWorkAccess(await getCurrentWorkAccess(), workId);
 
   const newToken = randomUUID().replace(/-/g, "");
   await prisma.work.update({ where: { id: workId }, data: { portalToken: newToken } });

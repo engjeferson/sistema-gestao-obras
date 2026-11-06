@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
-import { assertModuleWrite } from "@/server/actions/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
 import { createRdoWithSync, updateRdoWithSync, deleteRdoWithSync } from "@/server/services/rdo-sync";
 import { listStagesWithTasks, type StageTreeNode } from "@/server/actions/planejamento";
@@ -96,6 +96,7 @@ export async function createRdo(basePath: string, _prevState: string | undefined
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
+  assertWorkAccess(await getCurrentWorkAccess(), parsed.data.workId);
 
   const rdo = await createRdoWithSync(parsed.data, session.user.id);
 
@@ -118,6 +119,13 @@ export async function updateRdo(basePath: string, rdoId: string, _prevState: str
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
   await assertModuleWrite("rdoSomenteLeitura");
 
+  const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
+  if (!existing) {
+    return "RDO não encontrado.";
+  }
+  const workAccess = await getCurrentWorkAccess();
+  assertWorkAccess(workAccess, existing.workId);
+
   const parsed = rdoFormSchema.safeParse({
     workId: formData.get("workId"),
     data: formData.get("data"),
@@ -133,6 +141,7 @@ export async function updateRdo(basePath: string, rdoId: string, _prevState: str
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
+  assertWorkAccess(workAccess, parsed.data.workId);
 
   await updateRdoWithSync(rdoId, parsed.data);
 
@@ -154,6 +163,12 @@ export async function deleteRdo(rdoId: string, workId: string) {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
   await assertModuleWrite("rdoSomenteLeitura");
+
+  const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
+  if (!existing) {
+    throw new Error("RDO não encontrado.");
+  }
+  assertWorkAccess(await getCurrentWorkAccess(), existing.workId);
 
   await deleteRdoWithSync(rdoId);
 

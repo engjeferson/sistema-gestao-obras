@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, assertWorkAccess } from "@/lib/permissions";
 import { computeSaldo, computeSaldoComValor } from "@/lib/stock";
 import { stockEntradaSchema, stockSaidaSchema, stockTransferenciaSchema } from "@/lib/validations/estoque";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
@@ -229,6 +229,9 @@ export async function createStockEntrada(_prevState: string | undefined, formDat
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
+  if (data.destinoWorkId) {
+    assertWorkAccess(await getCurrentWorkAccess(), data.destinoWorkId);
+  }
 
   await prisma.stockMovement.create({
     data: {
@@ -273,6 +276,9 @@ export async function createStockSaida(_prevState: string | undefined, formData:
   }
   const data = parsed.data;
   const origem = data.origemWorkId || null;
+  if (origem) {
+    assertWorkAccess(await getCurrentWorkAccess(), origem);
+  }
 
   for (const item of data.itens) {
     const saldoAtual = await getSaldoAtual(item.materialId, origem);
@@ -332,6 +338,9 @@ export async function createStockTransferencia(_prevState: string | undefined, f
   const destino = data.destinoWorkId || null;
   const stageId = destino ? data.stageId || null : null;
   const taskId = destino ? data.taskId || null : null;
+  const workAccess = await getCurrentWorkAccess();
+  if (origem) assertWorkAccess(workAccess, origem);
+  if (destino) assertWorkAccess(workAccess, destino);
 
   const custosMedios = new Map<string, number>();
   for (const item of data.itens) {
