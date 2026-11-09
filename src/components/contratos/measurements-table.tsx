@@ -32,7 +32,11 @@ function FinalizeButton({ transactionId, workId }: { transactionId: string; work
   function handleClick() {
     startTransition(async () => {
       try {
-        await markAsPago(transactionId, workId);
+        const error = await markAsPago(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pagamento finalizado.");
         router.refresh();
       } catch {

@@ -61,11 +61,15 @@ function ApproveButton({ id }: { id: string }) {
   function handleClick() {
     startTransition(async () => {
       try {
-        await approvePreLancamento(id);
+        const error = await approvePreLancamento(id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pré-lançamento aprovado — lançamento criado no Financeiro.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível aprovar.");
+      } catch {
+        toast.error("Não foi possível aprovar.");
       }
     });
   }
@@ -85,11 +89,15 @@ function RejectButton({ id }: { id: string }) {
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await rejectPreLancamento(id);
+        const error = await rejectPreLancamento(id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pré-lançamento recusado.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível recusar.");
+      } catch {
+        toast.error("Não foi possível recusar.");
       } finally {
         setConfirming(false);
       }
@@ -122,11 +130,15 @@ function ReopenButton({ id }: { id: string }) {
   function handleClick() {
     startTransition(async () => {
       try {
-        await reopenPreLancamento(id);
+        const error = await reopenPreLancamento(id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pré-lançamento reaberto.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível reabrir.");
+      } catch {
+        toast.error("Não foi possível reabrir.");
       }
     });
   }
@@ -146,11 +158,15 @@ function DeleteButton({ id }: { id: string }) {
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deletePreLancamento(id);
+        const error = await deletePreLancamento(id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pré-lançamento excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }
@@ -183,7 +199,11 @@ function MarkPaidButton({ transactionId, workId }: { transactionId: string; work
   function handleClick() {
     startTransition(async () => {
       try {
-        await markAsPago(transactionId, workId);
+        const error = await markAsPago(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Conta marcada como paga.");
         router.refresh();
       } catch {
@@ -206,7 +226,11 @@ function UndoPaymentButton({ transactionId, workId }: { transactionId: string; w
   function handleClick() {
     startTransition(async () => {
       try {
-        await undoPayment(transactionId, workId);
+        const error = await undoPayment(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pagamento desfeito — o lançamento voltou para pendente.");
         router.refresh();
       } catch {
@@ -236,11 +260,15 @@ function RevertApprovalButton({ id }: { id: string }) {
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await revertPreLancamentoApproval(id);
+        const error = await revertPreLancamentoApproval(id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Aprovação revertida — o lançamento voltou para Recusados.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível reverter a aprovação.");
+      } catch {
+        toast.error("Não foi possível reverter a aprovação.");
       } finally {
         setConfirming(false);
       }

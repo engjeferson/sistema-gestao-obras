@@ -43,17 +43,18 @@ export async function addWorkHoliday(_prevState: string | undefined, formData: F
   return undefined;
 }
 
-export async function removeWorkHoliday(holidayId: string, workId: string) {
+export async function removeWorkHoliday(holidayId: string, workId: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
   const holiday = await prisma.workHoliday.findUnique({ where: { id: holidayId }, select: { workId: true } });
   if (!holiday) {
-    throw new Error("Feriado não encontrado.");
+    return "Feriado não encontrado.";
   }
   assertWorkAccess(await getCurrentWorkAccess(), holiday.workId);
 
   await prisma.workHoliday.delete({ where: { id: holidayId } });
   revalidatePath(`/obras/${workId}/calendario`);
   revalidatePath(`/obras/${workId}/planejamento`);
+  return undefined;
 }

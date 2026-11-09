@@ -159,14 +159,14 @@ export async function updateRdo(basePath: string, rdoId: string, _prevState: str
   redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
 }
 
-export async function deleteRdo(rdoId: string, workId: string) {
+export async function deleteRdo(rdoId: string, workId: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
   await assertModuleWrite("rdoSomenteLeitura");
 
   const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
   if (!existing) {
-    throw new Error("RDO não encontrado.");
+    return "RDO não encontrado.";
   }
   assertWorkAccess(await getCurrentWorkAccess(), existing.workId);
 
@@ -179,4 +179,5 @@ export async function deleteRdo(rdoId: string, workId: string) {
   revalidatePath("/obras");
   revalidatePath("/campo/obras");
   revalidatePath("/dashboard");
+  return undefined;
 }

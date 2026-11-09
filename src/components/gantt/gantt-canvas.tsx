@@ -156,9 +156,17 @@ export const GanttCanvas = forwardRef<
 
   function commitTaskDates(taskId: string, start: Date, end: Date) {
     startTransition(async () => {
-      await updatePlanningTaskDates(taskId, workId, toDateInputValue(start), toDateInputValue(end));
-      toast.success("Datas atualizadas.");
-      router.refresh();
+      try {
+        const error = await updatePlanningTaskDates(taskId, workId, toDateInputValue(start), toDateInputValue(end));
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Datas atualizadas.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar as datas.");
+      }
     });
   }
 
@@ -245,11 +253,15 @@ export const GanttCanvas = forwardRef<
 
       startTransition(async () => {
         try {
-          await addPlanningDependencyByCode(workId, active.sourceCode, null, targetRow.task.id);
+          const error = await addPlanningDependencyByCode(workId, active.sourceCode, null, targetRow.task.id);
+          if (error) {
+            toast.error(error);
+            return;
+          }
           toast.success("Predecessora criada.");
           router.refresh();
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Não foi possível criar a dependência.");
+        } catch {
+          toast.error("Não foi possível criar a dependência.");
         }
       });
     }

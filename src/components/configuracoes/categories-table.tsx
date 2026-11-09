@@ -37,8 +37,14 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
 
   function handleRename(category: CategoryRow, nome: string) {
     updateFinancialCategory(category.id, nome)
-      .then(() => router.refresh())
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível renomear."));
+      .then((error) => {
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      })
+      .catch(() => toast.error("Não foi possível renomear."));
   }
 
   return (

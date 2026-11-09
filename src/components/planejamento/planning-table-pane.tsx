@@ -178,10 +178,16 @@ export function PlanningTablePane({
       if (!drag) return;
 
       if (drag.kind === "task" && finalCrossTarget && finalCrossTarget !== drag.originalGroupId) {
-        moveTaskToStage(drag.id, workId, finalCrossTarget).then(() => {
-          toast.success("Atividade movida.");
-          router.refresh();
-        });
+        moveTaskToStage(drag.id, workId, finalCrossTarget)
+          .then((error) => {
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            toast.success("Atividade movida.");
+            router.refresh();
+          })
+          .catch(() => toast.error("Não foi possível mover a atividade."));
         return;
       }
 
@@ -372,8 +378,16 @@ function StageRowView({
 
   function handleRename(nome: string) {
     startTransition(async () => {
-      await updateStageName(stage.id, workId, nome);
-      router.refresh();
+      try {
+        const error = await updateStageName(stage.id, workId, nome);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível renomear a etapa.");
+      }
     });
   }
 
@@ -382,9 +396,17 @@ function StageRowView({
       return;
     }
     startTransition(async () => {
-      await deleteStage(stage.id, workId);
-      toast.success("Etapa removida.");
-      router.refresh();
+      try {
+        const error = await deleteStage(stage.id, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Etapa removida.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível excluir a etapa.");
+      }
     });
   }
 
@@ -494,8 +516,16 @@ function StageDateCells({
   function commit(nextStart: string, nextEnd: string) {
     if (!nextStart || !nextEnd) return;
     startTransition(async () => {
-      await updateStageDates(stage.id, workId, nextStart, nextEnd);
-      router.refresh();
+      try {
+        const error = await updateStageDates(stage.id, workId, nextStart, nextEnd);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar as datas.");
+      }
     });
   }
 
@@ -585,8 +615,16 @@ function StageProgressCells({ stage, workId }: { stage: PlainStage; workId: stri
     const n = Number(value);
     if (!Number.isFinite(n)) return;
     startTransition(async () => {
-      await updateStageProgress(stage.id, workId, n);
-      router.refresh();
+      try {
+        const error = await updateStageProgress(stage.id, workId, n);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar o percentual.");
+      }
     });
   }
 
@@ -652,16 +690,32 @@ function TaskRowView({
 
   function handleRename(nome: string) {
     startTransition(async () => {
-      await updateTaskName(task.id, workId, nome);
-      router.refresh();
+      try {
+        const error = await updateTaskName(task.id, workId, nome);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível renomear a atividade.");
+      }
     });
   }
 
   function commit(nextStart: string, nextEnd: string) {
     if (!nextStart || !nextEnd) return;
     startTransition(async () => {
-      await updatePlanningTaskDates(task.id, workId, nextStart, nextEnd);
-      router.refresh();
+      try {
+        const error = await updatePlanningTaskDates(task.id, workId, nextStart, nextEnd);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar as datas.");
+      }
     });
   }
 
@@ -681,9 +735,17 @@ function TaskRowView({
   function handleDelete() {
     if (!confirm("Excluir esta atividade? Essa ação não pode ser desfeita.")) return;
     startTransition(async () => {
-      await deleteTask(task.id, workId);
-      toast.success("Atividade removida.");
-      router.refresh();
+      try {
+        const error = await deleteTask(task.id, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Atividade removida.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível excluir a atividade.");
+      }
     });
   }
 
@@ -691,8 +753,16 @@ function TaskRowView({
     const n = Number(value);
     if (!Number.isFinite(n) || n < 0 || n === task.peso) return;
     startTransition(async () => {
-      await updateTaskPeso(task.id, workId, n);
-      router.refresh();
+      try {
+        const error = await updateTaskPeso(task.id, workId, n);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar o peso.");
+      }
     });
   }
 

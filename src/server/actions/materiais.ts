@@ -123,7 +123,7 @@ export async function toggleMaterialActive(materialId: string, ativo: boolean) {
 
 // Só pode ser excluído material que nunca entrou em nenhuma NF/entrada nem movimentação de
 // estoque (compra, saída, transferência) — se já foi usado em algum lugar, só desativar.
-export async function deleteMaterial(materialId: string) {
+export async function deleteMaterial(materialId: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
@@ -132,9 +132,10 @@ export async function deleteMaterial(materialId: string) {
     prisma.stockMovement.count({ where: { materialId } }),
   ]);
   if (invoiceItemsCount > 0 || stockMovementsCount > 0) {
-    throw new Error("Este material já foi utilizado e não pode ser excluído. Desative-o em vez disso.");
+    return "Este material já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
   }
 
   await prisma.material.delete({ where: { id: materialId } });
   revalidatePath("/cadastros/materiais");
+  return undefined;
 }

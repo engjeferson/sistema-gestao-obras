@@ -51,11 +51,15 @@ function DeleteButton({ material }: { material: MaterialRow }) {
   function handleDelete() {
     startTransition(async () => {
       try {
-        await deleteMaterial(material.id);
+        const error = await deleteMaterial(material.id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Material excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }

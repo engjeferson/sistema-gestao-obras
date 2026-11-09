@@ -18,9 +18,17 @@ export function DeleteBudgetItemButton({ itemId, workId }: { itemId: string; wor
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await deleteBudgetItem(itemId, workId);
-          toast.success("Custo previsto removido.");
-          router.refresh();
+          try {
+            const error = await deleteBudgetItem(itemId, workId);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            toast.success("Custo previsto removido.");
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível excluir.");
+          }
         })
       }
     >

@@ -280,22 +280,23 @@ export async function createFinancialCategory(_prevState: string | undefined, fo
   return undefined;
 }
 
-export async function updateFinancialCategory(categoryId: string, nome: string) {
+export async function updateFinancialCategory(categoryId: string, nome: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
 
   const trimmed = nome.trim();
   if (!trimmed) {
-    throw new Error("Informe o nome da categoria.");
+    return "Informe o nome da categoria.";
   }
 
   const existing = await prisma.financialCategory.findUnique({ where: { nome: trimmed } });
   if (existing && existing.id !== categoryId) {
-    throw new Error("Já existe uma categoria com esse nome.");
+    return "Já existe uma categoria com esse nome.";
   }
 
   await prisma.financialCategory.update({ where: { id: categoryId }, data: { nome: trimmed } });
   revalidatePath("/configuracoes/categorias");
+  return undefined;
 }
 
 export async function toggleFinancialCategoryActive(categoryId: string, ativo: boolean) {
@@ -507,7 +508,11 @@ export async function updateTransaction(
   redirect("/financeiro");
 }
 
-export async function markAsPago(transactionId: string, workId: string | null, formaPagamento?: PaymentMethod) {
+export async function markAsPago(
+  transactionId: string,
+  workId: string | null,
+  formaPagamento?: PaymentMethod,
+): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
@@ -517,7 +522,7 @@ export async function markAsPago(transactionId: string, workId: string | null, f
     select: { workId: true },
   });
   if (!transaction) {
-    throw new Error("Lançamento não encontrado.");
+    return "Lançamento não encontrado.";
   }
   if (transaction.workId) {
     assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
@@ -536,11 +541,12 @@ export async function markAsPago(transactionId: string, workId: string | null, f
   if (workId) {
     revalidatePath(`/obras/${workId}/financeiro`);
   }
+  return undefined;
 }
 
 // Reverte um pagamento sem apagar o lançamento — volta pra "Pendente" (ou "Vencido", se o
 // vencimento já passou, via healOverdueTransactions no próximo carregamento da lista).
-export async function undoPayment(transactionId: string, workId: string | null) {
+export async function undoPayment(transactionId: string, workId: string | null): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
@@ -550,7 +556,7 @@ export async function undoPayment(transactionId: string, workId: string | null) 
     select: { workId: true },
   });
   if (!transaction) {
-    throw new Error("Lançamento não encontrado.");
+    return "Lançamento não encontrado.";
   }
   if (transaction.workId) {
     assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
@@ -565,6 +571,7 @@ export async function undoPayment(transactionId: string, workId: string | null) 
   if (workId) {
     revalidatePath(`/obras/${workId}/financeiro`);
   }
+  return undefined;
 }
 
 export async function partialPayTransaction(
@@ -577,25 +584,25 @@ export async function partialPayTransaction(
     novoVencimento?: string;
     comprovanteUrl?: string;
   },
-) {
+): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
   const original = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!original) {
-    throw new Error("Lançamento não encontrado.");
+    return "Lançamento não encontrado.";
   }
   if (original.workId) {
     assertWorkAccess(await getCurrentWorkAccess(), original.workId);
   }
   if (original.status === "PAGO") {
-    throw new Error("Esta conta já está paga.");
+    return "Esta conta já está paga.";
   }
 
   const valorTotal = Number(original.valor);
   if (!(input.valorPago > 0) || input.valorPago >= valorTotal) {
-    throw new Error("O valor pago deve ser maior que zero e menor que o valor total da conta.");
+    return "O valor pago deve ser maior que zero e menor que o valor total da conta.";
   }
   const valorResidual = Math.round((valorTotal - input.valorPago) * 100) / 100;
   const grupoId = original.parcelaGrupoId ?? randomUUID();
@@ -650,22 +657,23 @@ export async function partialPayTransaction(
   if (original.invoiceId) {
     revalidatePath(`/notas-fiscais/${original.invoiceId}`);
   }
+  return undefined;
 }
 
-export async function deleteTransaction(transactionId: string, workId: string | null) {
+export async function deleteTransaction(transactionId: string, workId: string | null): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, FINANCEIRO_EDIT_ROLES);
   await assertCanEditFinanceiro(session);
 
   const transaction = await prisma.financialTransaction.findUnique({ where: { id: transactionId } });
   if (!transaction) {
-    throw new Error("Lançamento não encontrado.");
+    return "Lançamento não encontrado.";
   }
   if (transaction.workId) {
     assertWorkAccess(await getCurrentWorkAccess(), transaction.workId);
   }
   if (transaction.invoiceId) {
-    throw new Error("Esta conta está vinculada a uma nota fiscal. Remova o vínculo antes de excluir.");
+    return "Esta conta está vinculada a uma nota fiscal. Remova o vínculo antes de excluir.";
   }
 
   await prisma.financialTransaction.delete({ where: { id: transactionId } });
@@ -674,4 +682,5 @@ export async function deleteTransaction(transactionId: string, workId: string | 
   if (workId) {
     revalidatePath(`/obras/${workId}/financeiro`);
   }
+  return undefined;
 }

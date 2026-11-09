@@ -21,9 +21,17 @@ export function DeleteStageButton({ stageId, workId }: { stageId: string; workId
           return;
         }
         startTransition(async () => {
-          await deleteStage(stageId, workId);
-          toast.success("Etapa removida.");
-          router.refresh();
+          try {
+            const error = await deleteStage(stageId, workId);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            toast.success("Etapa removida.");
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível excluir a etapa.");
+          }
         });
       }}
     >
@@ -44,9 +52,17 @@ export function DeleteTaskButton({ taskId, workId }: { taskId: string; workId: s
       onClick={() => {
         if (!confirm("Excluir esta atividade? Essa ação não pode ser desfeita.")) return;
         startTransition(async () => {
-          await deleteTask(taskId, workId);
-          toast.success("Atividade removida.");
-          router.refresh();
+          try {
+            const error = await deleteTask(taskId, workId);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            toast.success("Atividade removida.");
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível excluir a atividade.");
+          }
         });
       }}
     >

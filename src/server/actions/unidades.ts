@@ -35,22 +35,23 @@ export async function createUnit(_prevState: string | undefined, formData: FormD
   return undefined;
 }
 
-export async function updateUnit(unitId: string, sigla: string, nome: string) {
+export async function updateUnit(unitId: string, sigla: string, nome: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
 
   const trimmedSigla = sigla.trim();
   if (!trimmedSigla) {
-    throw new Error("Informe a sigla da unidade.");
+    return "Informe a sigla da unidade.";
   }
 
   const existing = await prisma.unit.findUnique({ where: { sigla: trimmedSigla } });
   if (existing && existing.id !== unitId) {
-    throw new Error("Já existe uma unidade com essa sigla.");
+    return "Já existe uma unidade com essa sigla.";
   }
 
   await prisma.unit.update({ where: { id: unitId }, data: { sigla: trimmedSigla, nome: nome.trim() || null } });
   revalidatePath("/configuracoes/unidades");
+  return undefined;
 }
 
 export async function toggleUnitActive(unitId: string, ativo: boolean) {
