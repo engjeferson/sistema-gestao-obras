@@ -30,10 +30,14 @@ function ToggleActiveButton({ user }: { user: UserRow }) {
       onClick={() =>
         startTransition(async () => {
           try {
-            await toggleUserActive(user.id, !user.active);
+            const error = await toggleUserActive(user.id, !user.active);
+            if (error) {
+              toast.error(error);
+              return;
+            }
             router.refresh();
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Não foi possível atualizar.");
+          } catch {
+            toast.error("Não foi possível atualizar.");
           }
         })
       }

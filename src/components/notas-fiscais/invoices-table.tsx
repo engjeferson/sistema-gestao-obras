@@ -31,11 +31,15 @@ function DeleteInvoiceButton({ invoiceId, workId }: { invoiceId: string; workId:
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deleteInvoice(invoiceId, workId);
+        const error = await deleteInvoice(invoiceId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Nota fiscal excluída.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }

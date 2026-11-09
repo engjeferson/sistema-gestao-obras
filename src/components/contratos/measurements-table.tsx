@@ -32,7 +32,11 @@ function FinalizeButton({ transactionId, workId }: { transactionId: string; work
   function handleClick() {
     startTransition(async () => {
       try {
-        await markAsPago(transactionId, workId);
+        const error = await markAsPago(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pagamento finalizado.");
         router.refresh();
       } catch {
@@ -56,11 +60,15 @@ function DeleteButton({ measurementId, workId, contractId }: { measurementId: st
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deleteMeasurement(measurementId, workId, contractId);
+        const error = await deleteMeasurement(measurementId, workId, contractId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Medição excluída.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }

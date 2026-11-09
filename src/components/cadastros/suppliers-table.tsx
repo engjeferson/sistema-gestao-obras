@@ -52,11 +52,15 @@ function DeleteButton({ supplier }: { supplier: SupplierRow }) {
   function handleDelete() {
     startTransition(async () => {
       try {
-        await deleteSupplier(supplier.id);
+        const error = await deleteSupplier(supplier.id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Fornecedor excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }

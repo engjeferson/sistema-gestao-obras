@@ -30,7 +30,11 @@ export function TransactionRowActions({
   function handleMarkAsPago() {
     startTransition(async () => {
       try {
-        await markAsPago(transactionId, workId);
+        const error = await markAsPago(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Conta marcada como paga.");
         router.refresh();
       } catch {
@@ -42,7 +46,11 @@ export function TransactionRowActions({
   function handleUndoPayment() {
     startTransition(async () => {
       try {
-        await undoPayment(transactionId, workId);
+        const error = await undoPayment(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pagamento desfeito — o lançamento voltou para pendente.");
         router.refresh();
       } catch {
@@ -54,11 +62,15 @@ export function TransactionRowActions({
   function handleDelete() {
     startTransition(async () => {
       try {
-        await deleteTransaction(transactionId, workId);
+        const error = await deleteTransaction(transactionId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Lançamento excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirmingDelete(false);
       }

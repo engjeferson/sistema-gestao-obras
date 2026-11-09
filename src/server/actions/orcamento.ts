@@ -374,16 +374,17 @@ export async function createBudgetItem(_prevState: string | undefined, formData:
   return undefined;
 }
 
-export async function deleteBudgetItem(itemId: string, workId: string) {
+export async function deleteBudgetItem(itemId: string, workId: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
   const item = await prisma.budgetItem.findUnique({ where: { id: itemId }, select: { workId: true } });
   if (!item) {
-    throw new Error("Item de orçamento não encontrado.");
+    return "Item de orçamento não encontrado.";
   }
   assertWorkAccess(await getCurrentWorkAccess(), item.workId);
 
   await prisma.budgetItem.delete({ where: { id: itemId } });
   revalidatePath(`/obras/${workId}/orcamento`);
+  return undefined;
 }

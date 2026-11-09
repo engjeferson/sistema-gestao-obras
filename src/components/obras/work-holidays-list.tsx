@@ -3,6 +3,7 @@
 import { useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/status-labels";
@@ -65,8 +66,16 @@ function HolidayRow({ holiday, workId }: { holiday: WorkHolidayRow; workId: stri
         disabled={isPending}
         onClick={() =>
           startTransition(async () => {
-            await removeWorkHoliday(holiday.id, workId);
-            router.refresh();
+            try {
+              const error = await removeWorkHoliday(holiday.id, workId);
+              if (error) {
+                toast.error(error);
+                return;
+              }
+              router.refresh();
+            } catch {
+              toast.error("Não foi possível excluir.");
+            }
           })
         }
       >

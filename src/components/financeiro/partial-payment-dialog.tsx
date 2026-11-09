@@ -66,18 +66,22 @@ export function PartialPaymentDialog({
     }
     startTransition(async () => {
       try {
-        await partialPayTransaction(transactionId, workId, {
+        const error = await partialPayTransaction(transactionId, workId, {
           valorPago,
           formaPagamento: (formaPagamento as PaymentMethod) || undefined,
           dataPagamento,
           novoVencimento: novoVencimento || undefined,
           comprovanteUrl: comprovanteUrl || undefined,
         });
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Pagamento parcial registrado.");
         onOpenChange(false);
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível registrar o pagamento.");
+      } catch {
+        toast.error("Não foi possível registrar o pagamento.");
       }
     });
   }

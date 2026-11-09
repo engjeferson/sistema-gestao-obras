@@ -16,12 +16,17 @@ export function DeleteRdoButton({ rdoId, workId, basePath }: { rdoId: string; wo
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deleteRdo(rdoId, workId);
+        const error = await deleteRdo(rdoId, workId);
+        if (error) {
+          toast.error(error);
+          setConfirming(false);
+          return;
+        }
         toast.success("RDO excluído.");
         router.push(`${basePath}/rdo`);
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
         setConfirming(false);
       }
     });

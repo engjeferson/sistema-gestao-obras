@@ -184,14 +184,15 @@ export async function updateUser(userId: string, _prevState: string | undefined,
   redirect("/configuracoes/usuarios");
 }
 
-export async function toggleUserActive(userId: string, active: boolean) {
+export async function toggleUserActive(userId: string, active: boolean): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
 
   if (userId === session.user.id) {
-    throw new Error("Você não pode desativar sua própria conta.");
+    return "Você não pode desativar sua própria conta.";
   }
 
   await prisma.user.update({ where: { id: userId }, data: { active } });
   revalidatePath("/configuracoes/usuarios");
+  return undefined;
 }

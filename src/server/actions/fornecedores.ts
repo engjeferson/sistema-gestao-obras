@@ -122,7 +122,7 @@ export async function toggleSupplierActive(supplierId: string, ativo: boolean) {
 // Só pode ser excluído fornecedor que nunca entrou em nenhuma NF, lançamento financeiro ou
 // contrato — se já foi usado em algum lugar, só desativar. Serve pra limpar duplicatas (ex: um
 // fornecedor cadastrado duas vezes com maiúsculas diferentes) depois de reatribuir os lançamentos.
-export async function deleteSupplier(supplierId: string) {
+export async function deleteSupplier(supplierId: string): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
   await assertModuleWrite("cadastrosSomenteLeitura");
@@ -133,11 +133,12 @@ export async function deleteSupplier(supplierId: string) {
     prisma.contract.count({ where: { contratadoSupplierId: supplierId } }),
   ]);
   if (invoicesCount > 0 || transactionsCount > 0 || contractsCount > 0) {
-    throw new Error("Este fornecedor já foi utilizado e não pode ser excluído. Desative-o em vez disso.");
+    return "Este fornecedor já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
   }
 
   await prisma.supplier.delete({ where: { id: supplierId } });
   revalidatePath("/cadastros/fornecedores");
+  return undefined;
 }
 
 export async function getSupplierDetail(supplierId: string) {

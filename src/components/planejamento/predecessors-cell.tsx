@@ -66,14 +66,22 @@ export function PredecessorsCell({
           );
         }
         for (const code of toAdd) {
-          await addPlanningDependencyByCode(workId, code, ownerStageId, ownerTaskId);
+          const error = await addPlanningDependencyByCode(workId, code, ownerStageId, ownerTaskId);
+          if (error) {
+            toast.error(error);
+            return;
+          }
         }
         if (clearManualRef && ownerStageId) {
-          await clearStagePredecessorRef(ownerStageId, workId);
+          const error = await clearStagePredecessorRef(ownerStageId, workId);
+          if (error) {
+            toast.error(error);
+            return;
+          }
         }
         router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Não foi possível atualizar as predecessoras.");
+      } catch {
+        toast.error("Não foi possível atualizar as predecessoras.");
       }
     });
   }

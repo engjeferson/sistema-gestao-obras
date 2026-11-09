@@ -241,7 +241,7 @@ export async function updateInvoice(invoiceId: string, _prevState: string | unde
   redirect(`/notas-fiscais/${invoiceId}`);
 }
 
-export async function deleteInvoice(invoiceId: string, workId: string | null) {
+export async function deleteInvoice(invoiceId: string, workId: string | null): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
   await assertModuleWrite("notasFiscaisSomenteLeitura");
@@ -251,14 +251,14 @@ export async function deleteInvoice(invoiceId: string, workId: string | null) {
     include: { financialTransactions: true },
   });
   if (!invoice) {
-    throw new Error("Nota fiscal não encontrada.");
+    return "Nota fiscal não encontrada.";
   }
   if (invoice.workId) {
     assertWorkAccess(await getCurrentWorkAccess(), invoice.workId);
   }
 
   if (invoice?.financialTransactions.some((t) => t.status === "PAGO")) {
-    throw new Error("A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de excluir.");
+    return "A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de excluir.";
   }
 
   await prisma.$transaction(async (tx) => {
@@ -279,4 +279,5 @@ export async function deleteInvoice(invoiceId: string, workId: string | null) {
     revalidatePath("/estoque");
     revalidatePath("/financeiro");
   }
+  return undefined;
 }

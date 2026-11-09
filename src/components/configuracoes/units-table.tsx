@@ -37,8 +37,14 @@ export function UnitsTable({ units }: { units: UnitRow[] }) {
 
   function handleUpdate(unit: UnitRow, patch: { sigla?: string; nome?: string }) {
     updateUnit(unit.id, patch.sigla ?? unit.sigla, patch.nome ?? unit.nome ?? "")
-      .then(() => router.refresh())
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível salvar."));
+      .then((error) => {
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      })
+      .catch(() => toast.error("Não foi possível salvar."));
   }
 
   return (
