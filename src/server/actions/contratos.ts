@@ -363,7 +363,11 @@ export async function updateMeasurement(
   redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
 }
 
-export async function deleteMeasurement(measurementId: string, workId: string, contractId: string) {
+export async function deleteMeasurement(
+  measurementId: string,
+  workId: string,
+  contractId: string,
+): Promise<string | undefined> {
   const session = await auth();
   assertRole(session, ["ADMINISTRADOR"]);
   await assertModuleWrite("contratosSomenteLeitura");
@@ -374,7 +378,10 @@ export async function deleteMeasurement(measurementId: string, workId: string, c
   });
 
   if (measurement?.financialTransaction?.status === "PAGO") {
-    throw new Error("Esta medição está vinculada a um pagamento já efetuado. Trate a conta manualmente antes de excluir.");
+    // Retorna a mensagem em vez de lançar erro: o Next.js esconde a mensagem de exceptions
+    // lançadas em Server Action na build de produção (só mostra um código genérico tipo
+    // "Minified React error #441"), então um `throw` aqui nunca chegaria legível até o toast.
+    return "Esta medição está vinculada a um pagamento já efetuado. Trate a conta manualmente antes de excluir.";
   }
 
   await prisma.$transaction(async (tx) => {
@@ -387,6 +394,7 @@ export async function deleteMeasurement(measurementId: string, workId: string, c
   revalidatePath(`/obras/${workId}/contratos`);
   revalidatePath(`/obras/${workId}/contratos/${contractId}`);
   revalidatePath(`/obras/${workId}/financeiro`);
+  return undefined;
 }
 
 function parseContractAddendumForm(formData: FormData) {
