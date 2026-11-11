@@ -223,16 +223,6 @@ export function TransactionsTable({
                       {t.descricao}
                     </span>
                   )}
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {showObraColumn ? (
-                      <Badge variant="outline" className="max-w-[140px]">
-                        <span className="min-w-0 truncate">{t.work ? t.work.nome : "Despesa geral"}</span>
-                      </Badge>
-                    ) : null}
-                    <Badge variant="outline" className="max-w-[140px]">
-                      <span className="min-w-0 truncate">{t.categoria.nome}</span>
-                    </Badge>
-                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{formatDateTimeBR(t.createdAt)}</TableCell>
                 <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
@@ -261,13 +251,15 @@ export function TransactionsTable({
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableCell colSpan={detailColSpan} className="py-2">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {t.work ? (
-                        <Link href={`/obras/${t.workId}`} className="hover:underline">
-                          <Badge variant="outline">{t.work.nome}</Badge>
-                        </Link>
-                      ) : (
-                        <Badge variant="outline">Despesa geral</Badge>
-                      )}
+                      {showObraColumn ? (
+                        t.work ? (
+                          <Link href={`/obras/${t.workId}`} className="hover:underline">
+                            <Badge variant="outline">{t.work.nome}</Badge>
+                          </Link>
+                        ) : (
+                          <Badge variant="outline">Despesa geral</Badge>
+                        )
+                      ) : null}
                       <Badge variant={TRANSACTION_TYPE_BADGE[t.tipo]}>{TRANSACTION_TYPE_LABELS[t.tipo]}</Badge>
                       <Badge variant="outline">{t.categoria.nome}</Badge>
                       <Badge variant="outline">{t.favorecidoNome}</Badge>
