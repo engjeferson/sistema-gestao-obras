@@ -39,11 +39,15 @@ function DeleteContractButton({ contractId, workId }: { contractId: string; work
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deleteContract(contractId, workId);
+        const error = await deleteContract(contractId, workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Contrato excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }
@@ -123,7 +127,15 @@ export function ContractsTable({
       if (!finalOrder) return;
       const originalOrder = contracts.map((c) => c.id);
       if (JSON.stringify(finalOrder) === JSON.stringify(originalOrder)) return;
-      reorderContracts(workId, finalOrder).then(() => router.refresh());
+      reorderContracts(workId, finalOrder)
+        .then((error) => {
+          if (error) {
+            toast.error(error);
+            return;
+          }
+          router.refresh();
+        })
+        .catch(() => toast.error("Não foi possível reordenar os contratos."));
     }
 
     window.addEventListener("pointermove", onMove);

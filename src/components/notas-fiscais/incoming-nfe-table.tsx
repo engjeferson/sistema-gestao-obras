@@ -49,16 +49,32 @@ function RowActions({ row }: { row: IncomingNFeRow }) {
 
   function handleIgnore() {
     startTransition(async () => {
-      await ignoreIncomingNFe(row.id);
-      toast.success("Nota ignorada.");
-      router.refresh();
+      try {
+        const error = await ignoreIncomingNFe(row.id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Nota ignorada.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível ignorar a nota.");
+      }
     });
   }
 
   function handleRestore() {
     startTransition(async () => {
-      await restoreIncomingNFe(row.id);
-      router.refresh();
+      try {
+        const error = await restoreIncomingNFe(row.id);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível restaurar a nota.");
+      }
     });
   }
 

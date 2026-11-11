@@ -34,8 +34,16 @@ function ToggleButton({ supplier }: { supplier: SupplierRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleSupplierActive(supplier.id, !supplier.ativo);
-          router.refresh();
+          try {
+            const error = await toggleSupplierActive(supplier.id, !supplier.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar o fornecedor.");
+          }
         })
       }
     >

@@ -52,6 +52,10 @@ export function PreLancamentoIaFlow({
         imageKey = await uploadFileToR2(imageFile, "comprovantes", null, draftId);
       }
       const extracted = await extractPreLancamentoDraft({ mode: modo, text: text.trim() || undefined, imageKey });
+      if (typeof extracted === "string") {
+        toast.error(extracted);
+        return;
+      }
       setDraft({
         workId: extracted.workId || undefined,
         tipo: extracted.tipo,
@@ -69,8 +73,8 @@ export function PreLancamentoIaFlow({
       });
       setRawInput(text.trim());
       toast.success("Dados extraídos — confira antes de salvar.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível extrair os dados.");
+    } catch {
+      toast.error("Não foi possível extrair os dados.");
     } finally {
       setExtracting(false);
     }

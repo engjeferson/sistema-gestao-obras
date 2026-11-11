@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { userFormSchema, userEditFormSchema } from "@/lib/validations/usuarios";
 
 function parseFinancePermissionFields(formData: FormData) {
@@ -75,7 +75,12 @@ export async function getUser(userId: string) {
 
 export async function createUser(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const permissionFields = parseFinancePermissionFields(formData);
   const workAccessFields = parseWorkAccessFields(formData);
@@ -129,7 +134,12 @@ export async function createUser(_prevState: string | undefined, formData: FormD
 
 export async function updateUser(userId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const permissionFields = parseFinancePermissionFields(formData);
   const workAccessFields = parseWorkAccessFields(formData);
@@ -186,7 +196,12 @@ export async function updateUser(userId: string, _prevState: string | undefined,
 
 export async function toggleUserActive(userId: string, active: boolean): Promise<string | undefined> {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   if (userId === session.user.id) {
     return "Você não pode desativar sua própria conta.";

@@ -138,3 +138,14 @@ export function formatDateBR(date: Date | string) {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
+
+/**
+ * Pra timestamps de verdade (ex: `createdAt`), diferente de `formatDateBR` — que é pra campos
+ * `@db.Date` (sem hora, já salvos à meia-noite UTC representando o dia em si). Aqui a hora
+ * importa: formatar em UTC mostraria o dia seguinte pra registros criados à noite no horário de
+ * Brasília, então converte pro fuso de São Paulo antes de pegar o dia.
+ */
+export function formatDateTimeBR(date: Date | string) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(d);
+}

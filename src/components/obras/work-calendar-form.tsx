@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toggleWorkingWeekday } from "@/server/actions/work-calendar";
@@ -23,8 +24,16 @@ export function WorkCalendarForm({ workId, workingWeekdays }: { workId: string; 
 
   function handleToggle(weekday: number, checked: boolean) {
     startTransition(async () => {
-      await toggleWorkingWeekday(workId, weekday, checked);
-      router.refresh();
+      try {
+        const error = await toggleWorkingWeekday(workId, weekday, checked);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível atualizar o calendário.");
+      }
     });
   }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { clientFormSchema } from "@/lib/validations/clientes";
 import { joinPeopleNames } from "@/lib/text";
@@ -48,90 +48,106 @@ function parseClientForm(formData: FormData) {
 }
 
 export async function createClient(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseClientForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  const nome = joinPeopleNames(data.people.map((p) => p.nome));
+    const parsed = parseClientForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const nome = joinPeopleNames(data.people.map((p) => p.nome));
 
-  await prisma.client.create({
-    data: {
-      nome,
-      documento: data.documento || null,
-      telefone: data.telefone || null,
-      email: data.email || null,
-      endereco: data.endereco || null,
-      cep: data.cep || null,
-      numero: data.numero || null,
-      complemento: data.complemento || null,
-      bairro: data.bairro || null,
-      cidade: data.cidade || null,
-      uf: data.uf || null,
-      observacoes: data.observacoes || null,
-      people: {
-        create: data.people.map((p) => ({
-          nome: p.nome,
-          dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
-        })),
+    await prisma.client.create({
+      data: {
+        nome,
+        documento: data.documento || null,
+        telefone: data.telefone || null,
+        email: data.email || null,
+        endereco: data.endereco || null,
+        cep: data.cep || null,
+        numero: data.numero || null,
+        complemento: data.complemento || null,
+        bairro: data.bairro || null,
+        cidade: data.cidade || null,
+        uf: data.uf || null,
+        observacoes: data.observacoes || null,
+        people: {
+          create: data.people.map((p) => ({
+            nome: p.nome,
+            dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
+          })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   revalidatePath("/cadastros/clientes");
   redirect("/cadastros/clientes");
 }
 
 export async function updateClient(clientId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseClientForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  const nome = joinPeopleNames(data.people.map((p) => p.nome));
+    const parsed = parseClientForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const nome = joinPeopleNames(data.people.map((p) => p.nome));
 
-  await prisma.client.update({
-    where: { id: clientId },
-    data: {
-      nome,
-      documento: data.documento || null,
-      telefone: data.telefone || null,
-      email: data.email || null,
-      endereco: data.endereco || null,
-      cep: data.cep || null,
-      numero: data.numero || null,
-      complemento: data.complemento || null,
-      bairro: data.bairro || null,
-      cidade: data.cidade || null,
-      uf: data.uf || null,
-      observacoes: data.observacoes || null,
-      people: {
-        deleteMany: {},
-        create: data.people.map((p) => ({
-          nome: p.nome,
-          dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
-        })),
+    await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        nome,
+        documento: data.documento || null,
+        telefone: data.telefone || null,
+        email: data.email || null,
+        endereco: data.endereco || null,
+        cep: data.cep || null,
+        numero: data.numero || null,
+        complemento: data.complemento || null,
+        bairro: data.bairro || null,
+        cidade: data.cidade || null,
+        uf: data.uf || null,
+        observacoes: data.observacoes || null,
+        people: {
+          deleteMany: {},
+          create: data.people.map((p) => ({
+            nome: p.nome,
+            dataAniversario: p.dataAniversario ? new Date(p.dataAniversario) : null,
+          })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   revalidatePath("/cadastros/clientes");
   redirect("/cadastros/clientes");
 }
 
-export async function toggleClientActive(clientId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+export async function toggleClientActive(clientId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  await prisma.client.update({ where: { id: clientId }, data: { ativo } });
-  revalidatePath("/cadastros/clientes");
+    await prisma.client.update({ where: { id: clientId }, data: { ativo } });
+    revalidatePath("/cadastros/clientes");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }

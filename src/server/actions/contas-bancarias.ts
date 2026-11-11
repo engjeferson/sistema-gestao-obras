@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { bankAccountFormSchema } from "@/lib/validations/contas-bancarias";
 
 export async function listBankAccounts() {
@@ -34,28 +34,33 @@ function parseBankAccountForm(formData: FormData) {
 }
 
 export async function createBankAccount(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  const parsed = parseBankAccountForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseBankAccountForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    await prisma.bankAccount.create({
+      data: {
+        nome: data.nome,
+        banco: data.banco || null,
+        agencia: data.agencia || null,
+        conta: data.conta || null,
+        tipo: data.tipo,
+        saldoInicial: data.saldoInicial ?? null,
+        diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
+        diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  await prisma.bankAccount.create({
-    data: {
-      nome: data.nome,
-      banco: data.banco || null,
-      agencia: data.agencia || null,
-      conta: data.conta || null,
-      tipo: data.tipo,
-      saldoInicial: data.saldoInicial ?? null,
-      diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
-      diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/contas-bancarias");
   redirect("/cadastros/contas-bancarias");
@@ -66,38 +71,49 @@ export async function updateBankAccount(
   _prevState: string | undefined,
   formData: FormData,
 ) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  const parsed = parseBankAccountForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseBankAccountForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    await prisma.bankAccount.update({
+      where: { id: bankAccountId },
+      data: {
+        nome: data.nome,
+        banco: data.banco || null,
+        agencia: data.agencia || null,
+        conta: data.conta || null,
+        tipo: data.tipo,
+        saldoInicial: data.saldoInicial ?? null,
+        diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
+        diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  await prisma.bankAccount.update({
-    where: { id: bankAccountId },
-    data: {
-      nome: data.nome,
-      banco: data.banco || null,
-      agencia: data.agencia || null,
-      conta: data.conta || null,
-      tipo: data.tipo,
-      saldoInicial: data.saldoInicial ?? null,
-      diaFechamento: data.tipo === "CARTAO_CREDITO" ? (data.diaFechamento ?? null) : null,
-      diaVencimento: data.tipo === "CARTAO_CREDITO" ? (data.diaVencimento ?? null) : null,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/contas-bancarias");
   redirect("/cadastros/contas-bancarias");
 }
 
-export async function toggleBankAccountActive(bankAccountId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+export async function toggleBankAccountActive(bankAccountId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  await prisma.bankAccount.update({ where: { id: bankAccountId }, data: { ativo } });
-  revalidatePath("/cadastros/contas-bancarias");
+    await prisma.bankAccount.update({ where: { id: bankAccountId }, data: { ativo } });
+    revalidatePath("/cadastros/contas-bancarias");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }

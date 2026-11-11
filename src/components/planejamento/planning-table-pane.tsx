@@ -199,7 +199,15 @@ export function PlanningTablePane({
       if (JSON.stringify(newGroupOrder) === JSON.stringify(groupIds)) return;
       const kindById = new Map(rows.map((r) => [rowId(r), r.type] as const));
       const orderedItems = newGroupOrder.map((id) => ({ id, kind: kindById.get(id) ?? ("task" as const) }));
-      reorderChildren(workId, drag.originalGroupId, orderedItems).then(() => router.refresh());
+      reorderChildren(workId, drag.originalGroupId, orderedItems)
+        .then((error) => {
+          if (error) {
+            toast.error(error);
+            return;
+          }
+          router.refresh();
+        })
+        .catch(() => toast.error("Não foi possível reordenar."));
     }
 
     window.addEventListener("pointermove", onMove);

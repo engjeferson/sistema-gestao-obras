@@ -144,9 +144,17 @@ export function PlanningEditor({
       return;
     }
     startBaselineTransition(async () => {
-      await setPlanningBaseline(workId);
-      toast.success("Linha de base fixada.");
-      router.refresh();
+      try {
+        const error = await setPlanningBaseline(workId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Linha de base fixada.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível fixar a linha de base.");
+      }
     });
   }
 

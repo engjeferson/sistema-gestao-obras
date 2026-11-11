@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { UF_CODES } from "@/lib/sefaz/uf-codes";
 import { encryptCertificateForStorage, readCertificateInfo } from "@/lib/sefaz/cert";
 
@@ -56,7 +56,12 @@ async function getOrCreateCompanyId() {
 
 export async function uploadCertificate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const file = formData.get("certificado");
   const password = String(formData.get("senha") ?? "");
@@ -92,33 +97,44 @@ export async function uploadCertificate(_prevState: string | undefined, formData
   return undefined;
 }
 
-export async function removeCertificate() {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+export async function removeCertificate(): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
 
-  const companyId = await getOrCreateCompanyId();
-  await prisma.companySettings.update({
-    where: { id: companyId },
-    data: {
-      certificadoArquivoNome: null,
-      certificadoTitular: null,
-      certificadoValidoAte: null,
-      certificadoEnviadoEm: null,
-      certificadoDados: null,
-      certificadoIv: null,
-      certificadoAuthTag: null,
-      certificadoSenha: null,
-      certificadoSenhaIv: null,
-      certificadoSenhaAuthTag: null,
-    },
-  });
+    const companyId = await getOrCreateCompanyId();
+    await prisma.companySettings.update({
+      where: { id: companyId },
+      data: {
+        certificadoArquivoNome: null,
+        certificadoTitular: null,
+        certificadoValidoAte: null,
+        certificadoEnviadoEm: null,
+        certificadoDados: null,
+        certificadoIv: null,
+        certificadoAuthTag: null,
+        certificadoSenha: null,
+        certificadoSenhaIv: null,
+        certificadoSenhaAuthTag: null,
+      },
+    });
 
-  revalidatePath("/configuracoes/empresa");
+    revalidatePath("/configuracoes/empresa");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function updateCompanySettings(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const nome = String(formData.get("nome") ?? "").trim();
   const cnpj = String(formData.get("cnpj") ?? "").trim();

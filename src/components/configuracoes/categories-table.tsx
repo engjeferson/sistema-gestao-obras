@@ -22,8 +22,16 @@ function ToggleButton({ category }: { category: CategoryRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleFinancialCategoryActive(category.id, !category.ativo);
-          router.refresh();
+          try {
+            const error = await toggleFinancialCategoryActive(category.id, !category.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar a categoria.");
+          }
         })
       }
     >

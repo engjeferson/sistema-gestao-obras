@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { computeSaldo, computeSaldoComValor } from "@/lib/stock";
 import { stockEntradaSchema, stockSaidaSchema, stockTransferenciaSchema } from "@/lib/validations/estoque";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
@@ -212,174 +212,190 @@ async function getCustoMedioAtual(materialId: string, workId: string | null) {
 }
 
 export async function createStockEntrada(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = stockEntradaSchema.safeParse({
-    materialId: formData.get("materialId"),
-    destinoWorkId: formData.get("destinoWorkId") ?? undefined,
-    stageId: formData.get("stageId") ?? undefined,
-    taskId: formData.get("taskId") ?? undefined,
-    quantidade: formData.get("quantidade"),
-    valorUnitario: formData.get("valorUnitario") || undefined,
-    data: formData.get("data"),
-    motivo: formData.get("motivo") ?? undefined,
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  if (data.destinoWorkId) {
-    assertWorkAccess(await getCurrentWorkAccess(), data.destinoWorkId);
-  }
+    const parsed = stockEntradaSchema.safeParse({
+      materialId: formData.get("materialId"),
+      destinoWorkId: formData.get("destinoWorkId") ?? undefined,
+      stageId: formData.get("stageId") ?? undefined,
+      taskId: formData.get("taskId") ?? undefined,
+      quantidade: formData.get("quantidade"),
+      valorUnitario: formData.get("valorUnitario") || undefined,
+      data: formData.get("data"),
+      motivo: formData.get("motivo") ?? undefined,
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    if (data.destinoWorkId) {
+      assertWorkAccess(await getCurrentWorkAccess(), data.destinoWorkId);
+    }
 
-  await prisma.stockMovement.create({
-    data: {
-      materialId: data.materialId,
-      tipo: "ENTRADA",
-      destinoWorkId: data.destinoWorkId || null,
-      stageId: data.destinoWorkId ? data.stageId || null : null,
-      taskId: data.destinoWorkId ? data.taskId || null : null,
-      quantidade: data.quantidade,
-      valorUnitario: data.valorUnitario ?? null,
-      data: new Date(data.data),
-      motivo: data.motivo || null,
-      createdById: session.user.id,
-    },
-  });
+    await prisma.stockMovement.create({
+      data: {
+        materialId: data.materialId,
+        tipo: "ENTRADA",
+        destinoWorkId: data.destinoWorkId || null,
+        stageId: data.destinoWorkId ? data.stageId || null : null,
+        taskId: data.destinoWorkId ? data.taskId || null : null,
+        quantidade: data.quantidade,
+        valorUnitario: data.valorUnitario ?? null,
+        data: new Date(data.data),
+        motivo: data.motivo || null,
+        createdById: session.user.id,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   revalidatePath("/estoque");
   redirect("/estoque");
 }
 
 export async function createStockSaida(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-
-  let itensParsed: unknown;
   try {
-    itensParsed = JSON.parse(String(formData.get("itensJson") ?? "[]"));
-  } catch {
-    return "Itens inválidos.";
-  }
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = stockSaidaSchema.safeParse({
-    origemWorkId: formData.get("origemWorkId") ?? undefined,
-    stageId: formData.get("stageId") ?? undefined,
-    taskId: formData.get("taskId") ?? undefined,
-    data: formData.get("data"),
-    motivo: formData.get("motivo") ?? undefined,
-    itens: itensParsed,
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  const origem = data.origemWorkId || null;
-  if (origem) {
-    assertWorkAccess(await getCurrentWorkAccess(), origem);
-  }
-
-  for (const item of data.itens) {
-    const saldoAtual = await getSaldoAtual(item.materialId, origem);
-    if (saldoAtual < item.quantidade) {
-      return `Saldo insuficiente na origem para este material. Saldo atual: ${saldoAtual}.`;
+    let itensParsed: unknown;
+    try {
+      itensParsed = JSON.parse(String(formData.get("itensJson") ?? "[]"));
+    } catch {
+      return "Itens inválidos.";
     }
-  }
 
-  await prisma.$transaction(
-    data.itens.map((item) =>
-      prisma.stockMovement.create({
-        data: {
-          materialId: item.materialId,
-          tipo: "SAIDA",
-          origemWorkId: origem,
-          stageId: origem ? data.stageId || null : null,
-          taskId: origem ? data.taskId || null : null,
-          quantidade: item.quantidade,
-          valorUnitario: item.valorUnitario ?? null,
-          data: new Date(data.data),
-          motivo: data.motivo || null,
-          createdById: session.user.id,
-        },
-      }),
-    ),
-  );
+    const parsed = stockSaidaSchema.safeParse({
+      origemWorkId: formData.get("origemWorkId") ?? undefined,
+      stageId: formData.get("stageId") ?? undefined,
+      taskId: formData.get("taskId") ?? undefined,
+      data: formData.get("data"),
+      motivo: formData.get("motivo") ?? undefined,
+      itens: itensParsed,
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const origem = data.origemWorkId || null;
+    if (origem) {
+      assertWorkAccess(await getCurrentWorkAccess(), origem);
+    }
+
+    for (const item of data.itens) {
+      const saldoAtual = await getSaldoAtual(item.materialId, origem);
+      if (saldoAtual < item.quantidade) {
+        return `Saldo insuficiente na origem para este material. Saldo atual: ${saldoAtual}.`;
+      }
+    }
+
+    await prisma.$transaction(
+      data.itens.map((item) =>
+        prisma.stockMovement.create({
+          data: {
+            materialId: item.materialId,
+            tipo: "SAIDA",
+            origemWorkId: origem,
+            stageId: origem ? data.stageId || null : null,
+            taskId: origem ? data.taskId || null : null,
+            quantidade: item.quantidade,
+            valorUnitario: item.valorUnitario ?? null,
+            data: new Date(data.data),
+            motivo: data.motivo || null,
+            createdById: session.user.id,
+          },
+        }),
+      ),
+    );
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   revalidatePath("/estoque");
   redirect("/estoque");
 }
 
 export async function createStockTransferencia(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-
-  let itensParsed: unknown;
+  let grupoId: string;
   try {
-    itensParsed = JSON.parse(String(formData.get("itensJson") ?? "[]"));
-  } catch {
-    return "Itens inválidos.";
-  }
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = stockTransferenciaSchema.safeParse({
-    origemWorkId: formData.get("origemWorkId") ?? undefined,
-    destinoWorkId: formData.get("destinoWorkId") ?? undefined,
-    stageId: formData.get("stageId") ?? undefined,
-    taskId: formData.get("taskId") ?? undefined,
-    data: formData.get("data"),
-    motivo: formData.get("motivo") ?? undefined,
-    itens: itensParsed,
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  const origem = data.origemWorkId || null;
-  const destino = data.destinoWorkId || null;
-  const stageId = destino ? data.stageId || null : null;
-  const taskId = destino ? data.taskId || null : null;
-  const workAccess = await getCurrentWorkAccess();
-  if (origem) assertWorkAccess(workAccess, origem);
-  if (destino) assertWorkAccess(workAccess, destino);
-
-  const custosMedios = new Map<string, number>();
-  for (const item of data.itens) {
-    const saldoAtual = await getSaldoAtual(item.materialId, origem);
-    if (saldoAtual < item.quantidade) {
-      return `Saldo insuficiente na origem para este material. Saldo atual: ${saldoAtual}.`;
+    let itensParsed: unknown;
+    try {
+      itensParsed = JSON.parse(String(formData.get("itensJson") ?? "[]"));
+    } catch {
+      return "Itens inválidos.";
     }
-    custosMedios.set(item.materialId, await getCustoMedioAtual(item.materialId, origem));
+
+    const parsed = stockTransferenciaSchema.safeParse({
+      origemWorkId: formData.get("origemWorkId") ?? undefined,
+      destinoWorkId: formData.get("destinoWorkId") ?? undefined,
+      stageId: formData.get("stageId") ?? undefined,
+      taskId: formData.get("taskId") ?? undefined,
+      data: formData.get("data"),
+      motivo: formData.get("motivo") ?? undefined,
+      itens: itensParsed,
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const origem = data.origemWorkId || null;
+    const destino = data.destinoWorkId || null;
+    const stageId = destino ? data.stageId || null : null;
+    const taskId = destino ? data.taskId || null : null;
+    const workAccess = await getCurrentWorkAccess();
+    if (origem) assertWorkAccess(workAccess, origem);
+    if (destino) assertWorkAccess(workAccess, destino);
+
+    const custosMedios = new Map<string, number>();
+    for (const item of data.itens) {
+      const saldoAtual = await getSaldoAtual(item.materialId, origem);
+      if (saldoAtual < item.quantidade) {
+        return `Saldo insuficiente na origem para este material. Saldo atual: ${saldoAtual}.`;
+      }
+      custosMedios.set(item.materialId, await getCustoMedioAtual(item.materialId, origem));
+    }
+
+    grupoId = randomUUID();
+    const ultimaOS = await prisma.stockMovement.aggregate({
+      where: { tipo: "TRANSFERENCIA" },
+      _max: { numeroOS: true },
+    });
+    const numeroOS = (ultimaOS._max.numeroOS ?? 0) + 1;
+
+    await prisma.$transaction(
+      data.itens.map((item) =>
+        prisma.stockMovement.create({
+          data: {
+            materialId: item.materialId,
+            tipo: "TRANSFERENCIA",
+            origemWorkId: origem,
+            destinoWorkId: destino,
+            stageId,
+            taskId,
+            quantidade: item.quantidade,
+            // Mantém o mesmo custo já registrado na origem — não se cria valor na transferência.
+            valorUnitario: custosMedios.get(item.materialId) ?? null,
+            data: new Date(data.data),
+            motivo: data.motivo || null,
+            transferGrupoId: grupoId,
+            numeroOS,
+            createdById: session.user.id,
+          },
+        }),
+      ),
+    );
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  const grupoId = randomUUID();
-  const ultimaOS = await prisma.stockMovement.aggregate({
-    where: { tipo: "TRANSFERENCIA" },
-    _max: { numeroOS: true },
-  });
-  const numeroOS = (ultimaOS._max.numeroOS ?? 0) + 1;
-
-  await prisma.$transaction(
-    data.itens.map((item) =>
-      prisma.stockMovement.create({
-        data: {
-          materialId: item.materialId,
-          tipo: "TRANSFERENCIA",
-          origemWorkId: origem,
-          destinoWorkId: destino,
-          stageId,
-          taskId,
-          quantidade: item.quantidade,
-          // Mantém o mesmo custo já registrado na origem — não se cria valor na transferência.
-          valorUnitario: custosMedios.get(item.materialId) ?? null,
-          data: new Date(data.data),
-          motivo: data.motivo || null,
-          transferGrupoId: grupoId,
-          numeroOS,
-          createdById: session.user.id,
-        },
-      }),
-    ),
-  );
 
   revalidatePath("/estoque");
   redirect(`/estoque/transferencias/${grupoId}`);

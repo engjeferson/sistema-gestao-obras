@@ -30,10 +30,18 @@ export function PortalShareCard({ workId, portalToken }: { workId: string; porta
       return;
     }
     startTransition(async () => {
-      const newToken = await regeneratePortalToken(workId);
-      setToken(newToken);
-      setConfirmingRegenerate(false);
-      toast.success("Novo link gerado. O link antigo parou de funcionar.");
+      try {
+        const result = await regeneratePortalToken(workId);
+        if ("error" in result) {
+          toast.error(result.error);
+          return;
+        }
+        setToken(result.token);
+        setConfirmingRegenerate(false);
+        toast.success("Novo link gerado. O link antigo parou de funcionar.");
+      } catch {
+        toast.error("Não foi possível gerar um novo link.");
+      }
     });
   }
 

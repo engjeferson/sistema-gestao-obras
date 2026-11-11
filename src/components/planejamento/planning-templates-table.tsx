@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import Link from "next/link";
 import { Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,8 +32,16 @@ function DeleteButton({ templateId }: { templateId: string }) {
       onClick={() => {
         if (!confirm("Excluir este template? Isso não afeta obras que já usaram ele.")) return;
         startTransition(async () => {
-          await deletePlanningTemplate(templateId);
-          router.refresh();
+          try {
+            const error = await deletePlanningTemplate(templateId);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível excluir o template.");
+          }
         });
       }}
     >

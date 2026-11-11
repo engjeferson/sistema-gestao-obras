@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 
 export async function listActiveUnits() {
   return prisma.unit.findMany({ where: { ativo: true }, orderBy: { sigla: "asc" } });
@@ -16,48 +16,64 @@ export async function listAllUnits() {
 }
 
 export async function createUnit(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
 
-  const sigla = String(formData.get("sigla") ?? "").trim();
-  if (!sigla) {
-    return "Informe a sigla da unidade.";
+    const sigla = String(formData.get("sigla") ?? "").trim();
+    if (!sigla) {
+      return "Informe a sigla da unidade.";
+    }
+    const nome = String(formData.get("nome") ?? "").trim();
+
+    const existing = await prisma.unit.findUnique({ where: { sigla } });
+    if (existing) {
+      return "Já existe uma unidade com essa sigla.";
+    }
+
+    await prisma.unit.create({ data: { sigla, nome: nome || null } });
+    revalidatePath("/configuracoes/unidades");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const nome = String(formData.get("nome") ?? "").trim();
-
-  const existing = await prisma.unit.findUnique({ where: { sigla } });
-  if (existing) {
-    return "Já existe uma unidade com essa sigla.";
-  }
-
-  await prisma.unit.create({ data: { sigla, nome: nome || null } });
-  revalidatePath("/configuracoes/unidades");
-  return undefined;
 }
 
 export async function updateUnit(unitId: string, sigla: string, nome: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
 
-  const trimmedSigla = sigla.trim();
-  if (!trimmedSigla) {
-    return "Informe a sigla da unidade.";
+    const trimmedSigla = sigla.trim();
+    if (!trimmedSigla) {
+      return "Informe a sigla da unidade.";
+    }
+
+    const existing = await prisma.unit.findUnique({ where: { sigla: trimmedSigla } });
+    if (existing && existing.id !== unitId) {
+      return "Já existe uma unidade com essa sigla.";
+    }
+
+    await prisma.unit.update({ where: { id: unitId }, data: { sigla: trimmedSigla, nome: nome.trim() || null } });
+    revalidatePath("/configuracoes/unidades");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  const existing = await prisma.unit.findUnique({ where: { sigla: trimmedSigla } });
-  if (existing && existing.id !== unitId) {
-    return "Já existe uma unidade com essa sigla.";
-  }
-
-  await prisma.unit.update({ where: { id: unitId }, data: { sigla: trimmedSigla, nome: nome.trim() || null } });
-  revalidatePath("/configuracoes/unidades");
-  return undefined;
 }
 
-export async function toggleUnitActive(unitId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
+export async function toggleUnitActive(unitId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
 
-  await prisma.unit.update({ where: { id: unitId }, data: { ativo } });
-  revalidatePath("/configuracoes/unidades");
+    await prisma.unit.update({ where: { id: unitId }, data: { ativo } });
+    revalidatePath("/configuracoes/unidades");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }

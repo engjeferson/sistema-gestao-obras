@@ -22,8 +22,16 @@ function ToggleButton({ unit }: { unit: UnitRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleUnitActive(unit.id, !unit.ativo);
-          router.refresh();
+          try {
+            const error = await toggleUnitActive(unit.id, !unit.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar a unidade.");
+          }
         })
       }
     >

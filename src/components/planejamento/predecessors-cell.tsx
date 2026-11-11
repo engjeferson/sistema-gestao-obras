@@ -57,13 +57,17 @@ export function PredecessorsCell({
     startTransition(async () => {
       try {
         for (const chip of toRemove) {
-          await removeGroupedDependency(
+          const error = await removeGroupedDependency(
             workId,
             chip.type === "stage" ? chip.id : null,
             chip.type === "task" ? chip.id : null,
             ownerStageId,
             ownerTaskId,
           );
+          if (error) {
+            toast.error(error);
+            return;
+          }
         }
         for (const code of toAdd) {
           const error = await addPlanningDependencyByCode(workId, code, ownerStageId, ownerTaskId);
