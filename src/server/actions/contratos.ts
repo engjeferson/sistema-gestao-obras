@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { contractFormSchema, measurementFormSchema, contractAddendumFormSchema } from "@/lib/validations/contratos";
 import { getCompanySettings } from "@/server/actions/empresa";
@@ -107,101 +107,123 @@ function parseAttachments(formData: FormData): { url: string; nome: string }[] {
 }
 
 export async function createContract(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const parsed = parseContractForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseContractForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    const attachments = parseAttachments(formData);
+    const [parties, contratosCount] = await Promise.all([
+      resolveContractParties(data),
+      prisma.contract.count({ where: { workId: data.workId } }),
+    ]);
+
+    await prisma.contract.create({
+      data: {
+        workId: data.workId,
+        nome: data.nome,
+        tipo: data.tipo,
+        direcao: data.direcao,
+        ...parties,
+        valor: data.valor ?? null,
+        data: new Date(data.data),
+        observacoes: data.observacoes || null,
+        ordem: contratosCount,
+        attachments: { create: attachments },
+      },
+    });
+
+    revalidatePath(`/obras/${data.workId}/contratos`);
+    redirect(`/obras/${data.workId}/contratos`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  const attachments = parseAttachments(formData);
-  const [parties, contratosCount] = await Promise.all([
-    resolveContractParties(data),
-    prisma.contract.count({ where: { workId: data.workId } }),
-  ]);
-
-  await prisma.contract.create({
-    data: {
-      workId: data.workId,
-      nome: data.nome,
-      tipo: data.tipo,
-      direcao: data.direcao,
-      ...parties,
-      valor: data.valor ?? null,
-      data: new Date(data.data),
-      observacoes: data.observacoes || null,
-      ordem: contratosCount,
-      attachments: { create: attachments },
-    },
-  });
-
-  revalidatePath(`/obras/${data.workId}/contratos`);
-  redirect(`/obras/${data.workId}/contratos`);
 }
 
-export async function reorderContracts(workId: string, orderedIds: string[]) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+export async function reorderContracts(workId: string, orderedIds: string[]): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  await prisma.$transaction(
-    orderedIds.map((id, index) => prisma.contract.updateMany({ where: { id, workId }, data: { ordem: index } })),
-  );
+    await prisma.$transaction(
+      orderedIds.map((id, index) => prisma.contract.updateMany({ where: { id, workId }, data: { ordem: index } })),
+    );
 
-  revalidatePath(`/obras/${workId}/contratos`);
+    revalidatePath(`/obras/${workId}/contratos`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function updateContract(contractId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const existingContract = await prisma.contract.findUnique({ where: { id: contractId }, select: { workId: true } });
-  if (!existingContract) {
-    return "Contrato não encontrado.";
+    const existingContract = await prisma.contract.findUnique({ where: { id: contractId }, select: { workId: true } });
+    if (!existingContract) {
+      return "Contrato não encontrado.";
+    }
+    const workAccess = await getCurrentWorkAccess();
+    assertWorkAccess(workAccess, existingContract.workId);
+
+    const parsed = parseContractForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(workAccess, data.workId);
+    const attachments = parseAttachments(formData);
+    const parties = await resolveContractParties(data);
+
+    await prisma.contract.update({
+      where: { id: contractId },
+      data: {
+        nome: data.nome,
+        tipo: data.tipo,
+        direcao: data.direcao,
+        ...parties,
+        valor: data.valor ?? null,
+        data: new Date(data.data),
+        observacoes: data.observacoes || null,
+        attachments: { deleteMany: {}, create: attachments },
+      },
+    });
+
+    revalidatePath(`/obras/${data.workId}/contratos`);
+    revalidatePath(`/obras/${data.workId}/contratos/${contractId}`);
+    redirect(`/obras/${data.workId}/contratos/${contractId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const workAccess = await getCurrentWorkAccess();
-  assertWorkAccess(workAccess, existingContract.workId);
-
-  const parsed = parseContractForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  assertWorkAccess(workAccess, data.workId);
-  const attachments = parseAttachments(formData);
-  const parties = await resolveContractParties(data);
-
-  await prisma.contract.update({
-    where: { id: contractId },
-    data: {
-      nome: data.nome,
-      tipo: data.tipo,
-      direcao: data.direcao,
-      ...parties,
-      valor: data.valor ?? null,
-      data: new Date(data.data),
-      observacoes: data.observacoes || null,
-      attachments: { deleteMany: {}, create: attachments },
-    },
-  });
-
-  revalidatePath(`/obras/${data.workId}/contratos`);
-  revalidatePath(`/obras/${data.workId}/contratos/${contractId}`);
-  redirect(`/obras/${data.workId}/contratos/${contractId}`);
 }
 
-export async function deleteContract(contractId: string, workId: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+export async function deleteContract(contractId: string, workId: string): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  await prisma.contract.delete({ where: { id: contractId } });
-  revalidatePath(`/obras/${workId}/contratos`);
+    await prisma.contract.delete({ where: { id: contractId } });
+    revalidatePath(`/obras/${workId}/contratos`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 function parseMeasurementForm(formData: FormData) {
@@ -223,76 +245,81 @@ function parseMeasurementForm(formData: FormData) {
 }
 
 export async function createMeasurement(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const parsed = parseMeasurementForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  const attachments = parseAttachments(formData);
+    const parsed = parseMeasurementForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    const attachments = parseAttachments(formData);
 
-  const contract = await prisma.contract.findUnique({ where: { id: data.contractId } });
-  if (!contract) {
-    return "Contrato não encontrado.";
-  }
-  if (contract.workId !== data.workId) {
-    return "Contrato não pertence a esta obra.";
-  }
+    const contract = await prisma.contract.findUnique({ where: { id: data.contractId } });
+    if (!contract) {
+      return "Contrato não encontrado.";
+    }
+    if (contract.workId !== data.workId) {
+      return "Contrato não pertence a esta obra.";
+    }
 
-  const favorecidoNome = contract.direcao === "PAGAR" ? contract.contratado : contract.contratante;
+    const favorecidoNome = contract.direcao === "PAGAR" ? contract.contratado : contract.contratante;
 
-  await prisma.$transaction(async (tx) => {
-    const lastMeasurement = await tx.contractMeasurement.findFirst({
-      where: { contractId: data.contractId },
-      orderBy: { numero: "desc" },
-      select: { numero: true },
+    await prisma.$transaction(async (tx) => {
+      const lastMeasurement = await tx.contractMeasurement.findFirst({
+        where: { contractId: data.contractId },
+        orderBy: { numero: "desc" },
+        select: { numero: true },
+      });
+      const numero = (lastMeasurement?.numero ?? 0) + 1;
+
+      const measurement = await tx.contractMeasurement.create({
+        data: {
+          contractId: data.contractId,
+          numero,
+          data: new Date(data.data),
+          descricao: data.descricao || null,
+          valor: data.valor,
+          observacoes: data.observacoes || null,
+          attachments: { create: attachments },
+        },
+      });
+
+      const confirmado = Boolean(data.confirmar);
+
+      await tx.financialTransaction.create({
+        data: {
+          workId: data.workId,
+          tipo: contract.direcao,
+          descricao: `Medição #${numero} — ${contract.nome}`,
+          categoriaId: data.categoriaId,
+          favorecidoNome,
+          bankAccountId: data.bankAccountId || null,
+          stageId: data.stageId || null,
+          taskId: data.taskId || null,
+          valor: data.valor,
+          dataEmissao: new Date(data.data),
+          dataVencimento: new Date(data.dataVencimento),
+          dataPagamento: confirmado ? new Date(data.data) : null,
+          formaPagamento: data.formaPagamento,
+          status: confirmado ? "PAGO" : "PENDENTE",
+          contractMeasurementId: measurement.id,
+          createdById: session.user.id,
+        },
+      });
     });
-    const numero = (lastMeasurement?.numero ?? 0) + 1;
 
-    const measurement = await tx.contractMeasurement.create({
-      data: {
-        contractId: data.contractId,
-        numero,
-        data: new Date(data.data),
-        descricao: data.descricao || null,
-        valor: data.valor,
-        observacoes: data.observacoes || null,
-        attachments: { create: attachments },
-      },
-    });
-
-    const confirmado = Boolean(data.confirmar);
-
-    await tx.financialTransaction.create({
-      data: {
-        workId: data.workId,
-        tipo: contract.direcao,
-        descricao: `Medição #${numero} — ${contract.nome}`,
-        categoriaId: data.categoriaId,
-        favorecidoNome,
-        bankAccountId: data.bankAccountId || null,
-        stageId: data.stageId || null,
-        taskId: data.taskId || null,
-        valor: data.valor,
-        dataEmissao: new Date(data.data),
-        dataVencimento: new Date(data.dataVencimento),
-        dataPagamento: confirmado ? new Date(data.data) : null,
-        formaPagamento: data.formaPagamento,
-        status: confirmado ? "PAGO" : "PENDENTE",
-        contractMeasurementId: measurement.id,
-        createdById: session.user.id,
-      },
-    });
-  });
-
-  revalidatePath(`/obras/${data.workId}/contratos`);
-  revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
-  revalidatePath(`/obras/${data.workId}/financeiro`);
-  redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
+    revalidatePath(`/obras/${data.workId}/contratos`);
+    revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
+    revalidatePath(`/obras/${data.workId}/financeiro`);
+    redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function getMeasurement(measurementId: string) {
@@ -307,60 +334,65 @@ export async function updateMeasurement(
   _prevState: string | undefined,
   formData: FormData,
 ) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const measurement = await prisma.contractMeasurement.findUnique({
-    where: { id: measurementId },
-    include: { financialTransaction: true, contract: { select: { workId: true } } },
-  });
-  if (!measurement) {
-    return "Medição não encontrada.";
-  }
-  const workAccess = await getCurrentWorkAccess();
-  assertWorkAccess(workAccess, measurement.contract.workId);
-
-  const parsed = parseMeasurementForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  assertWorkAccess(workAccess, data.workId);
-  const attachments = parseAttachments(formData);
-
-  await prisma.$transaction(async (tx) => {
-    await tx.contractMeasurement.update({
+    const measurement = await prisma.contractMeasurement.findUnique({
       where: { id: measurementId },
-      data: {
-        data: new Date(data.data),
-        descricao: data.descricao || null,
-        valor: data.valor,
-        observacoes: data.observacoes || null,
-        attachments: { deleteMany: {}, create: attachments },
-      },
+      include: { financialTransaction: true, contract: { select: { workId: true } } },
     });
+    if (!measurement) {
+      return "Medição não encontrada.";
+    }
+    const workAccess = await getCurrentWorkAccess();
+    assertWorkAccess(workAccess, measurement.contract.workId);
 
-    if (measurement.financialTransaction) {
-      await tx.financialTransaction.update({
-        where: { id: measurement.financialTransaction.id },
+    const parsed = parseMeasurementForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(workAccess, data.workId);
+    const attachments = parseAttachments(formData);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contractMeasurement.update({
+        where: { id: measurementId },
         data: {
-          categoriaId: data.categoriaId,
-          bankAccountId: data.bankAccountId || null,
-          stageId: data.stageId || null,
-          taskId: data.taskId || null,
+          data: new Date(data.data),
+          descricao: data.descricao || null,
           valor: data.valor,
-          dataEmissao: new Date(data.data),
-          dataVencimento: new Date(data.dataVencimento),
+          observacoes: data.observacoes || null,
+          attachments: { deleteMany: {}, create: attachments },
         },
       });
-    }
-  });
 
-  revalidatePath(`/obras/${data.workId}/contratos`);
-  revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
-  revalidatePath(`/obras/${data.workId}/financeiro`);
-  redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
+      if (measurement.financialTransaction) {
+        await tx.financialTransaction.update({
+          where: { id: measurement.financialTransaction.id },
+          data: {
+            categoriaId: data.categoriaId,
+            bankAccountId: data.bankAccountId || null,
+            stageId: data.stageId || null,
+            taskId: data.taskId || null,
+            valor: data.valor,
+            dataEmissao: new Date(data.data),
+            dataVencimento: new Date(data.dataVencimento),
+          },
+        });
+      }
+    });
+
+    revalidatePath(`/obras/${data.workId}/contratos`);
+    revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
+    revalidatePath(`/obras/${data.workId}/financeiro`);
+    redirect(`/obras/${data.workId}/contratos/${data.contractId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function deleteMeasurement(
@@ -368,33 +400,38 @@ export async function deleteMeasurement(
   workId: string,
   contractId: string,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const measurement = await prisma.contractMeasurement.findUnique({
-    where: { id: measurementId },
-    include: { financialTransaction: true },
-  });
+    const measurement = await prisma.contractMeasurement.findUnique({
+      where: { id: measurementId },
+      include: { financialTransaction: true },
+    });
 
-  if (measurement?.financialTransaction?.status === "PAGO") {
-    // Retorna a mensagem em vez de lançar erro: o Next.js esconde a mensagem de exceptions
-    // lançadas em Server Action na build de produção (só mostra um código genérico tipo
-    // "Minified React error #441"), então um `throw` aqui nunca chegaria legível até o toast.
-    return "Esta medição está vinculada a um pagamento já efetuado. Trate a conta manualmente antes de excluir.";
-  }
-
-  await prisma.$transaction(async (tx) => {
-    if (measurement?.financialTransaction) {
-      await tx.financialTransaction.delete({ where: { id: measurement.financialTransaction.id } });
+    if (measurement?.financialTransaction?.status === "PAGO") {
+      // Retorna a mensagem em vez de lançar erro: o Next.js esconde a mensagem de exceptions
+      // lançadas em Server Action na build de produção (só mostra um código genérico tipo
+      // "Minified React error #441"), então um `throw` aqui nunca chegaria legível até o toast.
+      return "Esta medição está vinculada a um pagamento já efetuado. Trate a conta manualmente antes de excluir.";
     }
-    await tx.contractMeasurement.delete({ where: { id: measurementId } });
-  });
 
-  revalidatePath(`/obras/${workId}/contratos`);
-  revalidatePath(`/obras/${workId}/contratos/${contractId}`);
-  revalidatePath(`/obras/${workId}/financeiro`);
-  return undefined;
+    await prisma.$transaction(async (tx) => {
+      if (measurement?.financialTransaction) {
+        await tx.financialTransaction.delete({ where: { id: measurement.financialTransaction.id } });
+      }
+      await tx.contractMeasurement.delete({ where: { id: measurementId } });
+    });
+
+    revalidatePath(`/obras/${workId}/contratos`);
+    revalidatePath(`/obras/${workId}/contratos/${contractId}`);
+    revalidatePath(`/obras/${workId}/financeiro`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 function parseContractAddendumForm(formData: FormData) {
@@ -410,44 +447,59 @@ function parseContractAddendumForm(formData: FormData) {
 }
 
 export async function createContractAddendum(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  const parsed = parseContractAddendumForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseContractAddendumForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    const contract = await prisma.contract.findUnique({ where: { id: data.contractId }, select: { workId: true } });
+    if (!contract || contract.workId !== data.workId) {
+      return "Contrato não encontrado.";
+    }
+
+    await prisma.contractAddendum.create({
+      data: {
+        contractId: data.contractId,
+        data: new Date(data.data),
+        descricao: data.descricao || null,
+        valor: data.valor,
+        observacoes: data.observacoes || null,
+        arquivoUrl: data.arquivoUrl || null,
+      },
+    });
+
+    revalidatePath(`/obras/${data.workId}/contratos`);
+    revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  const contract = await prisma.contract.findUnique({ where: { id: data.contractId }, select: { workId: true } });
-  if (!contract || contract.workId !== data.workId) {
-    return "Contrato não encontrado.";
-  }
-
-  await prisma.contractAddendum.create({
-    data: {
-      contractId: data.contractId,
-      data: new Date(data.data),
-      descricao: data.descricao || null,
-      valor: data.valor,
-      observacoes: data.observacoes || null,
-      arquivoUrl: data.arquivoUrl || null,
-    },
-  });
-
-  revalidatePath(`/obras/${data.workId}/contratos`);
-  revalidatePath(`/obras/${data.workId}/contratos/${data.contractId}`);
-  return undefined;
 }
 
-export async function deleteContractAddendum(addendumId: string, workId: string, contractId: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR"]);
-  await assertModuleWrite("contratosSomenteLeitura");
+export async function deleteContractAddendum(
+  addendumId: string,
+  workId: string,
+  contractId: string,
+): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR"]);
+    await assertModuleWrite("contratosSomenteLeitura");
 
-  await prisma.contractAddendum.delete({ where: { id: addendumId } });
+    await prisma.contractAddendum.delete({ where: { id: addendumId } });
 
-  revalidatePath(`/obras/${workId}/contratos`);
-  revalidatePath(`/obras/${workId}/contratos/${contractId}`);
+    revalidatePath(`/obras/${workId}/contratos`);
+    revalidatePath(`/obras/${workId}/contratos/${contractId}`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }

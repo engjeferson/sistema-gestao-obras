@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { rdoFormSchema } from "@/lib/validations/rdo";
 import { createRdoWithSync, updateRdoWithSync, deleteRdoWithSync } from "@/server/services/rdo-sync";
@@ -77,107 +77,122 @@ function parseJsonField<T>(formData: FormData, key: string, fallback: T): T {
 }
 
 export async function createRdo(basePath: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
-  await assertModuleWrite("rdoSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+    await assertModuleWrite("rdoSomenteLeitura");
 
-  const parsed = rdoFormSchema.safeParse({
-    workId: formData.get("workId"),
-    data: formData.get("data"),
-    clima: formData.get("clima") ?? undefined,
-    semAtividade: formData.get("semAtividade") === "true",
-    observacoesGerais: formData.get("observacoesGerais") ?? undefined,
-    workers: parseJsonField(formData, "workersJson", []),
-    activities: parseJsonField(formData, "activitiesJson", []),
-    occurrences: parseJsonField(formData, "occurrencesJson", []),
-    photos: parseJsonField(formData, "photosJson", []),
-  });
+    const parsed = rdoFormSchema.safeParse({
+      workId: formData.get("workId"),
+      data: formData.get("data"),
+      clima: formData.get("clima") ?? undefined,
+      semAtividade: formData.get("semAtividade") === "true",
+      observacoesGerais: formData.get("observacoesGerais") ?? undefined,
+      workers: parseJsonField(formData, "workersJson", []),
+      activities: parseJsonField(formData, "activitiesJson", []),
+      occurrences: parseJsonField(formData, "occurrencesJson", []),
+      photos: parseJsonField(formData, "photosJson", []),
+    });
 
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    assertWorkAccess(await getCurrentWorkAccess(), parsed.data.workId);
+
+    const rdo = await createRdoWithSync(parsed.data, session.user.id);
+
+    revalidatePath(`/obras/${parsed.data.workId}/rdo`);
+    revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
+    revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
+    revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
+    revalidatePath("/obras");
+    revalidatePath("/campo/obras");
+    revalidatePath("/dashboard");
+
+    // No Campo (RDO mobile), volta pra lista de RDOs da obra em vez do detalhe — lá dá pra ver,
+    // editar, excluir ou voltar pra Minhas Obras, sem precisar navegar de novo até o RDO recém-criado.
+    const isMobile = basePath.startsWith("/campo");
+    redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdo.id}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  assertWorkAccess(await getCurrentWorkAccess(), parsed.data.workId);
-
-  const rdo = await createRdoWithSync(parsed.data, session.user.id);
-
-  revalidatePath(`/obras/${parsed.data.workId}/rdo`);
-  revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
-  revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
-  revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
-  revalidatePath("/obras");
-  revalidatePath("/campo/obras");
-  revalidatePath("/dashboard");
-
-  // No Campo (RDO mobile), volta pra lista de RDOs da obra em vez do detalhe — lá dá pra ver,
-  // editar, excluir ou voltar pra Minhas Obras, sem precisar navegar de novo até o RDO recém-criado.
-  const isMobile = basePath.startsWith("/campo");
-  redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdo.id}`);
 }
 
 export async function updateRdo(basePath: string, rdoId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
-  await assertModuleWrite("rdoSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+    await assertModuleWrite("rdoSomenteLeitura");
 
-  const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
-  if (!existing) {
-    return "RDO não encontrado.";
+    const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
+    if (!existing) {
+      return "RDO não encontrado.";
+    }
+    const workAccess = await getCurrentWorkAccess();
+    assertWorkAccess(workAccess, existing.workId);
+
+    const parsed = rdoFormSchema.safeParse({
+      workId: formData.get("workId"),
+      data: formData.get("data"),
+      clima: formData.get("clima") ?? undefined,
+      semAtividade: formData.get("semAtividade") === "true",
+      observacoesGerais: formData.get("observacoesGerais") ?? undefined,
+      workers: parseJsonField(formData, "workersJson", []),
+      activities: parseJsonField(formData, "activitiesJson", []),
+      occurrences: parseJsonField(formData, "occurrencesJson", []),
+      photos: parseJsonField(formData, "photosJson", []),
+    });
+
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    assertWorkAccess(workAccess, parsed.data.workId);
+
+    await updateRdoWithSync(rdoId, parsed.data);
+
+    revalidatePath(`/obras/${parsed.data.workId}/rdo`);
+    revalidatePath(`/obras/${parsed.data.workId}/rdo/${rdoId}`);
+    revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
+    revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
+    revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
+    revalidatePath(`/campo/obras/${parsed.data.workId}/rdo/${rdoId}`);
+    revalidatePath("/obras");
+    revalidatePath("/campo/obras");
+    revalidatePath("/dashboard");
+
+    const isMobile = basePath.startsWith("/campo");
+    redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const workAccess = await getCurrentWorkAccess();
-  assertWorkAccess(workAccess, existing.workId);
-
-  const parsed = rdoFormSchema.safeParse({
-    workId: formData.get("workId"),
-    data: formData.get("data"),
-    clima: formData.get("clima") ?? undefined,
-    semAtividade: formData.get("semAtividade") === "true",
-    observacoesGerais: formData.get("observacoesGerais") ?? undefined,
-    workers: parseJsonField(formData, "workersJson", []),
-    activities: parseJsonField(formData, "activitiesJson", []),
-    occurrences: parseJsonField(formData, "occurrencesJson", []),
-    photos: parseJsonField(formData, "photosJson", []),
-  });
-
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  assertWorkAccess(workAccess, parsed.data.workId);
-
-  await updateRdoWithSync(rdoId, parsed.data);
-
-  revalidatePath(`/obras/${parsed.data.workId}/rdo`);
-  revalidatePath(`/obras/${parsed.data.workId}/rdo/${rdoId}`);
-  revalidatePath(`/obras/${parsed.data.workId}/planejamento`);
-  revalidatePath(`/obras/${parsed.data.workId}/visao-geral`);
-  revalidatePath(`/campo/obras/${parsed.data.workId}/rdo`);
-  revalidatePath(`/campo/obras/${parsed.data.workId}/rdo/${rdoId}`);
-  revalidatePath("/obras");
-  revalidatePath("/campo/obras");
-  revalidatePath("/dashboard");
-
-  const isMobile = basePath.startsWith("/campo");
-  redirect(isMobile ? `${basePath}/${parsed.data.workId}/rdo` : `${basePath}/${parsed.data.workId}/rdo/${rdoId}`);
 }
 
 export async function deleteRdo(rdoId: string, workId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
-  await assertModuleWrite("rdoSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "OBRA"]);
+    await assertModuleWrite("rdoSomenteLeitura");
 
-  const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
-  if (!existing) {
-    return "RDO não encontrado.";
+    const existing = await prisma.rdo.findUnique({ where: { id: rdoId }, select: { workId: true } });
+    if (!existing) {
+      return "RDO não encontrado.";
+    }
+    assertWorkAccess(await getCurrentWorkAccess(), existing.workId);
+
+    await deleteRdoWithSync(rdoId);
+
+    revalidatePath(`/obras/${workId}/rdo`);
+    revalidatePath(`/obras/${workId}/planejamento`);
+    revalidatePath(`/obras/${workId}/visao-geral`);
+    revalidatePath(`/campo/obras/${workId}/rdo`);
+    revalidatePath("/obras");
+    revalidatePath("/campo/obras");
+    revalidatePath("/dashboard");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  assertWorkAccess(await getCurrentWorkAccess(), existing.workId);
-
-  await deleteRdoWithSync(rdoId);
-
-  revalidatePath(`/obras/${workId}/rdo`);
-  revalidatePath(`/obras/${workId}/planejamento`);
-  revalidatePath(`/obras/${workId}/visao-geral`);
-  revalidatePath(`/campo/obras/${workId}/rdo`);
-  revalidatePath("/obras");
-  revalidatePath("/campo/obras");
-  revalidatePath("/dashboard");
-  return undefined;
 }

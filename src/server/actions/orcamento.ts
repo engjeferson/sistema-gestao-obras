@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import {
   sumBudgetItems,
@@ -327,64 +327,74 @@ export async function listBudgetByStage(workId: string) {
 }
 
 export async function createBudgetItem(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = budgetItemFormSchema.safeParse({
-    workId: formData.get("workId"),
-    taskId: formData.get("taskId") ?? undefined,
-    stageId: formData.get("stageId") ?? undefined,
-    codigo: formData.get("codigo") ?? undefined,
-    descricao: formData.get("descricao") ?? undefined,
-    tipoCusto: formData.get("tipoCusto"),
-    unidade: formData.get("unidade") ?? undefined,
-    quantidadePrevista: formData.get("quantidadePrevista") ?? undefined,
-    valorUnitarioPrevisto: formData.get("valorUnitarioPrevisto") ?? undefined,
-    valorTotalPrevisto: formData.get("valorTotalPrevisto") ?? undefined,
-    observacoes: formData.get("observacoes") ?? undefined,
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = budgetItemFormSchema.safeParse({
+      workId: formData.get("workId"),
+      taskId: formData.get("taskId") ?? undefined,
+      stageId: formData.get("stageId") ?? undefined,
+      codigo: formData.get("codigo") ?? undefined,
+      descricao: formData.get("descricao") ?? undefined,
+      tipoCusto: formData.get("tipoCusto"),
+      unidade: formData.get("unidade") ?? undefined,
+      quantidadePrevista: formData.get("quantidadePrevista") ?? undefined,
+      valorUnitarioPrevisto: formData.get("valorUnitarioPrevisto") ?? undefined,
+      valorTotalPrevisto: formData.get("valorTotalPrevisto") ?? undefined,
+      observacoes: formData.get("observacoes") ?? undefined,
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+
+    const valorTotalPrevisto =
+      data.quantidadePrevista !== undefined && data.valorUnitarioPrevisto !== undefined
+        ? data.quantidadePrevista * data.valorUnitarioPrevisto
+        : (data.valorTotalPrevisto ?? 0);
+
+    await prisma.budgetItem.create({
+      data: {
+        workId: data.workId,
+        taskId: data.taskId ?? null,
+        stageId: data.stageId ?? null,
+        codigo: data.codigo || null,
+        descricao: data.descricao || null,
+        tipoCusto: data.tipoCusto,
+        unidade: data.unidade,
+        quantidadePrevista: data.quantidadePrevista ?? null,
+        valorUnitarioPrevisto: data.valorUnitarioPrevisto ?? null,
+        valorTotalPrevisto,
+        observacoes: data.observacoes || null,
+      },
+    });
+
+    revalidatePath(`/obras/${data.workId}/orcamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-
-  const valorTotalPrevisto =
-    data.quantidadePrevista !== undefined && data.valorUnitarioPrevisto !== undefined
-      ? data.quantidadePrevista * data.valorUnitarioPrevisto
-      : (data.valorTotalPrevisto ?? 0);
-
-  await prisma.budgetItem.create({
-    data: {
-      workId: data.workId,
-      taskId: data.taskId ?? null,
-      stageId: data.stageId ?? null,
-      codigo: data.codigo || null,
-      descricao: data.descricao || null,
-      tipoCusto: data.tipoCusto,
-      unidade: data.unidade,
-      quantidadePrevista: data.quantidadePrevista ?? null,
-      valorUnitarioPrevisto: data.valorUnitarioPrevisto ?? null,
-      valorTotalPrevisto,
-      observacoes: data.observacoes || null,
-    },
-  });
-
-  revalidatePath(`/obras/${data.workId}/orcamento`);
-  return undefined;
 }
 
 export async function deleteBudgetItem(itemId: string, workId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const item = await prisma.budgetItem.findUnique({ where: { id: itemId }, select: { workId: true } });
-  if (!item) {
-    return "Item de orçamento não encontrado.";
+    const item = await prisma.budgetItem.findUnique({ where: { id: itemId }, select: { workId: true } });
+    if (!item) {
+      return "Item de orçamento não encontrado.";
+    }
+    assertWorkAccess(await getCurrentWorkAccess(), item.workId);
+
+    await prisma.budgetItem.delete({ where: { id: itemId } });
+    revalidatePath(`/obras/${workId}/orcamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  assertWorkAccess(await getCurrentWorkAccess(), item.workId);
-
-  await prisma.budgetItem.delete({ where: { id: itemId } });
-  revalidatePath(`/obras/${workId}/orcamento`);
-  return undefined;
 }

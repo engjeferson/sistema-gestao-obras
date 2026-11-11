@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { createTemplateSchema, applyTemplateSchema, saveAsTemplateSchema } from "@/lib/validations/planejamento-templates";
 
@@ -69,19 +69,30 @@ export async function getPlanningTemplateForEdit(templateId: string) {
   return { id: template.id, nome: template.nome, descricao: template.descricao, rows };
 }
 
-export async function deletePlanningTemplate(templateId: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+export async function deletePlanningTemplate(templateId: string): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
 
-  await prisma.planningTemplate.delete({ where: { id: templateId } });
-  revalidatePath("/planejamento-templates");
+    await prisma.planningTemplate.delete({ where: { id: templateId } });
+    revalidatePath("/planejamento-templates");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function createPlanningTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   let rowsParsed: unknown;
   try {
@@ -169,8 +180,13 @@ export async function createPlanningTemplate(_prevState: string | undefined, for
 
 export async function updatePlanningTemplate(templateId: string, _prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   let rowsParsed: unknown;
   try {
@@ -264,8 +280,13 @@ export async function updatePlanningTemplate(templateId: string, _prevState: str
 
 export async function saveWorkPlanningAsTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const parsed = saveAsTemplateSchema.safeParse({
     workId: formData.get("workId"),
@@ -276,7 +297,12 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  try {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const stages = await prisma.planningStage.findMany({
     where: { workId: data.workId },
@@ -359,8 +385,13 @@ export async function saveWorkPlanningAsTemplate(_prevState: string | undefined,
 
 export async function applyPlanningTemplate(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const parsed = applyTemplateSchema.safeParse({
     workId: formData.get("workId"),
@@ -371,7 +402,12 @@ export async function applyPlanningTemplate(_prevState: string | undefined, form
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  try {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const template = await prisma.planningTemplate.findUnique({
     where: { id: data.templateId },

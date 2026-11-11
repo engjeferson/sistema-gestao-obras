@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { professionalFormSchema } from "@/lib/validations/profissionais";
 
@@ -36,29 +36,34 @@ function parseProfessionalForm(formData: FormData) {
 }
 
 export async function createProfessional(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseProfessionalForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseProfessionalForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    await prisma.professional.create({
+      data: {
+        nome: data.nome,
+        tipoId: data.tipoId,
+        telefone: data.telefone || null,
+        documento: data.documento || null,
+        email: data.email || null,
+        observacoes: data.observacoes || null,
+      },
+    });
+
+    revalidatePath("/cadastros/profissionais");
+    redirect("/cadastros/profissionais");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  await prisma.professional.create({
-    data: {
-      nome: data.nome,
-      tipoId: data.tipoId,
-      telefone: data.telefone || null,
-      documento: data.documento || null,
-      email: data.email || null,
-      observacoes: data.observacoes || null,
-    },
-  });
-
-  revalidatePath("/cadastros/profissionais");
-  redirect("/cadastros/profissionais");
 }
 
 export async function updateProfessional(
@@ -66,37 +71,48 @@ export async function updateProfessional(
   _prevState: string | undefined,
   formData: FormData,
 ) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseProfessionalForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseProfessionalForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    await prisma.professional.update({
+      where: { id: professionalId },
+      data: {
+        nome: data.nome,
+        tipoId: data.tipoId,
+        telefone: data.telefone || null,
+        documento: data.documento || null,
+        email: data.email || null,
+        observacoes: data.observacoes || null,
+      },
+    });
+
+    revalidatePath("/cadastros/profissionais");
+    redirect("/cadastros/profissionais");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  await prisma.professional.update({
-    where: { id: professionalId },
-    data: {
-      nome: data.nome,
-      tipoId: data.tipoId,
-      telefone: data.telefone || null,
-      documento: data.documento || null,
-      email: data.email || null,
-      observacoes: data.observacoes || null,
-    },
-  });
-
-  revalidatePath("/cadastros/profissionais");
-  redirect("/cadastros/profissionais");
 }
 
-export async function toggleProfessionalActive(professionalId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+export async function toggleProfessionalActive(professionalId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  await prisma.professional.update({ where: { id: professionalId }, data: { ativo } });
-  revalidatePath("/cadastros/profissionais");
+    await prisma.professional.update({ where: { id: professionalId }, data: { ativo } });
+    revalidatePath("/cadastros/profissionais");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }

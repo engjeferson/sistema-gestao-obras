@@ -168,106 +168,116 @@ function sumItens(itens: InvoiceItemValues[]) {
 }
 
 export async function createPreLancamento(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
+  try {
+    const session = await auth();
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
 
-  const parsed = parsePreLancamentoForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parsePreLancamentoForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    if (data.workId) {
+      assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    }
+    const attachments = parseAttachments(formData);
+    const origem = formData.get("origem") === "IA" ? "IA" : "MANUAL";
+    const rawInput = (formData.get("rawInput") as string) || null;
+    const itens = data.itens && data.itens.length > 0 ? data.itens : null;
+    const valorFrete = itens ? (data.valorFrete ?? 0) : null;
+    const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
+    const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
+
+    await prisma.preLancamento.create({
+      data: {
+        workId: data.workId || null,
+        stageId: data.stageId || null,
+        tipo: data.tipo,
+        descricao: data.descricao,
+        categoriaId: data.categoriaId || null,
+        favorecidoNome: data.favorecidoNome || null,
+        valor,
+        dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
+        observacao: data.observacao || null,
+        numeroDocumento: data.numeroDocumento || null,
+        itensJson: itens ?? Prisma.DbNull,
+        valorFrete,
+        valorDesconto,
+        bankAccountId: data.bankAccountId || null,
+        formaPagamento: data.formaPagamento || null,
+        contaPaga: data.contaPaga ?? false,
+        dataPagamento: data.dataPagamento ? new Date(data.dataPagamento) : null,
+        origem,
+        rawInput,
+        createdById: session.user.id,
+        attachments: { create: attachments },
+      },
+    });
+
+    revalidatePath("/financeiro/pre-lancamentos");
+    redirect("/financeiro/pre-lancamentos");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  if (data.workId) {
-    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  }
-  const attachments = parseAttachments(formData);
-  const origem = formData.get("origem") === "IA" ? "IA" : "MANUAL";
-  const rawInput = (formData.get("rawInput") as string) || null;
-  const itens = data.itens && data.itens.length > 0 ? data.itens : null;
-  const valorFrete = itens ? (data.valorFrete ?? 0) : null;
-  const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
-  const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
-
-  await prisma.preLancamento.create({
-    data: {
-      workId: data.workId || null,
-      stageId: data.stageId || null,
-      tipo: data.tipo,
-      descricao: data.descricao,
-      categoriaId: data.categoriaId || null,
-      favorecidoNome: data.favorecidoNome || null,
-      valor,
-      dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
-      observacao: data.observacao || null,
-      numeroDocumento: data.numeroDocumento || null,
-      itensJson: itens ?? Prisma.DbNull,
-      valorFrete,
-      valorDesconto,
-      bankAccountId: data.bankAccountId || null,
-      formaPagamento: data.formaPagamento || null,
-      contaPaga: data.contaPaga ?? false,
-      dataPagamento: data.dataPagamento ? new Date(data.dataPagamento) : null,
-      origem,
-      rawInput,
-      createdById: session.user.id,
-      attachments: { create: attachments },
-    },
-  });
-
-  revalidatePath("/financeiro/pre-lancamentos");
-  redirect("/financeiro/pre-lancamentos");
 }
 
 export async function updatePreLancamento(id: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
+  try {
+    const session = await auth();
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
 
-  const existing = await prisma.preLancamento.findUnique({ where: { id }, select: { workId: true } });
-  if (!existing) {
-    return "Pré-lançamento não encontrado.";
+    const existing = await prisma.preLancamento.findUnique({ where: { id }, select: { workId: true } });
+    if (!existing) {
+      return "Pré-lançamento não encontrado.";
+    }
+    const workAccess = await getCurrentWorkAccess();
+    if (existing.workId) assertWorkAccess(workAccess, existing.workId);
+
+    const parsed = parsePreLancamentoForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    if (data.workId) assertWorkAccess(workAccess, data.workId);
+    const attachments = parseAttachments(formData);
+    const itens = data.itens && data.itens.length > 0 ? data.itens : null;
+    const valorFrete = itens ? (data.valorFrete ?? 0) : null;
+    const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
+    const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
+
+    await prisma.preLancamento.update({
+      where: { id },
+      data: {
+        workId: data.workId || null,
+        stageId: data.stageId || null,
+        tipo: data.tipo,
+        descricao: data.descricao,
+        categoriaId: data.categoriaId || null,
+        favorecidoNome: data.favorecidoNome || null,
+        valor,
+        dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
+        observacao: data.observacao || null,
+        numeroDocumento: data.numeroDocumento || null,
+        itensJson: itens ?? Prisma.DbNull,
+        valorFrete,
+        valorDesconto,
+        bankAccountId: data.bankAccountId || null,
+        formaPagamento: data.formaPagamento || null,
+        contaPaga: data.contaPaga ?? false,
+        dataPagamento: data.dataPagamento ? new Date(data.dataPagamento) : null,
+        attachments: { deleteMany: {}, create: attachments },
+      },
+    });
+
+    revalidatePath("/financeiro/pre-lancamentos");
+    redirect("/financeiro/pre-lancamentos");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const workAccess = await getCurrentWorkAccess();
-  if (existing.workId) assertWorkAccess(workAccess, existing.workId);
-
-  const parsed = parsePreLancamentoForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
-  }
-  const data = parsed.data;
-  if (data.workId) assertWorkAccess(workAccess, data.workId);
-  const attachments = parseAttachments(formData);
-  const itens = data.itens && data.itens.length > 0 ? data.itens : null;
-  const valorFrete = itens ? (data.valorFrete ?? 0) : null;
-  const valorDesconto = itens ? (data.valorDesconto ?? 0) : null;
-  const valor = itens ? sumItens(itens) + (valorFrete ?? 0) - (valorDesconto ?? 0) : data.valor;
-
-  await prisma.preLancamento.update({
-    where: { id },
-    data: {
-      workId: data.workId || null,
-      stageId: data.stageId || null,
-      tipo: data.tipo,
-      descricao: data.descricao,
-      categoriaId: data.categoriaId || null,
-      favorecidoNome: data.favorecidoNome || null,
-      valor,
-      dataVencimento: data.dataVencimento ? new Date(data.dataVencimento) : null,
-      observacao: data.observacao || null,
-      numeroDocumento: data.numeroDocumento || null,
-      itensJson: itens ?? Prisma.DbNull,
-      valorFrete,
-      valorDesconto,
-      bankAccountId: data.bankAccountId || null,
-      formaPagamento: data.formaPagamento || null,
-      contaPaga: data.contaPaga ?? false,
-      dataPagamento: data.dataPagamento ? new Date(data.dataPagamento) : null,
-      attachments: { deleteMany: {}, create: attachments },
-    },
-  });
-
-  revalidatePath("/financeiro/pre-lancamentos");
-  redirect("/financeiro/pre-lancamentos");
 }
 
 async function checkPreLancamentoAccess(id: string): Promise<string | undefined> {
@@ -282,57 +292,82 @@ async function checkPreLancamentoAccess(id: string): Promise<string | undefined>
 }
 
 export async function deletePreLancamento(id: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
-  const accessError = await checkPreLancamentoAccess(id);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+    const accessError = await checkPreLancamentoAccess(id);
+    if (accessError) return accessError;
 
-  await prisma.preLancamento.delete({ where: { id } });
-  revalidatePath("/financeiro/pre-lancamentos");
-  return undefined;
+    await prisma.preLancamento.delete({ where: { id } });
+    revalidatePath("/financeiro/pre-lancamentos");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function rejectPreLancamento(id: string, motivo?: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
-  const accessError = await checkPreLancamentoAccess(id);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+    const accessError = await checkPreLancamentoAccess(id);
+    if (accessError) return accessError;
 
-  await prisma.preLancamento.update({
-    where: { id },
-    data: { status: "RECUSADO", motivoRecusa: motivo?.trim() || null },
-  });
-  revalidatePath("/financeiro/pre-lancamentos");
-  return undefined;
+    await prisma.preLancamento.update({
+      where: { id },
+      data: { status: "RECUSADO", motivoRecusa: motivo?.trim() || null },
+    });
+    revalidatePath("/financeiro/pre-lancamentos");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function reopenPreLancamento(id: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
-  const accessError = await checkPreLancamentoAccess(id);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+    const accessError = await checkPreLancamentoAccess(id);
+    if (accessError) return accessError;
 
-  await prisma.preLancamento.update({ where: { id }, data: { status: "PENDENTE", motivoRecusa: null } });
-  revalidatePath("/financeiro/pre-lancamentos");
-  return undefined;
+    await prisma.preLancamento.update({ where: { id }, data: { status: "PENDENTE", motivoRecusa: null } });
+    revalidatePath("/financeiro/pre-lancamentos");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 // Aprovar exige os campos que o FinancialTransaction não abre mão de ter (categoria e
 // vencimento) — diferente do resto do pré-lançamento, que pode ficar incompleto até aqui.
 export async function approvePreLancamento(id: string): Promise<string | undefined> {
   const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
+  try {
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const preLancamento = await prisma.preLancamento.findUnique({ where: { id }, include: { attachments: true } });
   if (!preLancamento) {
     return "Pré-lançamento não encontrado.";
   }
-  if (preLancamento.workId) {
-    assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
+  try {
+    if (preLancamento.workId) {
+      assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
+    }
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
   if (preLancamento.status === "FINALIZADO") {
     return "Este pré-lançamento já foi finalizado.";
@@ -443,15 +478,25 @@ export async function approvePreLancamento(id: string): Promise<string | undefin
 // pra Recusados, de onde dá pra reabrir ou excluir normalmente.
 export async function revertPreLancamentoApproval(id: string): Promise<string | undefined> {
   const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
+  try {
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const preLancamento = await prisma.preLancamento.findUnique({ where: { id } });
   if (!preLancamento) {
     return "Pré-lançamento não encontrado.";
   }
-  if (preLancamento.workId) {
-    assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
+  try {
+    if (preLancamento.workId) {
+      assertWorkAccess(await getCurrentWorkAccess(), preLancamento.workId);
+    }
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
   if (preLancamento.status !== "FINALIZADO") {
     return "Este pré-lançamento não está finalizado.";
@@ -496,8 +541,13 @@ export async function extractPreLancamentoDraft(input: {
   imageKey?: string;
 }) {
   const session = await auth();
-  assertRole(session, FINANCEIRO_EDIT_ROLES);
-  await assertCanEditFinanceiro(session);
+  try {
+    assertRole(session, FINANCEIRO_EDIT_ROLES);
+    await assertCanEditFinanceiro(session);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const [works, categorias, materials, units] = await Promise.all([
     prisma.work.findMany({ where: { status: { not: "CONCLUIDA" } }, select: { id: true, nome: true } }),

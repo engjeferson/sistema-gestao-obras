@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { invoiceFormSchema } from "@/lib/validations/notas-fiscais";
 import { createInvoiceWithFinancialEntry } from "@/server/services/nf-financial";
 import { markIncomingNFeLancada } from "@/server/actions/sefaz-radar";
@@ -124,46 +124,51 @@ function parseInvoiceForm(formData: FormData) {
 }
 
 export async function createInvoice(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("notasFiscaisSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("notasFiscaisSomenteLeitura");
 
-  const result = parseInvoiceForm(formData);
-  if ("error" in result) {
-    return result.error;
+    const result = parseInvoiceForm(formData);
+    if ("error" in result) {
+      return result.error;
+    }
+    const data = result.data;
+    if (data.workId) {
+      assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    }
+
+    const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+    const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
+    const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
+    const radarId = (formData.get("radarId") as string) || null;
+
+    const { invoice } = await createInvoiceWithFinancialEntry(
+      data,
+      session.user.id,
+      arquivoUrl,
+      arquivoXmlUrl,
+      comprovanteUrl,
+    );
+
+    if (radarId) {
+      await markIncomingNFeLancada(radarId, invoice.id);
+    }
+
+    revalidatePath("/notas-fiscais");
+    revalidatePath("/estoque");
+    revalidatePath("/cadastros/materiais");
+    if (data.workId) {
+      revalidatePath(`/obras/${data.workId}/materiais`);
+      revalidatePath(`/obras/${data.workId}/financeiro`);
+      redirect(`/obras/${data.workId}/materiais`);
+    }
+    revalidatePath("/financeiro");
+    redirect("/estoque");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = result.data;
-  if (data.workId) {
-    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  }
-
-  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
-  const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
-  const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
-  const radarId = (formData.get("radarId") as string) || null;
-
-  const { invoice } = await createInvoiceWithFinancialEntry(
-    data,
-    session.user.id,
-    arquivoUrl,
-    arquivoXmlUrl,
-    comprovanteUrl,
-  );
-
-  if (radarId) {
-    await markIncomingNFeLancada(radarId, invoice.id);
-  }
-
-  revalidatePath("/notas-fiscais");
-  revalidatePath("/estoque");
-  revalidatePath("/cadastros/materiais");
-  if (data.workId) {
-    revalidatePath(`/obras/${data.workId}/materiais`);
-    revalidatePath(`/obras/${data.workId}/financeiro`);
-    redirect(`/obras/${data.workId}/materiais`);
-  }
-  revalidatePath("/financeiro");
-  redirect("/estoque");
 }
 
 // Só dá pra editar a nota inteira (itens, estoque, conta a pagar) enquanto a conta vinculada
@@ -192,92 +197,102 @@ export async function getInvoiceEditability(invoiceId: string) {
 }
 
 export async function updateInvoice(invoiceId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("notasFiscaisSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("notasFiscaisSomenteLeitura");
 
-  const editability = await getInvoiceEditability(invoiceId);
-  if (!editability.editable) {
-    return editability.reason;
+    const editability = await getInvoiceEditability(invoiceId);
+    if (!editability.editable) {
+      return editability.reason;
+    }
+
+    const existingInvoice = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { workId: true } });
+    if (!existingInvoice) {
+      return "Nota fiscal não encontrada.";
+    }
+    const workAccess = await getCurrentWorkAccess();
+    if (existingInvoice.workId) assertWorkAccess(workAccess, existingInvoice.workId);
+
+    const result = parseInvoiceForm(formData);
+    if ("error" in result) {
+      return result.error;
+    }
+    const data = result.data;
+    if (data.workId) assertWorkAccess(workAccess, data.workId);
+
+    const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
+    const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
+    const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
+
+    await createInvoiceWithFinancialEntry(
+      data,
+      session.user.id,
+      arquivoUrl,
+      arquivoXmlUrl,
+      comprovanteUrl,
+      invoiceId,
+    );
+
+    revalidatePath("/notas-fiscais");
+    revalidatePath(`/notas-fiscais/${invoiceId}`);
+    revalidatePath("/estoque");
+    revalidatePath("/cadastros/materiais");
+    if (data.workId) {
+      revalidatePath(`/obras/${data.workId}/materiais`);
+      revalidatePath(`/obras/${data.workId}/financeiro`);
+    } else {
+      revalidatePath("/financeiro");
+    }
+    redirect(`/notas-fiscais/${invoiceId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  const existingInvoice = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { workId: true } });
-  if (!existingInvoice) {
-    return "Nota fiscal não encontrada.";
-  }
-  const workAccess = await getCurrentWorkAccess();
-  if (existingInvoice.workId) assertWorkAccess(workAccess, existingInvoice.workId);
-
-  const result = parseInvoiceForm(formData);
-  if ("error" in result) {
-    return result.error;
-  }
-  const data = result.data;
-  if (data.workId) assertWorkAccess(workAccess, data.workId);
-
-  const arquivoUrl = (formData.get("arquivoUrl") as string) || null;
-  const arquivoXmlUrl = (formData.get("arquivoXmlUrl") as string) || null;
-  const comprovanteUrl = (formData.get("comprovanteUrl") as string) || null;
-
-  await createInvoiceWithFinancialEntry(
-    data,
-    session.user.id,
-    arquivoUrl,
-    arquivoXmlUrl,
-    comprovanteUrl,
-    invoiceId,
-  );
-
-  revalidatePath("/notas-fiscais");
-  revalidatePath(`/notas-fiscais/${invoiceId}`);
-  revalidatePath("/estoque");
-  revalidatePath("/cadastros/materiais");
-  if (data.workId) {
-    revalidatePath(`/obras/${data.workId}/materiais`);
-    revalidatePath(`/obras/${data.workId}/financeiro`);
-  } else {
-    revalidatePath("/financeiro");
-  }
-  redirect(`/notas-fiscais/${invoiceId}`);
 }
 
 export async function deleteInvoice(invoiceId: string, workId: string | null): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
-  await assertModuleWrite("notasFiscaisSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "FINANCEIRO"]);
+    await assertModuleWrite("notasFiscaisSomenteLeitura");
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    include: { financialTransactions: true },
-  });
-  if (!invoice) {
-    return "Nota fiscal não encontrada.";
-  }
-  if (invoice.workId) {
-    assertWorkAccess(await getCurrentWorkAccess(), invoice.workId);
-  }
-
-  if (invoice?.financialTransactions.some((t) => t.status === "PAGO")) {
-    return "A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de excluir.";
-  }
-
-  await prisma.$transaction(async (tx) => {
-    // A exclusão do InvoiceItem em cascata só desvincula a StockMovement (ON DELETE SET NULL),
-    // não a apaga — sem isso o material ficava contando no estoque mesmo com a nota excluída.
-    await tx.stockMovement.deleteMany({ where: { invoiceItem: { invoiceId } } });
-    if (invoice?.financialTransactions.length) {
-      await tx.financialTransaction.deleteMany({ where: { invoiceId } });
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { financialTransactions: true },
+    });
+    if (!invoice) {
+      return "Nota fiscal não encontrada.";
     }
-    await tx.invoice.delete({ where: { id: invoiceId } });
-  });
+    if (invoice.workId) {
+      assertWorkAccess(await getCurrentWorkAccess(), invoice.workId);
+    }
 
-  revalidatePath("/notas-fiscais");
-  if (workId) {
-    revalidatePath(`/obras/${workId}/materiais`);
-    revalidatePath(`/obras/${workId}/financeiro`);
-  } else {
-    revalidatePath("/estoque");
-    revalidatePath("/financeiro");
+    if (invoice?.financialTransactions.some((t) => t.status === "PAGO")) {
+      return "A conta vinculada a esta nota já foi paga. Trate a conta manualmente antes de excluir.";
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // A exclusão do InvoiceItem em cascata só desvincula a StockMovement (ON DELETE SET NULL),
+      // não a apaga — sem isso o material ficava contando no estoque mesmo com a nota excluída.
+      await tx.stockMovement.deleteMany({ where: { invoiceItem: { invoiceId } } });
+      if (invoice?.financialTransactions.length) {
+        await tx.financialTransaction.deleteMany({ where: { invoiceId } });
+      }
+      await tx.invoice.delete({ where: { id: invoiceId } });
+    });
+
+    revalidatePath("/notas-fiscais");
+    if (workId) {
+      revalidatePath(`/obras/${workId}/materiais`);
+      revalidatePath(`/obras/${workId}/financeiro`);
+    } else {
+      revalidatePath("/estoque");
+      revalidatePath("/financeiro");
+    }
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  return undefined;
 }

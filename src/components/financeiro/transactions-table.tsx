@@ -22,6 +22,7 @@ import {
   UNIT_LABELS,
   formatCurrencyBRL,
   formatDateBR,
+  formatDateTimeBR,
 } from "@/lib/status-labels";
 import type { PaymentMethod } from "@/generated/prisma/enums";
 
@@ -41,10 +42,11 @@ type TransactionRow = {
   favorecidoNome: string;
   valor: unknown;
   dataVencimento: Date;
+  createdAt: Date;
   effectiveStatus: string;
   formaPagamento: string | null;
   categoria: { nome: string };
-  work: { nome: string; codigo: string } | null;
+  work: { nome: string } | null;
   invoice: { items: InvoiceItemRow[] } | null;
 };
 
@@ -110,7 +112,11 @@ export function TransactionsTable({
     const ids = Array.from(selected);
     startTransition(async () => {
       try {
-        await batchMarkAsPago(ids, (formaPagamento as PaymentMethod) || undefined);
+        const error = await batchMarkAsPago(ids, (formaPagamento as PaymentMethod) || undefined);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Contas marcadas como pagas.");
         setSelected(new Set());
         setFormaPagamento("");
@@ -152,6 +158,7 @@ export function TransactionsTable({
               <TableHead>Tipo</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Favorecido</TableHead>
+              <TableHead>Lançado em</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Valor</TableHead>
               <TableHead>Forma</TableHead>
@@ -201,8 +208,8 @@ export function TransactionsTable({
                 {showObraColumn ? (
                   <TableCell>
                     {t.work ? (
-                      <Link href={`/obras/${t.workId}`} className="hover:underline">
-                        {t.work.codigo}
+                      <Link href={`/obras/${t.workId}`} className="block max-w-[160px] truncate hover:underline" title={t.work.nome}>
+                        {t.work.nome}
                       </Link>
                     ) : (
                       "Despesa geral"
@@ -218,6 +225,7 @@ export function TransactionsTable({
                     {t.favorecidoNome}
                   </span>
                 </TableCell>
+                <TableCell className="text-muted-foreground">{formatDateTimeBR(t.createdAt)}</TableCell>
                 <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
                 <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
                 <TableCell>

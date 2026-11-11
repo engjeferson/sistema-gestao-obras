@@ -33,8 +33,16 @@ function ToggleButton({ material }: { material: MaterialRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleMaterialActive(material.id, !material.ativo);
-          router.refresh();
+          try {
+            const error = await toggleMaterialActive(material.id, !material.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar o material.");
+          }
         })
       }
     >

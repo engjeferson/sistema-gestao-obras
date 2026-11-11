@@ -27,11 +27,15 @@ function DeleteButton({ addendumId, workId, contractId }: { addendumId: string; 
   function handleConfirm() {
     startTransition(async () => {
       try {
-        await deleteContractAddendum(addendumId, workId, contractId);
+        const error = await deleteContractAddendum(addendumId, workId, contractId);
+        if (error) {
+          toast.error(error);
+          return;
+        }
         toast.success("Aditivo excluído.");
         router.refresh();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      } catch {
+        toast.error("Não foi possível excluir.");
       } finally {
         setConfirming(false);
       }

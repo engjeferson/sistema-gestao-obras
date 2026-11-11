@@ -22,8 +22,16 @@ function ToggleButton({ type }: { type: ProfessionalTypeRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleProfessionalTypeActive(type.id, !type.ativo);
-          router.refresh();
+          try {
+            const error = await toggleProfessionalTypeActive(type.id, !type.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar o tipo.");
+          }
         })
       }
     >

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { workFormSchema } from "@/lib/validations/obras";
 import { getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getMaterialCostBreakdown } from "@/server/actions/estoque";
@@ -46,93 +46,109 @@ function parseWorkForm(formData: FormData) {
 }
 
 export async function createWork(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = parseWorkForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseWorkForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    const codigo = data.codigo || (await gerarProximoCodigo());
+    const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
+    if (existingCodigo) {
+      return "Já existe uma obra com esse código.";
+    }
+
+    const work = await prisma.work.create({
+      data: {
+        nome: data.nome,
+        codigo,
+        clientId: data.clientId,
+        responsavelTecnicoId: data.responsavelTecnicoId || null,
+        encarregadoId: data.encarregadoId || null,
+        telefone: data.telefone || null,
+        endereco: data.endereco || null,
+        valorContrato: data.valorContrato,
+        areaConstruida: data.areaConstruida ?? null,
+        dataInicio: new Date(data.dataInicio),
+        dataPrevistaTermino: new Date(data.dataPrevistaTermino),
+        status: data.status,
+        observacoes: data.observacoes || null,
+      },
+    });
+
+    revalidatePath("/obras");
+    redirect(`/obras/${work.id}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  const codigo = data.codigo || (await gerarProximoCodigo());
-  const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
-  if (existingCodigo) {
-    return "Já existe uma obra com esse código.";
-  }
-
-  const work = await prisma.work.create({
-    data: {
-      nome: data.nome,
-      codigo,
-      clientId: data.clientId,
-      responsavelTecnicoId: data.responsavelTecnicoId || null,
-      encarregadoId: data.encarregadoId || null,
-      telefone: data.telefone || null,
-      endereco: data.endereco || null,
-      valorContrato: data.valorContrato,
-      areaConstruida: data.areaConstruida ?? null,
-      dataInicio: new Date(data.dataInicio),
-      dataPrevistaTermino: new Date(data.dataPrevistaTermino),
-      status: data.status,
-      observacoes: data.observacoes || null,
-    },
-  });
-
-  revalidatePath("/obras");
-  redirect(`/obras/${work.id}`);
 }
 
 export async function updateWork(workId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  const parsed = parseWorkForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseWorkForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    const codigo = data.codigo || (await gerarProximoCodigo());
+    const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
+    if (existingCodigo && existingCodigo.id !== workId) {
+      return "Já existe uma obra com esse código.";
+    }
+
+    await prisma.work.update({
+      where: { id: workId },
+      data: {
+        nome: data.nome,
+        codigo,
+        clientId: data.clientId,
+        responsavelTecnicoId: data.responsavelTecnicoId || null,
+        encarregadoId: data.encarregadoId || null,
+        telefone: data.telefone || null,
+        endereco: data.endereco || null,
+        valorContrato: data.valorContrato,
+        areaConstruida: data.areaConstruida ?? null,
+        dataInicio: new Date(data.dataInicio),
+        dataPrevistaTermino: new Date(data.dataPrevistaTermino),
+        status: data.status,
+        observacoes: data.observacoes || null,
+        renderUrl: data.renderUrl || null,
+      },
+    });
+
+    revalidatePath("/obras");
+    revalidatePath(`/obras/${workId}`);
+    redirect(`/obras/${workId}`);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  const codigo = data.codigo || (await gerarProximoCodigo());
-  const existingCodigo = await prisma.work.findUnique({ where: { codigo } });
-  if (existingCodigo && existingCodigo.id !== workId) {
-    return "Já existe uma obra com esse código.";
-  }
-
-  await prisma.work.update({
-    where: { id: workId },
-    data: {
-      nome: data.nome,
-      codigo,
-      clientId: data.clientId,
-      responsavelTecnicoId: data.responsavelTecnicoId || null,
-      encarregadoId: data.encarregadoId || null,
-      telefone: data.telefone || null,
-      endereco: data.endereco || null,
-      valorContrato: data.valorContrato,
-      areaConstruida: data.areaConstruida ?? null,
-      dataInicio: new Date(data.dataInicio),
-      dataPrevistaTermino: new Date(data.dataPrevistaTermino),
-      status: data.status,
-      observacoes: data.observacoes || null,
-      renderUrl: data.renderUrl || null,
-    },
-  });
-
-  revalidatePath("/obras");
-  revalidatePath(`/obras/${workId}`);
-  redirect(`/obras/${workId}`);
 }
 
-export async function updateWorkStatus(workId: string, status: WorkStatus) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+export async function updateWorkStatus(workId: string, status: WorkStatus): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  await prisma.work.update({ where: { id: workId }, data: { status } });
-  revalidatePath("/obras");
-  revalidatePath(`/obras/${workId}`);
+    await prisma.work.update({ where: { id: workId }, data: { status } });
+    revalidatePath("/obras");
+    revalidatePath(`/obras/${workId}`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function listWorks(filters?: { status?: WorkStatus; search?: string }) {

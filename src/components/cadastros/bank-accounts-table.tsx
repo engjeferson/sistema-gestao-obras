@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,8 +38,16 @@ function ToggleButton({ bankAccount }: { bankAccount: BankAccountRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleBankAccountActive(bankAccount.id, !bankAccount.ativo);
-          router.refresh();
+          try {
+            const error = await toggleBankAccountActive(bankAccount.id, !bankAccount.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar a conta bancária.");
+          }
         })
       }
     >

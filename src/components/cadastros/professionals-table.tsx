@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,8 +29,16 @@ function ToggleButton({ professional }: { professional: ProfessionalRow }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await toggleProfessionalActive(professional.id, !professional.ativo);
-          router.refresh();
+          try {
+            const error = await toggleProfessionalActive(professional.id, !professional.ativo);
+            if (error) {
+              toast.error(error);
+              return;
+            }
+            router.refresh();
+          } catch {
+            toast.error("Não foi possível atualizar o profissional.");
+          }
         })
       }
     >

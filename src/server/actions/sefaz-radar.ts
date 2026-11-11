@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { buscarLoteDistribuicao, buscarNFeCompletaPorChave } from "@/lib/sefaz/dist-dfe";
 import { parseResNFe, parseProcNFeSummary, type ResNFeSummary } from "@/lib/sefaz/parse-res-nfe";
 import { enviarManifestacao, TIPO_EVENTO_MANIFESTACAO } from "@/lib/sefaz/manifestacao";
@@ -243,15 +243,20 @@ export async function getSefazSyncStatus() {
 }
 
 export async function syncIncomingNFes(): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  const result = await runIncomingNFeSync();
-  if (result.status === "error") return result.message;
-  if (result.status === "skipped") {
-    return `Sincronizado recentemente — tente novamente em ${result.minutosRestantes} min.`;
+    const result = await runIncomingNFeSync();
+    if (result.status === "error") return result.message;
+    if (result.status === "skipped") {
+      return `Sincronizado recentemente — tente novamente em ${result.minutosRestantes} min.`;
+    }
+    return result.novos > 0 ? undefined : "Nenhuma nota nova encontrada.";
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  return result.novos > 0 ? undefined : "Nenhuma nota nova encontrada.";
 }
 
 /**
@@ -279,20 +284,32 @@ export async function cronSyncIncomingNFes(): Promise<SyncResult> {
   return runIncomingNFeSync();
 }
 
-export async function ignoreIncomingNFe(id: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+export async function ignoreIncomingNFe(id: string): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  await prisma.incomingNFe.update({ where: { id }, data: { status: "IGNORADA" } });
-  revalidatePath("/notas-fiscais/radar");
+    await prisma.incomingNFe.update({ where: { id }, data: { status: "IGNORADA" } });
+    revalidatePath("/notas-fiscais/radar");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
-export async function restoreIncomingNFe(id: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+export async function restoreIncomingNFe(id: string): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
 
-  await prisma.incomingNFe.update({ where: { id }, data: { status: "PENDENTE" } });
-  revalidatePath("/notas-fiscais/radar");
+    await prisma.incomingNFe.update({ where: { id }, data: { status: "PENDENTE" } });
+    revalidatePath("/notas-fiscais/radar");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export type IncomingNFeResumo = {
@@ -379,7 +396,12 @@ export async function manifestarIncomingNFe(
   observacao?: string,
 ): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, message: err.message };
+    throw err;
+  }
 
   const incoming = await prisma.incomingNFe.findUnique({ where: { id }, select: { chaveAcesso: true } });
   if (!incoming) return { ok: false, message: "Nota não encontrada." };

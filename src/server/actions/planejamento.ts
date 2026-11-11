@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole, assertWorkAccess } from "@/lib/permissions";
+import { assertRole, assertWorkAccess, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite, getCurrentWorkAccess } from "@/server/actions/permissions";
 import { getEffectiveStatus, computeCascade } from "@/lib/planning";
 import { computeCriticalPath } from "@/lib/critical-path";
@@ -113,27 +113,33 @@ export async function getCriticalPathForWork(workId: string) {
  * `baselineInicio`/`baselineFim`. Chamar de novo SOBRESCREVE a linha de base anterior — não há
  * versionamento, é uma referência fixa só (bate com a spec: "início/término planejado" único).
  */
-export async function setPlanningBaseline(workId: string) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+export async function setPlanningBaseline(workId: string): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  const tasks = await prisma.planningTask.findMany({
-    where: { workId },
-    select: { id: true, dataInicioPrevista: true, dataFimPrevista: true },
-  });
+    const tasks = await prisma.planningTask.findMany({
+      where: { workId },
+      select: { id: true, dataInicioPrevista: true, dataFimPrevista: true },
+    });
 
-  await prisma.$transaction(
-    tasks.map((t) =>
-      prisma.planningTask.update({
-        where: { id: t.id },
-        data: { baselineInicio: t.dataInicioPrevista, baselineFim: t.dataFimPrevista },
-      }),
-    ),
-  );
+    await prisma.$transaction(
+      tasks.map((t) =>
+        prisma.planningTask.update({
+          where: { id: t.id },
+          data: { baselineInicio: t.dataInicioPrevista, baselineFim: t.dataFimPrevista },
+        }),
+      ),
+    );
 
-  revalidatePath(`/obras/${workId}/planejamento`);
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function listStagesForAllWorks() {
@@ -270,63 +276,68 @@ export async function addPlanningDependencyByCode(
   ownerStageId: string | null,
   ownerTaskId: string | null,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  const roots = await listStagesWithTasks(workId);
-  const predecessor = findEntityByCode(roots, predecessorCode.trim());
-  if (!predecessor) {
-    return "Código não encontrado.";
-  }
-
-  const ownerStage = ownerStageId ? findStageById(roots, ownerStageId) : null;
-  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStage);
-
-  // Etapa-alvo ainda sem nenhuma atividade — funciona como uma "atividade solta", então não há
-  // atividade nenhuma pra criar um vínculo de verdade (PlanningDependency é sempre entre
-  // atividades). Em vez de vínculo, empurra a data de início dela pra depois do término da
-  // predecessora, uma vez só — mantendo a duração que ela já tinha, se tinha alguma.
-  if (ownerStage && ownerTaskIds.length === 0) {
-    if (!predecessor.dataFimPrevista) {
-      return "A predecessora ainda não tem data de término definida.";
+    const roots = await listStagesWithTasks(workId);
+    const predecessor = findEntityByCode(roots, predecessorCode.trim());
+    if (!predecessor) {
+      return "Código não encontrado.";
     }
-    const calendar = await getWorkCalendar(prisma, workId);
-    const newStart = addWorkingDays(predecessor.dataFimPrevista, 1, calendar);
-    const currentDuration =
-      ownerStage.dataInicioPrevista && ownerStage.dataFimPrevista
-        ? countWorkingDays(ownerStage.dataInicioPrevista, ownerStage.dataFimPrevista, calendar)
-        : 1;
-    const newEnd = addWorkingDays(newStart, currentDuration - 1, calendar);
 
-    await prisma.planningStage.update({
-      where: { id: ownerStage.id },
-      // predecessorRef não é um vínculo de verdade (não existe atividade pra sustentar isso) —
-      // só pra tela lembrar o código digitado e continuar mostrando no campo de predecessoras.
-      data: { dataInicioPrevista: newStart, dataFimPrevista: newEnd, predecessorRef: predecessorCode.trim() },
+    const ownerStage = ownerStageId ? findStageById(roots, ownerStageId) : null;
+    const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStage);
+
+    // Etapa-alvo ainda sem nenhuma atividade — funciona como uma "atividade solta", então não há
+    // atividade nenhuma pra criar um vínculo de verdade (PlanningDependency é sempre entre
+    // atividades). Em vez de vínculo, empurra a data de início dela pra depois do término da
+    // predecessora, uma vez só — mantendo a duração que ela já tinha, se tinha alguma.
+    if (ownerStage && ownerTaskIds.length === 0) {
+      if (!predecessor.dataFimPrevista) {
+        return "A predecessora ainda não tem data de término definida.";
+      }
+      const calendar = await getWorkCalendar(prisma, workId);
+      const newStart = addWorkingDays(predecessor.dataFimPrevista, 1, calendar);
+      const currentDuration =
+        ownerStage.dataInicioPrevista && ownerStage.dataFimPrevista
+          ? countWorkingDays(ownerStage.dataInicioPrevista, ownerStage.dataFimPrevista, calendar)
+          : 1;
+      const newEnd = addWorkingDays(newStart, currentDuration - 1, calendar);
+
+      await prisma.planningStage.update({
+        where: { id: ownerStage.id },
+        // predecessorRef não é um vínculo de verdade (não existe atividade pra sustentar isso) —
+        // só pra tela lembrar o código digitado e continuar mostrando no campo de predecessoras.
+        data: { dataInicioPrevista: newStart, dataFimPrevista: newEnd, predecessorRef: predecessorCode.trim() },
+      });
+      revalidatePath(`/obras/${workId}/planejamento`);
+      return undefined;
+    }
+
+    const pairs = predecessor.taskIds.flatMap((p) =>
+      ownerTaskIds.filter((s) => s !== p).map((s) => ({ predecessorTaskId: p, successorTaskId: s })),
+    );
+    if (pairs.length === 0) {
+      return "Não foi possível relacionar — confira se não é o próprio item.";
+    }
+
+    await prisma.planningDependency.createMany({ data: pairs, skipDuplicates: true });
+
+    await prisma.$transaction(async (tx) => {
+      for (const predecessorTaskId of new Set(predecessor.taskIds)) {
+        await applyCascadeForTask(tx, workId, predecessorTaskId);
+      }
     });
+
     revalidatePath(`/obras/${workId}/planejamento`);
     return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  const pairs = predecessor.taskIds.flatMap((p) =>
-    ownerTaskIds.filter((s) => s !== p).map((s) => ({ predecessorTaskId: p, successorTaskId: s })),
-  );
-  if (pairs.length === 0) {
-    return "Não foi possível relacionar — confira se não é o próprio item.";
-  }
-
-  await prisma.planningDependency.createMany({ data: pairs, skipDuplicates: true });
-
-  await prisma.$transaction(async (tx) => {
-    for (const predecessorTaskId of new Set(predecessor.taskIds)) {
-      await applyCascadeForTask(tx, workId, predecessorTaskId);
-    }
-  });
-
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
 }
 
 export async function removeGroupedDependency(
@@ -335,23 +346,29 @@ export async function removeGroupedDependency(
   predecessorTaskId: string | null,
   ownerStageId: string | null,
   ownerTaskId: string | null,
-) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  const roots = await listStagesWithTasks(workId);
-  const predecessorTaskIds = predecessorTaskId
-    ? [predecessorTaskId]
-    : leafTaskIds(predecessorStageId ? findStageById(roots, predecessorStageId) : null);
-  const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStageId ? findStageById(roots, ownerStageId) : null);
+    const roots = await listStagesWithTasks(workId);
+    const predecessorTaskIds = predecessorTaskId
+      ? [predecessorTaskId]
+      : leafTaskIds(predecessorStageId ? findStageById(roots, predecessorStageId) : null);
+    const ownerTaskIds = ownerTaskId ? [ownerTaskId] : leafTaskIds(ownerStageId ? findStageById(roots, ownerStageId) : null);
 
-  await prisma.planningDependency.deleteMany({
-    where: { predecessorTaskId: { in: predecessorTaskIds }, successorTaskId: { in: ownerTaskIds } },
-  });
+    await prisma.planningDependency.deleteMany({
+      where: { predecessorTaskId: { in: predecessorTaskIds }, successorTaskId: { in: ownerTaskIds } },
+    });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function listStagesWithTasks(workId: string): Promise<StageTreeNode[]> {
@@ -545,29 +562,34 @@ export async function listStagesWithTasks(workId: string): Promise<StageTreeNode
 }
 
 export async function createStage(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
 
-  const parsed = stageFormSchema.safeParse({
-    workId: formData.get("workId"),
-    parentId: formData.get("parentId") || undefined,
-    nome: formData.get("nome"),
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = stageFormSchema.safeParse({
+      workId: formData.get("workId"),
+      parentId: formData.get("parentId") || undefined,
+      nome: formData.get("nome"),
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+    const parentId = data.parentId ?? null;
+
+    const ordem = parentId ? await nextChildOrdem(prisma, data.workId, parentId) : await nextStageOrdem(prisma, data.workId, null);
+    await prisma.planningStage.create({
+      data: { workId: data.workId, parentId, nome: data.nome, ordem },
+    });
+
+    revalidatePath(`/obras/${data.workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-  const parentId = data.parentId ?? null;
-
-  const ordem = parentId ? await nextChildOrdem(prisma, data.workId, parentId) : await nextStageOrdem(prisma, data.workId, null);
-  await prisma.planningStage.create({
-    data: { workId: data.workId, parentId, nome: data.nome, ordem },
-  });
-
-  revalidatePath(`/obras/${data.workId}/planejamento`);
-  return undefined;
 }
 
 async function checkStageAccess(stageId: string): Promise<string | undefined> {
@@ -575,7 +597,12 @@ async function checkStageAccess(stageId: string): Promise<string | undefined> {
   if (!stage) {
     return "Etapa não encontrada.";
   }
-  assertWorkAccess(await getCurrentWorkAccess(), stage.workId);
+  try {
+    assertWorkAccess(await getCurrentWorkAccess(), stage.workId);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
   return undefined;
 }
 
@@ -584,23 +611,33 @@ async function checkTaskAccess(taskId: string): Promise<string | undefined> {
   if (!task) {
     return "Atividade não encontrada.";
   }
-  assertWorkAccess(await getCurrentWorkAccess(), task.workId);
+  try {
+    assertWorkAccess(await getCurrentWorkAccess(), task.workId);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
   return undefined;
 }
 
 export async function updateStageName(stageId: string, workId: string, nome: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkStageAccess(stageId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkStageAccess(stageId);
+    if (accessError) return accessError;
 
-  const trimmed = nome.trim();
-  if (!trimmed) return undefined;
+    const trimmed = nome.trim();
+    if (!trimmed) return undefined;
 
-  await prisma.planningStage.update({ where: { id: stageId }, data: { nome: trimmed } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    await prisma.planningStage.update({ where: { id: stageId }, data: { nome: trimmed } });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 /**
@@ -613,19 +650,24 @@ export async function updateStageDates(
   start: string,
   end: string,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkStageAccess(stageId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkStageAccess(stageId);
+    if (accessError) return accessError;
 
-  await prisma.planningStage.update({
-    where: { id: stageId },
-    data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
-  });
+    await prisma.planningStage.update({
+      where: { id: stageId },
+      data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
+    });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 /**
@@ -638,46 +680,61 @@ export async function updateStageProgress(
   workId: string,
   percentual: number,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkStageAccess(stageId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkStageAccess(stageId);
+    if (accessError) return accessError;
 
-  const clamped = Math.min(100, Math.max(0, percentual));
-  await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
+    const clamped = Math.min(100, Math.max(0, percentual));
+    await prisma.planningStage.update({ where: { id: stageId }, data: { percentualExecutado: clamped } });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-  revalidatePath(`/obras/${workId}/visao-geral`);
-  revalidatePath("/obras");
-  revalidatePath("/campo/obras");
-  revalidatePath("/dashboard");
-  return undefined;
+    revalidatePath(`/obras/${workId}/planejamento`);
+    revalidatePath(`/obras/${workId}/visao-geral`);
+    revalidatePath("/obras");
+    revalidatePath("/campo/obras");
+    revalidatePath("/dashboard");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 /** Limpa o código de predecessora "lembrado" numa etapa sem atividades (ver `predecessorRef`). */
 export async function clearStagePredecessorRef(stageId: string, workId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkStageAccess(stageId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkStageAccess(stageId);
+    if (accessError) return accessError;
 
-  await prisma.planningStage.update({ where: { id: stageId }, data: { predecessorRef: null } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    await prisma.planningStage.update({ where: { id: stageId }, data: { predecessorRef: null } });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function deleteStage(stageId: string, workId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkStageAccess(stageId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkStageAccess(stageId);
+    if (accessError) return accessError;
 
-  await prisma.planningStage.delete({ where: { id: stageId } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    await prisma.planningStage.delete({ where: { id: stageId } });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 /** Reordena (arrastar) as etapas/subs irmãs sob `parentId` pra bater com `orderedStageIds`. */
@@ -689,24 +746,30 @@ export async function reorderChildren(
   workId: string,
   parentId: string | null,
   orderedItems: { id: string; kind: "stage" | "task" }[],
-) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  assertWorkAccess(await getCurrentWorkAccess(), workId);
+): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
 
-  await prisma.$transaction(
-    orderedItems.map((item, index) =>
-      item.kind === "stage"
-        ? prisma.planningStage.updateMany({ where: { id: item.id, workId, parentId }, data: { ordem: index } })
-        : prisma.planningTask.updateMany({
-            where: { id: item.id, workId, stageId: parentId ?? undefined },
-            data: { ordem: index },
-          }),
-    ),
-  );
+    await prisma.$transaction(
+      orderedItems.map((item, index) =>
+        item.kind === "stage"
+          ? prisma.planningStage.updateMany({ where: { id: item.id, workId, parentId }, data: { ordem: index } })
+          : prisma.planningTask.updateMany({
+              where: { id: item.id, workId, stageId: parentId ?? undefined },
+              data: { ordem: index },
+            }),
+      ),
+    );
 
-  revalidatePath(`/obras/${workId}/planejamento`);
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 /** Move uma atividade pra outra etapa/sub (arrastar entre etapas) — entra no fim da nova lista. */
@@ -715,56 +778,66 @@ export async function moveTaskToStage(
   workId: string,
   newStageId: string,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const taskAccessError = await checkTaskAccess(taskId);
-  if (taskAccessError) return taskAccessError;
-  const stageAccessError = await checkStageAccess(newStageId);
-  if (stageAccessError) return stageAccessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const taskAccessError = await checkTaskAccess(taskId);
+    if (taskAccessError) return taskAccessError;
+    const stageAccessError = await checkStageAccess(newStageId);
+    if (stageAccessError) return stageAccessError;
 
-  const ordem = await nextChildOrdem(prisma, workId, newStageId);
-  await prisma.planningTask.update({
-    where: { id: taskId },
-    data: { stageId: newStageId, ordem },
-  });
+    const ordem = await nextChildOrdem(prisma, workId, newStageId);
+    await prisma.planningTask.update({
+      where: { id: taskId },
+      data: { stageId: newStageId, ordem },
+    });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function createTask(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
 
-  const parsed = taskFormSchema.safeParse({
-    workId: formData.get("workId"),
-    stageId: formData.get("stageId"),
-    nome: formData.get("nome"),
-    dataInicioPrevista: formData.get("dataInicioPrevista"),
-    dataFimPrevista: formData.get("dataFimPrevista"),
-  });
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = taskFormSchema.safeParse({
+      workId: formData.get("workId"),
+      stageId: formData.get("stageId"),
+      nome: formData.get("nome"),
+      dataInicioPrevista: formData.get("dataInicioPrevista"),
+      dataFimPrevista: formData.get("dataFimPrevista"),
+    });
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+
+    const ordem = await nextChildOrdem(prisma, data.workId, data.stageId);
+    await prisma.planningTask.create({
+      data: {
+        workId: data.workId,
+        stageId: data.stageId,
+        nome: data.nome,
+        ordem,
+        dataInicioPrevista: new Date(data.dataInicioPrevista),
+        dataFimPrevista: new Date(data.dataFimPrevista),
+      },
+    });
+
+    revalidatePath(`/obras/${data.workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
-
-  const ordem = await nextChildOrdem(prisma, data.workId, data.stageId);
-  await prisma.planningTask.create({
-    data: {
-      workId: data.workId,
-      stageId: data.stageId,
-      nome: data.nome,
-      ordem,
-      dataInicioPrevista: new Date(data.dataInicioPrevista),
-      dataFimPrevista: new Date(data.dataFimPrevista),
-    },
-  });
-
-  revalidatePath(`/obras/${data.workId}/planejamento`);
-  return undefined;
 }
 
 /**
@@ -774,44 +847,59 @@ export async function createTask(_prevState: string | undefined, formData: FormD
  * precisa somar 100), só não pode ser negativo.
  */
 export async function updateTaskPeso(taskId: string, workId: string, peso: number): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkTaskAccess(taskId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkTaskAccess(taskId);
+    if (accessError) return accessError;
 
-  const clamped = Math.max(0, peso);
-  await prisma.planningTask.update({ where: { id: taskId }, data: { peso: clamped } });
+    const clamped = Math.max(0, peso);
+    await prisma.planningTask.update({ where: { id: taskId }, data: { peso: clamped } });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function updateTaskName(taskId: string, workId: string, nome: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkTaskAccess(taskId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkTaskAccess(taskId);
+    if (accessError) return accessError;
 
-  const trimmed = nome.trim();
-  if (!trimmed) return undefined;
+    const trimmed = nome.trim();
+    if (!trimmed) return undefined;
 
-  await prisma.planningTask.update({ where: { id: taskId }, data: { nome: trimmed } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    await prisma.planningTask.update({ where: { id: taskId }, data: { nome: trimmed } });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function deleteTask(taskId: string, workId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkTaskAccess(taskId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkTaskAccess(taskId);
+    if (accessError) return accessError;
 
-  await prisma.planningTask.delete({ where: { id: taskId } });
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    await prisma.planningTask.delete({ where: { id: taskId } });
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function updatePlanningTaskDates(
@@ -820,28 +908,38 @@ export async function updatePlanningTaskDates(
   start: string,
   end: string,
 ): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
-  const accessError = await checkTaskAccess(taskId);
-  if (accessError) return accessError;
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+    const accessError = await checkTaskAccess(taskId);
+    if (accessError) return accessError;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.planningTask.update({
-      where: { id: taskId },
-      data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
+    await prisma.$transaction(async (tx) => {
+      await tx.planningTask.update({
+        where: { id: taskId },
+        data: { dataInicioPrevista: new Date(start), dataFimPrevista: new Date(end) },
+      });
+      await applyCascadeForTask(tx, workId, taskId);
     });
-    await applyCascadeForTask(tx, workId, taskId);
-  });
 
-  revalidatePath(`/obras/${workId}/planejamento`);
-  return undefined;
+    revalidatePath(`/obras/${workId}/planejamento`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 export async function importPlanningBulk(_prevState: string | undefined, formData: FormData) {
   const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
-  await assertModuleWrite("planejamentoSomenteLeitura");
+  try {
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    await assertModuleWrite("planejamentoSomenteLeitura");
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   let rowsParsed: unknown;
   try {
@@ -855,7 +953,12 @@ export async function importPlanningBulk(_prevState: string | undefined, formDat
     return parsed.error.issues[0]?.message ?? "Dados inválidos.";
   }
   const data = parsed.data;
-  assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  try {
+    assertWorkAccess(await getCurrentWorkAccess(), data.workId);
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 
   const etapaRows = data.rows.filter((r) => r.tipo === "ETAPA");
   const atividadeRows = data.rows.filter((r) => r.tipo === "ATIVIDADE");

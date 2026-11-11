@@ -41,9 +41,17 @@ export function CertificateForm({ status }: { status: CertificateStatus }) {
   function handleRemove() {
     if (!window.confirm("Remover o certificado digital cadastrado?")) return;
     startRemoveTransition(async () => {
-      await removeCertificate();
-      toast.success("Certificado removido.");
-      router.refresh();
+      try {
+        const error = await removeCertificate();
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        toast.success("Certificado removido.");
+        router.refresh();
+      } catch {
+        toast.error("Não foi possível remover o certificado.");
+      }
     });
   }
 

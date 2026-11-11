@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { materialFormSchema } from "@/lib/validations/materiais";
 
 export async function listMaterials() {
@@ -60,82 +60,103 @@ function parseMaterialForm(formData: FormData) {
 }
 
 export async function createMaterial(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = parseMaterialForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseMaterialForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    const existing = await prisma.material.findUnique({ where: { nome: data.nome } });
+    if (existing) {
+      return "Já existe um material com esse nome.";
+    }
+
+    await prisma.material.create({
+      data: {
+        nome: data.nome,
+        unidadePadrao: data.unidadePadrao,
+        precoUnitario: data.precoUnitario ?? null,
+        categoria: data.categoria || null,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  const existing = await prisma.material.findUnique({ where: { nome: data.nome } });
-  if (existing) {
-    return "Já existe um material com esse nome.";
-  }
-
-  await prisma.material.create({
-    data: {
-      nome: data.nome,
-      unidadePadrao: data.unidadePadrao,
-      precoUnitario: data.precoUnitario ?? null,
-      categoria: data.categoria || null,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/materiais");
   redirect("/cadastros/materiais");
 }
 
 export async function updateMaterial(materialId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const parsed = parseMaterialForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseMaterialForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+
+    await prisma.material.update({
+      where: { id: materialId },
+      data: {
+        nome: data.nome,
+        unidadePadrao: data.unidadePadrao,
+        precoUnitario: data.precoUnitario ?? null,
+        categoria: data.categoria || null,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-
-  await prisma.material.update({
-    where: { id: materialId },
-    data: {
-      nome: data.nome,
-      unidadePadrao: data.unidadePadrao,
-      precoUnitario: data.precoUnitario ?? null,
-      categoria: data.categoria || null,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/materiais");
   redirect("/cadastros/materiais");
 }
 
-export async function toggleMaterialActive(materialId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+export async function toggleMaterialActive(materialId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  await prisma.material.update({ where: { id: materialId }, data: { ativo } });
-  revalidatePath("/cadastros/materiais");
+    await prisma.material.update({ where: { id: materialId }, data: { ativo } });
+    revalidatePath("/cadastros/materiais");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 // Só pode ser excluído material que nunca entrou em nenhuma NF/entrada nem movimentação de
 // estoque (compra, saída, transferência) — se já foi usado em algum lugar, só desativar.
 export async function deleteMaterial(materialId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
 
-  const [invoiceItemsCount, stockMovementsCount] = await Promise.all([
-    prisma.invoiceItem.count({ where: { materialId } }),
-    prisma.stockMovement.count({ where: { materialId } }),
-  ]);
-  if (invoiceItemsCount > 0 || stockMovementsCount > 0) {
-    return "Este material já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
+    const [invoiceItemsCount, stockMovementsCount] = await Promise.all([
+      prisma.invoiceItem.count({ where: { materialId } }),
+      prisma.stockMovement.count({ where: { materialId } }),
+    ]);
+    if (invoiceItemsCount > 0 || stockMovementsCount > 0) {
+      return "Este material já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
+    }
+
+    await prisma.material.delete({ where: { id: materialId } });
+    revalidatePath("/cadastros/materiais");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  await prisma.material.delete({ where: { id: materialId } });
-  revalidatePath("/cadastros/materiais");
-  return undefined;
 }

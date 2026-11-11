@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { assertRole } from "@/lib/permissions";
+import { assertRole, ForbiddenError } from "@/lib/permissions";
 import { assertModuleWrite } from "@/server/actions/permissions";
 import { supplierFormSchema } from "@/lib/validations/fornecedores";
 
@@ -38,107 +38,128 @@ function parseSupplierForm(formData: FormData) {
 }
 
 export async function createSupplier(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseSupplierForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseSupplierForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const nome = data.nome.toUpperCase();
+
+    const existing = await prisma.supplier.findFirst({ where: { nome: { equals: nome, mode: "insensitive" } } });
+    if (existing) {
+      return "Já existe um fornecedor com esse nome.";
+    }
+
+    await prisma.supplier.create({
+      data: {
+        nome,
+        nomeFantasia: data.nomeFantasia || null,
+        documento: data.documento || null,
+        telefone: data.telefone || null,
+        whatsapp: data.whatsapp || null,
+        email: data.email || null,
+        endereco: data.endereco || null,
+        categoria: data.categoria,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  const nome = data.nome.toUpperCase();
-
-  const existing = await prisma.supplier.findFirst({ where: { nome: { equals: nome, mode: "insensitive" } } });
-  if (existing) {
-    return "Já existe um fornecedor com esse nome.";
-  }
-
-  await prisma.supplier.create({
-    data: {
-      nome,
-      nomeFantasia: data.nomeFantasia || null,
-      documento: data.documento || null,
-      telefone: data.telefone || null,
-      whatsapp: data.whatsapp || null,
-      email: data.email || null,
-      endereco: data.endereco || null,
-      categoria: data.categoria,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/fornecedores");
   redirect("/cadastros/fornecedores");
 }
 
 export async function updateSupplier(supplierId: string, _prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const parsed = parseSupplierForm(formData);
-  if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    const parsed = parseSupplierForm(formData);
+    if (!parsed.success) {
+      return parsed.error.issues[0]?.message ?? "Dados inválidos.";
+    }
+    const data = parsed.data;
+    const nome = data.nome.toUpperCase();
+
+    const existing = await prisma.supplier.findFirst({
+      where: { nome: { equals: nome, mode: "insensitive" }, id: { not: supplierId } },
+    });
+    if (existing) {
+      return "Já existe um fornecedor com esse nome.";
+    }
+
+    await prisma.supplier.update({
+      where: { id: supplierId },
+      data: {
+        nome,
+        nomeFantasia: data.nomeFantasia || null,
+        documento: data.documento || null,
+        telefone: data.telefone || null,
+        whatsapp: data.whatsapp || null,
+        email: data.email || null,
+        endereco: data.endereco || null,
+        categoria: data.categoria,
+        observacoes: data.observacoes || null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-  const data = parsed.data;
-  const nome = data.nome.toUpperCase();
-
-  const existing = await prisma.supplier.findFirst({
-    where: { nome: { equals: nome, mode: "insensitive" }, id: { not: supplierId } },
-  });
-  if (existing) {
-    return "Já existe um fornecedor com esse nome.";
-  }
-
-  await prisma.supplier.update({
-    where: { id: supplierId },
-    data: {
-      nome,
-      nomeFantasia: data.nomeFantasia || null,
-      documento: data.documento || null,
-      telefone: data.telefone || null,
-      whatsapp: data.whatsapp || null,
-      email: data.email || null,
-      endereco: data.endereco || null,
-      categoria: data.categoria,
-      observacoes: data.observacoes || null,
-    },
-  });
 
   revalidatePath("/cadastros/fornecedores");
   redirect("/cadastros/fornecedores");
 }
 
-export async function toggleSupplierActive(supplierId: string, ativo: boolean) {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+export async function toggleSupplierActive(supplierId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  await prisma.supplier.update({ where: { id: supplierId }, data: { ativo } });
-  revalidatePath("/cadastros/fornecedores");
+    await prisma.supplier.update({ where: { id: supplierId }, data: { ativo } });
+    revalidatePath("/cadastros/fornecedores");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 // Só pode ser excluído fornecedor que nunca entrou em nenhuma NF, lançamento financeiro ou
 // contrato — se já foi usado em algum lugar, só desativar. Serve pra limpar duplicatas (ex: um
 // fornecedor cadastrado duas vezes com maiúsculas diferentes) depois de reatribuir os lançamentos.
 export async function deleteSupplier(supplierId: string): Promise<string | undefined> {
-  const session = await auth();
-  assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
-  await assertModuleWrite("cadastrosSomenteLeitura");
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO", "FINANCEIRO"]);
+    await assertModuleWrite("cadastrosSomenteLeitura");
 
-  const [invoicesCount, transactionsCount, contractsCount] = await Promise.all([
-    prisma.invoice.count({ where: { supplierId } }),
-    prisma.financialTransaction.count({ where: { supplierId } }),
-    prisma.contract.count({ where: { contratadoSupplierId: supplierId } }),
-  ]);
-  if (invoicesCount > 0 || transactionsCount > 0 || contractsCount > 0) {
-    return "Este fornecedor já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
+    const [invoicesCount, transactionsCount, contractsCount] = await Promise.all([
+      prisma.invoice.count({ where: { supplierId } }),
+      prisma.financialTransaction.count({ where: { supplierId } }),
+      prisma.contract.count({ where: { contratadoSupplierId: supplierId } }),
+    ]);
+    if (invoicesCount > 0 || transactionsCount > 0 || contractsCount > 0) {
+      return "Este fornecedor já foi utilizado e não pode ser excluído. Desative-o em vez disso.";
+    }
+
+    await prisma.supplier.delete({ where: { id: supplierId } });
+    revalidatePath("/cadastros/fornecedores");
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
   }
-
-  await prisma.supplier.delete({ where: { id: supplierId } });
-  revalidatePath("/cadastros/fornecedores");
-  return undefined;
 }
 
 export async function getSupplierDetail(supplierId: string) {
