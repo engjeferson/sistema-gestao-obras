@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Layers } from "lucide-react";
+import { ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -70,6 +70,7 @@ export function TransactionsTable({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [materiaisDe, setMateriaisDe] = useState<TransactionRow | null>(null);
   const [confirmBatchOpen, setConfirmBatchOpen] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState("");
@@ -92,6 +93,15 @@ export function TransactionsTable({
       return next.size === prev.size ? prev : next;
     });
   }, [transactions]);
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -129,6 +139,7 @@ export function TransactionsTable({
   }
 
   const hasFooter = (showSelection && selected.size > 0) || !!footerTotals;
+  const detailColSpan = 8 + (showSelection ? 1 : 0);
 
   return (
     <>
@@ -143,6 +154,7 @@ export function TransactionsTable({
           <TableHeader>
             <TableRow>
               <TableHead className="w-8" />
+              <TableHead className="w-8" />
               {showSelection ? (
                 <TableHead className="w-10">
                   <input
@@ -154,14 +166,9 @@ export function TransactionsTable({
                 </TableHead>
               ) : null}
               <TableHead>Descrição</TableHead>
-              {showObraColumn ? <TableHead>Obra</TableHead> : null}
-              <TableHead>Tipo</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Favorecido</TableHead>
               <TableHead>Lançado em</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead>Forma</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -169,8 +176,10 @@ export function TransactionsTable({
           <TableBody>
             {transactions.map((t) => {
               const items = t.invoice?.items ?? [];
+              const isExpanded = expanded.has(t.id);
               return (
-              <TableRow key={t.id}>
+              <Fragment key={t.id}>
+              <TableRow>
                 <TableCell>
                   {items.length > 0 ? (
                     <button
@@ -182,6 +191,16 @@ export function TransactionsTable({
                       <Layers className="size-4" />
                     </button>
                   ) : null}
+                </TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(t.id)}
+                    className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title={isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
+                  >
+                    {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                  </button>
                 </TableCell>
                 {showSelection ? (
                   <TableCell>
@@ -204,37 +223,20 @@ export function TransactionsTable({
                       {t.descricao}
                     </span>
                   )}
-                </TableCell>
-                {showObraColumn ? (
-                  <TableCell>
-                    {t.work ? (
-                      <Link href={`/obras/${t.workId}`} className="block max-w-[160px] truncate hover:underline" title={t.work.nome}>
-                        {t.work.nome}
-                      </Link>
-                    ) : (
-                      "Despesa geral"
-                    )}
-                  </TableCell>
-                ) : null}
-                <TableCell>
-                  <Badge variant={TRANSACTION_TYPE_BADGE[t.tipo]}>{TRANSACTION_TYPE_LABELS[t.tipo]}</Badge>
-                </TableCell>
-                <TableCell>{t.categoria.nome}</TableCell>
-                <TableCell>
-                  <span title={t.favorecidoNome} className="block max-w-[160px] truncate">
-                    {t.favorecidoNome}
-                  </span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {showObraColumn ? (
+                      <Badge variant="outline" className="max-w-[140px]">
+                        <span className="min-w-0 truncate">{t.work ? t.work.nome : "Despesa geral"}</span>
+                      </Badge>
+                    ) : null}
+                    <Badge variant="outline" className="max-w-[140px]">
+                      <span className="min-w-0 truncate">{t.categoria.nome}</span>
+                    </Badge>
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{formatDateTimeBR(t.createdAt)}</TableCell>
                 <TableCell>{formatDateBR(t.dataVencimento)}</TableCell>
                 <TableCell>{formatCurrencyBRL(Number(t.valor))}</TableCell>
-                <TableCell>
-                  {t.formaPagamento ? (
-                    <Badge variant="outline">{PAYMENT_METHOD_LABELS[t.formaPagamento] ?? t.formaPagamento}</Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </TableCell>
                 <TableCell>
                   <Badge
                     variant={TRANSACTION_STATUS_BADGE[t.effectiveStatus]}
@@ -255,6 +257,28 @@ export function TransactionsTable({
                   ) : null}
                 </TableCell>
               </TableRow>
+              {isExpanded ? (
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableCell colSpan={detailColSpan} className="py-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {t.work ? (
+                        <Link href={`/obras/${t.workId}`} className="hover:underline">
+                          <Badge variant="outline">{t.work.nome}</Badge>
+                        </Link>
+                      ) : (
+                        <Badge variant="outline">Despesa geral</Badge>
+                      )}
+                      <Badge variant={TRANSACTION_TYPE_BADGE[t.tipo]}>{TRANSACTION_TYPE_LABELS[t.tipo]}</Badge>
+                      <Badge variant="outline">{t.categoria.nome}</Badge>
+                      <Badge variant="outline">{t.favorecidoNome}</Badge>
+                      {t.formaPagamento ? (
+                        <Badge variant="outline">{PAYMENT_METHOD_LABELS[t.formaPagamento] ?? t.formaPagamento}</Badge>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              </Fragment>
               );
             })}
           </TableBody>
