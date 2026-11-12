@@ -253,7 +253,11 @@ export function TransactionsTable({
                     <div className="flex flex-wrap items-center gap-1.5">
                       {showObraColumn ? (
                         t.work ? (
-                          <Link href={`/obras/${t.workId}`} className="hover:underline">
+                          <Link
+                            href={`/financeiro?workId=${t.workId}`}
+                            title={`Ver todos os lançamentos de ${t.work.nome}`}
+                            className="hover:underline"
+                          >
                             <Badge variant="outline">{t.work.nome}</Badge>
                           </Link>
                         ) : (
