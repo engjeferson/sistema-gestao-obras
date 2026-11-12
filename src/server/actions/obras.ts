@@ -263,8 +263,6 @@ export async function getWork(workId: string) {
   });
 }
 
-const ACTIVE_STATUSES = ["PLANEJAMENTO", "EM_ANDAMENTO"] as const;
-
 export async function getObrasDashboard() {
   const workAccess = await getCurrentWorkAccess();
   const workWhere = workAccess !== null ? { id: { in: workAccess } } : {};
@@ -383,17 +381,22 @@ export async function getObrasDashboard() {
       0,
       Math.floor((hoje.getTime() - work.dataInicio.getTime()) / (1000 * 60 * 60 * 24)),
     );
+    const percentualExecutado = progressoByWork.get(work.id) ?? 0;
+    // Auto-cura: assim que a obra bate 100% de execução, o status vira Concluída sozinho — mesma
+    // ideia do getEffectiveStatus das etapas/atividades, mas só nessa direção (nunca volta pra
+    // Em andamento sozinho se o percentual cair depois, pra não desfazer uma conclusão manual).
+    const status = percentualExecutado >= 100 && work.status !== "CONCLUIDA" ? "CONCLUIDA" : work.status;
     return {
       id: work.id,
       codigo: work.codigo,
       nome: work.nome,
-      status: work.status,
+      status,
       ativo: work.ativo,
       client: work.client,
       responsavelTecnico: work.responsavelTecnico,
       encarregado: work.encarregado,
       dataPrevistaTermino: work.dataPrevistaTermino,
-      percentualExecutado: progressoByWork.get(work.id) ?? 0,
+      percentualExecutado,
       diasDecorridos,
       // Mesma base de custo do campo "Custo total da obra" logo abaixo (não-material qualquer
       // status + material via estoque) — antes usava só despesas pagas (sem material nenhum),
@@ -405,7 +408,14 @@ export async function getObrasDashboard() {
     };
   });
 
-  const ativasCount = works.filter((w) => (ACTIVE_STATUSES as readonly string[]).includes(w.status)).length;
+  const concludedIds = works
+    .filter((w) => (progressoByWork.get(w.id) ?? 0) >= 100 && w.status !== "CONCLUIDA")
+    .map((w) => w.id);
+  if (concludedIds.length > 0) {
+    await prisma.work.updateMany({ where: { id: { in: concludedIds } }, data: { status: "CONCLUIDA" } });
+  }
+
+  const ativasCount = works.filter((w) => w.ativo).length;
 
   return {
     works: rows,
