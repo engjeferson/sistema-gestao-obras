@@ -151,6 +151,22 @@ export async function updateWorkStatus(workId: string, status: WorkStatus): Prom
   }
 }
 
+export async function toggleWorkActive(workId: string, ativo: boolean): Promise<string | undefined> {
+  try {
+    const session = await auth();
+    assertRole(session, ["ADMINISTRADOR", "ENGENHEIRO"]);
+    assertWorkAccess(await getCurrentWorkAccess(), workId);
+
+    await prisma.work.update({ where: { id: workId }, data: { ativo } });
+    revalidatePath("/obras");
+    revalidatePath(`/obras/${workId}`);
+    return undefined;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
+}
+
 export async function listWorks(filters?: { status?: WorkStatus; search?: string }) {
   const workAccess = await getCurrentWorkAccess();
   return prisma.work.findMany({
@@ -372,6 +388,7 @@ export async function getObrasDashboard() {
       codigo: work.codigo,
       nome: work.nome,
       status: work.status,
+      ativo: work.ativo,
       client: work.client,
       responsavelTecnico: work.responsavelTecnico,
       encarregado: work.encarregado,
