@@ -357,6 +357,7 @@ model Work {
   dataInicio           DateTime   @db.Date
   dataPrevistaTermino  DateTime   @db.Date
   status               WorkStatus @default(PLANEJAMENTO)
+  ativo                Boolean    @default(true)
   observacoes          String?
   workingWeekdays      Int[]      @default([1, 2, 3, 4, 5])
   createdAt            DateTime   @default(now())

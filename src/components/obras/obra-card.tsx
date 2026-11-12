@@ -20,6 +20,7 @@ import {
 import { getInitials } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import type { ObraDashboardRow } from "@/server/actions/obras";
+import { ObraActiveToggle } from "@/components/obras/obra-active-toggle";
 
 function PersonMini({ label, person }: { label: string; person: { nome: string } | null }) {
   return (
@@ -60,14 +61,17 @@ export function ObraCard({
           <PersonMini label="Encarregado" person={obra.encarregado} />
         </div>
 
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href={`/obras/${obra.id}`} className="truncate font-heading text-base font-semibold hover:text-primary">
-              {obra.nome}
-            </Link>
-            <Badge variant={WORK_STATUS_BADGE[obra.status]}>{WORK_STATUS_LABELS[obra.status]}</Badge>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Link href={`/obras/${obra.id}`} className="truncate font-heading text-base font-semibold hover:text-primary">
+                {obra.nome}
+              </Link>
+              <Badge variant={WORK_STATUS_BADGE[obra.status]}>{WORK_STATUS_LABELS[obra.status]}</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">{obra.codigo}</p>
           </div>
-          <p className="text-xs text-muted-foreground">{obra.codigo}</p>
+          <ObraActiveToggle workId={obra.id} ativo={obra.ativo} />
         </div>
 
         <div className="flex flex-col gap-1">
