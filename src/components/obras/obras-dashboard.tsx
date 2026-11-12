@@ -23,10 +23,7 @@ import { normalizeSearch } from "@/lib/text";
 import { formatCurrencyBRL } from "@/lib/status-labels";
 import { cn } from "@/lib/utils";
 import type { ObraDashboardRow } from "@/server/actions/obras";
-import type { WorkStatus } from "@/generated/prisma/enums";
 import type { FinancePermissions } from "@/lib/finance-permissions";
-
-const ACTIVE_STATUSES: WorkStatus[] = ["PLANEJAMENTO", "EM_ANDAMENTO"];
 
 type StatusTab = "todas" | "ativas" | "inativas";
 
@@ -58,8 +55,8 @@ export function ObrasDashboard({
   const filtered = useMemo(() => {
     const q = normalizeSearch(search);
     return works.filter((obra) => {
-      if (statusTab === "ativas" && !ACTIVE_STATUSES.includes(obra.status)) return false;
-      if (statusTab === "inativas" && ACTIVE_STATUSES.includes(obra.status)) return false;
+      if (statusTab === "ativas" && !obra.ativo) return false;
+      if (statusTab === "inativas" && obra.ativo) return false;
       if (clientId && obra.client?.id !== clientId) return false;
       if (q && ![obra.nome, obra.codigo].some((field) => normalizeSearch(field).includes(q))) return false;
       return true;
