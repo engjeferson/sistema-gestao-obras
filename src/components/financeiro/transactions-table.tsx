@@ -262,7 +262,13 @@ export function TransactionsTable({
                       ) : null}
                       <Badge variant={TRANSACTION_TYPE_BADGE[t.tipo]}>{TRANSACTION_TYPE_LABELS[t.tipo]}</Badge>
                       <Badge variant="outline">{t.categoria.nome}</Badge>
-                      <Badge variant="outline">{t.favorecidoNome}</Badge>
+                      <Link
+                        href={`/financeiro?favorecido=${encodeURIComponent(t.favorecidoNome)}`}
+                        title={`Ver todos os lançamentos com ${t.favorecidoNome}`}
+                        className="hover:underline"
+                      >
+                        <Badge variant="outline">{t.favorecidoNome}</Badge>
+                      </Link>
                       {t.formaPagamento ? (
                         <Badge variant="outline">{PAYMENT_METHOD_LABELS[t.formaPagamento] ?? t.formaPagamento}</Badge>
                       ) : null}
