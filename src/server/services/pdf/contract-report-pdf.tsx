@@ -134,6 +134,10 @@ export function ContractReportPdfDocument({ contract, company, logoBase64, origi
         <View style={styles.body}>
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
+              <Text style={styles.metaLabel}>Obra</Text>
+              <Text style={styles.metaValue}>{contract.work.nome}</Text>
+            </View>
+            <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Tipo</Text>
               <Text style={styles.metaValue}>{CONTRACT_TYPE_LABELS[contract.tipo]}</Text>
             </View>

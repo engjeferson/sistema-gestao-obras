@@ -82,6 +82,7 @@ export async function getContract(contractId: string) {
   return prisma.contract.findUnique({
     where: { id: contractId },
     include: {
+      work: { select: { nome: true, codigo: true } },
       measurements: {
         include: { financialTransaction: true, attachments: { orderBy: { createdAt: "asc" } } },
         orderBy: { numero: "desc" },
