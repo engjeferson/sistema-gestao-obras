@@ -45,7 +45,7 @@ export function PortalPhotoGallery({ photos: allPhotos }: { photos: Photo[] }) {
       </div>
 
       <Dialog open={current !== null} onOpenChange={(open) => !open && setOpenIndex(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-4xl">
           <DialogTitle className="sr-only">{current?.descricao ?? "Foto da obra"}</DialogTitle>
           {current ? (
             <div className="flex flex-col gap-2">
@@ -65,7 +65,7 @@ export function PortalPhotoGallery({ photos: allPhotos }: { photos: Photo[] }) {
                 <img
                   src={current.url}
                   alt={current.descricao ?? "Foto da obra"}
-                  className="max-h-[50vh] w-full rounded-md object-contain"
+                  className="max-h-[80vh] w-full rounded-md object-contain"
                 />
                 {photos.length > 1 ? (
                   <Button
