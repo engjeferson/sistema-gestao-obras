@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { formatDateBR } from "@/lib/status-labels";
 
-type Photo = { url: string | null; descricao: string | null };
+type Photo = { url: string | null; descricao: string | null; data: Date };
 
 export function PortalPhotoGallery({ photos: allPhotos }: { photos: Photo[] }) {
-  const photos = allPhotos.filter((foto): foto is Photo & { url: string } => Boolean(foto.url));
+  const photos = useMemo(
+    () => allPhotos.filter((foto): foto is Photo & { url: string } => Boolean(foto.url)),
+    [allPhotos],
+  );
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const current = openIndex !== null ? photos[openIndex] : null;
 
@@ -79,6 +83,7 @@ export function PortalPhotoGallery({ photos: allPhotos }: { photos: Photo[] }) {
                   </Button>
                 ) : null}
               </div>
+              <p className="text-xs text-muted-foreground">Foto de {formatDateBR(current.data)}</p>
               {current.descricao ? <p className="text-sm text-muted-foreground">{current.descricao}</p> : null}
               {photos.length > 1 ? (
                 <p className="text-center text-xs text-muted-foreground">

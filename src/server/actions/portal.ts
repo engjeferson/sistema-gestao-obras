@@ -158,6 +158,7 @@ export async function getPortalDayDetails(token: string, dateStr: string) {
     fotos: rdo.photos.map((photo) => ({
       url: portalFileUrl(token, photo.url),
       descricao: photo.descricao,
+      data: rdo.data,
     })),
   }));
 }
@@ -183,7 +184,7 @@ export async function getPortalStagePhotos(token: string, stageId: string) {
         },
       },
     },
-    select: { photos: { orderBy: { ordem: "asc" } } },
+    select: { data: true, photos: { orderBy: { ordem: "asc" } } },
     orderBy: { data: "asc" },
   });
 
@@ -191,6 +192,7 @@ export async function getPortalStagePhotos(token: string, stageId: string) {
     rdo.photos.map((photo) => ({
       url: portalFileUrl(token, photo.url),
       descricao: photo.descricao,
+      data: rdo.data,
     })),
   );
 
